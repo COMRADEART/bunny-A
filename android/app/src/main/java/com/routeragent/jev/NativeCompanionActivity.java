@@ -2,6 +2,7 @@ package com.routeragent.jev;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -23,9 +24,8 @@ import android.widget.TextView;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.text.DateFormat;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -34,7 +34,6 @@ public final class NativeCompanionActivity extends Activity {
     private static final int BG=Color.rgb(11,16,27), PANEL=Color.rgb(25,32,45), ELEVATED=Color.rgb(34,42,58),
             FG=Color.rgb(237,242,250), MUTED=Color.rgb(164,179,201), ACCENT=Color.rgb(121,170,255),
             WARN=Color.rgb(240,207,143), DANGER=Color.rgb(255,164,168), SUCCESS=Color.rgb(134,232,171);
-    private static final long CHAT_TRACK_LIMIT_MS=10*60_000;
 
     // Reads and commands run on separate threads so Stop never waits behind a state request.
     private final ExecutorService reads=Executors.newSingleThreadExecutor();
@@ -56,22 +55,22 @@ public final class NativeCompanionActivity extends Activity {
     private TextView statusView;
 
     private int activeTab=0; // 0 = Tasks, 1 = Chat, 2 = System
-    private final List<ChatMessage> chatHistory=new ArrayList<>();
+    // Process-wide so a rotated or recreated screen keeps every message's state; open messages are also stored (ChatTurn.encode).
+    private static ChatTurn.Book chat;
+    private SharedPreferences chatStore;
     private String chatDraft="";
-    private String pendingChatTaskId;
-    private long pendingChatSince;
-    private int chatVersion;
-
-    private static final class ChatMessage {
-        final String sender, text;
-        final boolean isUser;
-        ChatMessage(String sender, String text, boolean isUser) { this.sender=sender; this.text=text; this.isUser=isUser; }
-    }
 
     private final Runnable poll=new Runnable() { @Override public void run() { pollNow(); } };
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state); store=new NativeSessionStore(this);
+        // Rotation recreates the screen: keep the open tab and the unsent draft.
+        if(state!=null) { activeTab=state.getInt("tab",0); chatDraft=state.getString("draft",""); }
+        chatStore=getSharedPreferences("native_chat_v1",MODE_PRIVATE);
+        // A new process restores open messages from storage; a recreated screen keeps the live ones. Either way a send
+        // started by an earlier screen can no longer report here, so it becomes "outcome unknown" (Book.interrupted).
+        if(chat==null) chat=ChatTurn.Book.decode(chatStore.getString("turns",null)); else chat.interrupted();
+        saveChat();
         root=new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(BG);
         root.setOnApplyWindowInsetsListener((view,insets) -> {
             if(Build.VERSION.SDK_INT>=30) Insets30.apply(view,insets);
@@ -84,14 +83,15 @@ public final class NativeCompanionActivity extends Activity {
         reads.execute(() -> {
             try {
                 NativeSessionStore.Session saved=store.load();
-                post(() -> { session=saved; if(saved==null) pairing(null); else schedulePoll(0); });
+                post(() -> { session=saved; if(saved==null) pairing(null); else { schedulePoll(0); reconcileOpen(); } });
             } catch(Exception e) {
                 post(() -> pairing("This phone could not unlock its protected session (Android Keystore). Revoke the old device on Windows, then pair again."));
             }
         });
     }
 
-    @Override protected void onStart() { super.onStart(); started=true; if(session!=null) schedulePoll(0); }
+    @Override protected void onSaveInstanceState(Bundle out) { super.onSaveInstanceState(out); out.putInt("tab",activeTab); out.putString("draft",chatDraft); }
+    @Override protected void onStart() { super.onStart(); started=true; if(session!=null) { schedulePoll(0); reconcileOpen(); } }
     @Override protected void onStop() { started=false; main.removeCallbacks(poll); super.onStop(); }
     @Override protected void onDestroy() {
         destroyed=true;
@@ -113,7 +113,7 @@ public final class NativeCompanionActivity extends Activity {
     // POLLING (HTTP polling, not streaming)
     // ==========================================
 
-    private long pollInterval() { return PollPolicy.interval(pendingChatTaskId!=null, activeTab==0); }
+    private long pollInterval() { return PollPolicy.interval(chat.following(), activeTab==0); }
 
     private void schedulePoll(long delayMs) {
         main.removeCallbacks(poll);
@@ -139,9 +139,12 @@ public final class NativeCompanionActivity extends Activity {
         pollInFlight=false;
         // A response for an earlier session or older than one already shown never overwrites newer state.
         if(asked!=session || !policy.accept(generation)) { schedulePoll(pollInterval()); return; }
+        boolean recovered=failures>0;
         failures=0; lastFailure=null; lastSyncAt=System.currentTimeMillis();
         snapshot=fresh;
         trackChat();
+        // Reachable again: an open message is checked once against the Host's record, never re-sent.
+        if(recovered) reconcileOpen();
         renderCurrentTab(false);
         if(statusView!=null) statusView.setText(statusLine());
         schedulePoll(pollInterval());
@@ -170,24 +173,29 @@ public final class NativeCompanionActivity extends Activity {
     }
 
     interface Done { void ok(JSONObject result); }
+    interface Failed { void failed(Exception e); }
 
     /** One command, never retried. Refusals are shown as the Host worded them. */
-    private void runCommand(String action, JSONObject data, Done done) {
+    private void runCommand(String action, JSONObject data, Done done) { runCommand(action,data,UUID.randomUUID().toString(),epoch(),done,null); }
+
+    /** With failed set, the caller shows the outcome (chat does, on the message itself); otherwise a dialog does. */
+    private void runCommand(String action, JSONObject data, String operationId, String epoch, Done done, Failed failed) {
         if(session==null) return;
         final NativeSessionStore.Session asked=session;
-        final String epoch=epoch();
         commands.execute(() -> {
             try {
-                JSONObject result=client.command(asked,epoch,action,data);
+                JSONObject result=client.command(asked,epoch,action,data,operationId);
                 post(() -> { if(done!=null) done.ok(result); schedulePoll(0); });
             } catch(Exception e) {
                 post(() -> {
-                    String message=e instanceof HostExchange.Failure ? e.getMessage() : "The request failed.";
+                    if(failed!=null) failed.failed(e);
                     if(e instanceof HostExchange.Failure && ((HostExchange.Failure) e).kind==HostExchange.Failure.AUTH) { lastFailure=(HostExchange.Failure) e; offline(); return; }
-                    int kind=e instanceof HostExchange.Failure ? ((HostExchange.Failure) e).kind : 0;
-                    // Only a Host refusal or a send that never left the phone is "not done"; the rest stay open.
-                    String title=kind==HostExchange.Failure.OUTCOME_UNKNOWN ? "Outcome unknown" : kind==HostExchange.Failure.FAILED ? "Failed, may have partly applied" : "Not done";
-                    new AlertDialog.Builder(this).setTitle(title).setMessage(message).setPositiveButton("OK",null).show();
+                    if(failed==null) {
+                        int kind=e instanceof HostExchange.Failure ? ((HostExchange.Failure) e).kind : 0;
+                        // Only a Host refusal or a send that never left the phone is "not done"; the rest stay open.
+                        String title=kind==HostExchange.Failure.OUTCOME_UNKNOWN ? "Outcome unknown" : kind==HostExchange.Failure.FAILED ? "Failed, may have partly applied" : "Not done";
+                        new AlertDialog.Builder(this).setTitle(title).setMessage(e instanceof HostExchange.Failure ? e.getMessage() : "The request failed.").setPositiveButton("OK",null).show();
+                    }
                     schedulePoll(0);
                 });
             }
@@ -370,8 +378,8 @@ public final class NativeCompanionActivity extends Activity {
     /** Rebuilds the tab only when what it shows changed, so polling does not reset scrolling or typing. */
     private void renderCurrentTab(boolean force) {
         if(snapshot==null) { if(session!=null) loading("Connecting securely to workstation…"); return; }
-        String signature=activeTab + "|" + (lastFailure==null ? "" : lastFailure.getMessage()) + "|" + chatVersion + "|" +
-                (activeTab==1 ? "" : (String.valueOf(snapshot.optJSONObject("persistentTasks")) + snapshot.optJSONObject("missions") + snapshot.optJSONObject("hostIdentity")).hashCode());
+        String signature=activeTab + "|" + (lastFailure==null ? "" : lastFailure.getMessage()) + "|" + chat.signature().hashCode() + "|" +
+                (activeTab==1 ? "" : (String.valueOf(snapshot.optJSONObject("persistentTasks")) + snapshot.optJSONObject("missions") + snapshot.optJSONObject("hostIdentity") + snapshot.optJSONArray("tasks")).hashCode());
         if(!force && signature.equals(renderedSignature)) return;
         renderedSignature=signature;
         secure(false);
@@ -442,6 +450,19 @@ public final class NativeCompanionActivity extends Activity {
             addCard(body, t.optString("title","Task"), detail, stoppable ? "ptask.cancel" : null, t.optString("id"));
             shown++;
         }
+        // Chat tasks (this projection's active and recent ones), so a message with an unknown outcome can be looked up here.
+        JSONArray chats=snapshot.optJSONArray("tasks");
+        for(int i=0; chats!=null && i<Math.min(chats.length(),15); i++) {
+            JSONObject t=chats.optJSONObject(i);
+            if(t==null) continue;
+            String state=t.optString("state","unknown");
+            if("waiting_for_approval".equals(state)) approvals++;
+            String prompt=t.optString("prompt","Chat");
+            String detail="Chat · " + state.replace('_',' ') + " · " + t.optString("provider","?") + " · " + t.optString("model","?") + " · " + DateFormat.getTimeInstance(DateFormat.SHORT).format(new Date(t.optLong("createdAt")));
+            boolean stoppable=!"completed".equals(state) && !"failed".equals(state) && !"stopped".equals(state);
+            addCard(body, prompt.length()>80 ? prompt.substring(0,80) + "…" : prompt, detail, stoppable ? "stop" : null, t.optString("id"));
+            shown++;
+        }
         if(approvals>0) banner(body, "⚖️ " + approvals + " waiting for approval", "Open Bunny A on Windows to review and decide.", ACCENT, Color.rgb(36, 46, 68));
         if(shown==0) add(body, text("No missions or tasks on the workstation.", 14, FG), 20);
         add(body, button("Refresh Now", true, v -> schedulePoll(0)), 20);
@@ -470,54 +491,138 @@ public final class NativeCompanionActivity extends Activity {
     // CHAT
     // ==========================================
 
-    private void setLastReply(String sender, String text) {
-        if(!chatHistory.isEmpty() && !chatHistory.get(chatHistory.size()-1).isUser) chatHistory.set(chatHistory.size()-1, new ChatMessage(sender, text, false));
-        else chatHistory.add(new ChatMessage(sender, text, false));
-        chatVersion++;
+    /** Only ids, the Host, the epoch and proven states are stored; never the message text, a credential or a success. */
+    private void saveChat() { chatStore.edit().putString("turns", chat.encode()).commit(); }
+
+    private void chatChanged() {
+        saveChat();
         if(activeTab==1) renderCurrentTab(false);
     }
 
-    /** Follows the pending chat task through the polled snapshot; nothing here blocks a thread. */
+    private static String str(JSONObject o, String key) { return o==null || o.isNull(key) ? null : o.optString(key, null); }
+    private static int kindOf(Exception e) { return e instanceof HostExchange.Failure ? ((HostExchange.Failure) e).kind : 0; }
+
+    /** Follows each acknowledged message's own task through the polled snapshot; nothing here blocks a thread. */
     private void trackChat() {
-        if(pendingChatTaskId==null) return;
+        String before=chat.signature();
         JSONArray tasks=snapshot.optJSONArray("tasks");
-        JSONObject t=null;
-        for(int i=0; tasks!=null && i<tasks.length(); i++) { JSONObject x=tasks.optJSONObject(i); if(x!=null && pendingChatTaskId.equals(x.optString("id"))) { t=x; break; } }
-        long elapsed=(System.currentTimeMillis()-pendingChatSince)/1000;
-        if(t==null) { if(elapsed*1000>CHAT_TRACK_LIMIT_MS) { pendingChatTaskId=null; setLastReply("Bunny", "The workstation no longer lists this chat."); } return; }
-        String state=t.optString("state",""), model=t.optString("model","model");
-        String sender="Bunny (" + t.optString("provider","?") + " · " + model + ")";
-        if("completed".equals(state)) { pendingChatTaskId=null; String out=t.optString("output",""); setLastReply(sender, out.isEmpty() ? "(The model completed with empty output.)" : out); }
-        else if("failed".equals(state)) { pendingChatTaskId=null; setLastReply(sender, "Failed: " + t.optString("error","the task failed.")); }
-        else if("stopped".equals(state)) { pendingChatTaskId=null; setLastReply(sender, "Stopped."); }
-        else if(elapsed*1000>CHAT_TRACK_LIMIT_MS) { pendingChatTaskId=null; setLastReply(sender, "No result after " + elapsed + " s. It is still on the workstation and was not stopped."); }
-        else if("waiting_for_approval".equals(state)) setLastReply(sender, "Waiting for approval on Windows.");
-        else if("running".equals(state)) setLastReply(sender, "Generating (" + elapsed + " s)…");
-        else setLastReply(sender, "Workstation state: " + state.replace('_',' ') + "…");
+        long now=System.currentTimeMillis();
+        for(ChatTurn turn : chat.turns) {
+            if(!turn.following()) continue;
+            JSONObject t=null;
+            for(int i=0; tasks!=null && i<tasks.length(); i++) { JSONObject x=tasks.optJSONObject(i); if(x!=null && turn.taskId.equals(x.optString("id"))) { t=x; break; } }
+            if(t==null) { turn.taskMissing(now); continue; }
+            String state=t.optString("state","");
+            turn.taskObserved(state, t.optString("provider","?"), t.optString("model","model"), t.optString("output",""), str(t,"error"), now);
+            approveOnce(turn, state);
+        }
+        if(!before.equals(chat.signature())) saveChat();
+    }
+
+    /** The Host lets a phone launch only local, tool-free inference; anything else waits for Windows. Asked once per message. */
+    private void approveOnce(ChatTurn turn, String taskState) {
+        if(!"waiting_for_approval".equals(taskState) || turn.approveRequested || turn.taskId==null) return;
+        turn.approveRequested=true;
+        saveChat();
+        try { runCommand("approve", new JSONObject().put("id", turn.taskId), null); } catch(Exception ignored) {}
     }
 
     private void sendChat(String prompt) {
-        if(prompt.isEmpty() || pendingChatTaskId!=null) return;
+        if(prompt.isEmpty() || session==null || chat.blocking()!=null) return;
         chatDraft="";
-        chatHistory.add(new ChatMessage("You", prompt, true));
-        chatHistory.add(new ChatMessage("Bunny", "Sending to the workstation…", false));
-        chatVersion++;
-        renderCurrentTab(false);
-        try {
-            runCommand("submit", new JSONObject().put("prompt", prompt).put("mode", "fast"), res -> {
-                JSONObject task=res.optJSONObject("task");
-                if(task==null) { setLastReply("Bunny", "The workstation did not create a task for this message."); return; }
-                pendingChatTaskId=task.optString("id");
-                pendingChatSince=System.currentTimeMillis();
-                if("waiting_for_approval".equals(task.optString("state"))) {
-                    // The Host lets a phone launch only local, tool-free inference; anything else waits for Windows.
-                    try {
-                        runCommand("approve", new JSONObject().put("id", pendingChatTaskId), started -> setLastReply("Bunny", "Running on the workstation's local model…"));
-                    } catch(Exception ignored) {}
-                }
-            });
-        } catch(Exception e) { setLastReply("Bunny", "The message could not be sent."); }
+        // The operation id is chosen and stored before sending, so a lost answer can still be looked up by it.
+        final ChatTurn turn=chat.start(prompt, UUID.randomUUID().toString(), session.hostId, epoch(), System.currentTimeMillis());
+        chatChanged();
+        JSONObject data;
+        try { data=new JSONObject().put("prompt", prompt).put("mode", "fast"); }
+        catch(Exception e) { turn.commandFailed(HostExchange.Failure.NETWORK, "The message could not be prepared. Nothing was sent."); chatChanged(); return; }
+        runCommand("submit", data, turn.operationId, turn.epoch, res -> {
+            JSONObject task=res.optJSONObject("task");
+            turn.acknowledged(str(task,"id"), System.currentTimeMillis());
+            if(task!=null) approveOnce(turn, task.optString("state"));
+            chatChanged();
+        }, e -> {
+            turn.commandFailed(kindOf(e), e instanceof HostExchange.Failure ? e.getMessage() : "The request failed.");
+            chatChanged();
+            if(turn.state==ChatTurn.State.OUTCOME_UNKNOWN) reconcile(turn);
+            // The dialog repeats the message's own line; closing it changes nothing.
+            if(kindOf(e)!=HostExchange.Failure.AUTH) new AlertDialog.Builder(this).setTitle(turn.label()).setMessage(turn.text()).setPositiveButton("OK",null).show();
+        });
     }
+
+    private void reconcileOpen() { for(ChatTurn turn : chat.turns) reconcile(turn); }
+
+    /** Read-only: asks the Host what became of this message's operation id. Never re-sends the message. */
+    private void reconcile(ChatTurn turn) {
+        final NativeSessionStore.Session asked=session;
+        if(asked==null || !started || turn.checking || !turn.needsReconcile()) return;
+        if(!asked.hostId.equals(turn.hostId)) { turn.recordGone(); chatChanged(); return; }
+        JSONObject data;
+        try { data=new JSONObject().put("operationId", turn.operationId); } catch(Exception e) { return; }
+        turn.checking=true;
+        chatChanged();
+        // Bound to the message's own epoch: a restarted Host refuses (HOST_EPOCH_CHANGED) instead of answering from a new ledger.
+        runCommand("operation.status", data, UUID.randomUUID().toString(), turn.epoch, res -> {
+            turn.checking=false;
+            JSONObject d=res.optJSONObject("data"), snap=res.optJSONObject("snapshot");
+            JSONObject identity=snap==null ? null : snap.optJSONObject("hostIdentity");
+            String opState=d==null ? "unknown" : d.optString("state","unknown");
+            turn.reconciled(identity==null ? asked.hostId : str(identity,"hostId"), str(d,"epoch"), opState, str(d,"taskId"), str(d,"error"), System.currentTimeMillis());
+            chatChanged();
+            if(turn.needsReconcile() && "in_progress".equals(opState)) main.postDelayed(() -> reconcile(turn), 5000);
+        }, e -> {
+            turn.checking=false;
+            String code=e instanceof HostExchange.Failure ? ((HostExchange.Failure) e).code : null;
+            if("HOST_EPOCH_CHANGED".equals(code) || "HOST_IDENTITY_CHANGED".equals(code)) turn.recordGone(); else turn.checkFailed();
+            chatChanged();
+        });
+    }
+
+    private int labelColor(ChatTurn turn) {
+        switch(turn.state) {
+            case COMPLETED: return SUCCESS;
+            case OUTCOME_UNKNOWN: case FAILED: case RECONCILED: return WARN;
+            case REFUSED: case NOT_SENT: return DANGER;
+            default: return MUTED;
+        }
+    }
+
+    private LinearLayout bubble(String sender, String body, boolean user, String label, int labelColor) {
+        LinearLayout bubble=new LinearLayout(this);
+        bubble.setOrientation(LinearLayout.VERTICAL);
+        bubble.setBackground(surface(user ? ELEVATED : Color.rgb(20, 28, 44), 8));
+        bubble.setPadding(dp(12), dp(8), dp(12), dp(8));
+        TextView from=text(sender, 11, user ? ACCENT : SUCCESS);
+        from.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        bubble.addView(from);
+        if(label!=null) bubble.addView(text(label, 12, labelColor));
+        TextView content=text(body, 14, FG);
+        content.setTextIsSelectable(true);
+        bubble.addView(content);
+        bubble.setContentDescription(sender + ": " + (label==null ? "" : label + ". ") + body);
+        return bubble;
+    }
+
+    /** What the user can do about a message whose outcome is open: look, never re-send it. */
+    private View recoveryActions(ChatTurn turn) {
+        LinearLayout row=new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        if(turn.needsReconcile()) {
+            Button check=button(turn.checking ? "Checking the workstation…" : "Check workstation", false, v -> reconcile(turn));
+            check.setEnabled(!turn.checking);
+            add(row, check, 8);
+        }
+        add(row, button("View workstation tasks", false, v -> { activeTab=0; renderCurrentTab(true); schedulePoll(0); }), 8);
+        if(turn.state==ChatTurn.State.OUTCOME_UNKNOWN && !turn.released)
+            add(row, button("Send a new message anyway…", false, v -> new AlertDialog.Builder(this)
+                    .setTitle("Send a new message?")
+                    .setMessage("The earlier message may already have run on the workstation. Bunny A could not confirm it and did not send it again. A new message is a separate request: if the earlier one ran, both will have run.")
+                    .setNegativeButton("Keep waiting", null)
+                    .setPositiveButton("I understand", (d, w) -> { turn.release(); chatChanged(); }).show()), 8);
+        return row;
+    }
+
+    private ChatTurn followed() { for(ChatTurn t : chat.turns) if(t.following()) return t; return null; }
 
     private void showChatTab() {
         LinearLayout body=page("Companion Chat");
@@ -529,22 +634,13 @@ public final class NativeCompanionActivity extends Activity {
         chatBox.setOrientation(LinearLayout.VERTICAL);
         chatBox.setBackground(surface(PANEL, 10));
         chatBox.setPadding(dp(12), dp(12), dp(12), dp(12));
-        if(chatHistory.isEmpty()) chatBox.addView(text("No messages yet.", 13, MUTED));
-        for(ChatMessage msg : chatHistory) {
-            LinearLayout bubble=new LinearLayout(this);
-            bubble.setOrientation(LinearLayout.VERTICAL);
-            bubble.setBackground(surface(msg.isUser ? ELEVATED : Color.rgb(20, 28, 44), 8));
-            bubble.setPadding(dp(12), dp(8), dp(12), dp(8));
-            TextView sender=text(msg.sender, 11, msg.isUser ? ACCENT : SUCCESS);
-            sender.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-            bubble.addView(sender);
-            TextView content=text(msg.text, 14, FG);
-            content.setTextIsSelectable(true);
-            bubble.addView(content);
-            bubble.setContentDescription(msg.sender + ": " + msg.text);
-            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1, -2);
-            lp.topMargin=dp(6);
-            chatBox.addView(bubble, lp);
+        if(chat.turns.isEmpty()) chatBox.addView(text("No messages yet.", 13, MUTED));
+        for(ChatTurn turn : chat.turns) {
+            String said=turn.prompt!=null ? turn.prompt : "Message sent at " + DateFormat.getTimeInstance(DateFormat.SHORT).format(new Date(turn.sentAt)) + ". Its text is not kept on this phone after Bunny A restarts.";
+            add(chatBox, bubble("You", said, true, null, MUTED), 6);
+            LinearLayout reply=bubble(turn.sender, turn.text(), false, turn.label() + (turn.checking ? " · checking the workstation…" : ""), labelColor(turn));
+            if(turn.state==ChatTurn.State.OUTCOME_UNKNOWN || turn.state==ChatTurn.State.RECONCILED) reply.addView(recoveryActions(turn));
+            add(chatBox, reply, 6);
         }
         add(body, chatBox, 14);
 
@@ -567,13 +663,15 @@ public final class NativeCompanionActivity extends Activity {
 
         LinearLayout actions=new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
-        Button sendBtn=button(pendingChatTaskId==null ? "Send" : "Waiting…", true, v -> sendChat(chatDraft.trim()));
-        sendBtn.setEnabled(pendingChatTaskId==null && lastFailure==null);
+        ChatTurn open=chat.blocking(), followed=followed();
+        Button sendBtn=button(open==null ? "Send" : open.state==ChatTurn.State.OUTCOME_UNKNOWN ? "Resolve above first" : "Waiting…", true, v -> sendChat(chatDraft.trim()));
+        sendBtn.setEnabled(open==null && lastFailure==null);
         Button stopBtn=button("Stop", false, v -> {
-            if(pendingChatTaskId==null) return;
-            try { runCommand("stop", new JSONObject().put("id", pendingChatTaskId), null); } catch(Exception ignored) {}
+            ChatTurn t=followed();
+            if(t==null) return;
+            try { runCommand("stop", new JSONObject().put("id", t.taskId), null); } catch(Exception ignored) {}
         });
-        stopBtn.setEnabled(pendingChatTaskId!=null);
+        stopBtn.setEnabled(followed!=null);
         actions.addView(sendBtn, new LinearLayout.LayoutParams(0, -2, 2f));
         LinearLayout.LayoutParams stopParams=new LinearLayout.LayoutParams(0, -2, 1f);
         stopParams.leftMargin=dp(8);
@@ -621,7 +719,7 @@ public final class NativeCompanionActivity extends Activity {
 
     private void forgetLocally() {
         boolean cleared=store.clear();
-        session=null; snapshot=null; lastFailure=null; pendingChatTaskId=null; chatHistory.clear(); chatVersion++;
+        session=null; snapshot=null; lastFailure=null; chat.turns.clear(); saveChat();
         pairing(cleared ? null : "This phone could not confirm erasing its local key. Clear Bunny A's app data in Android Settings to finish.");
     }
 
@@ -650,7 +748,7 @@ public final class NativeCompanionActivity extends Activity {
                 client.revoke(current);
                 post(() -> {
                     boolean cleared=store.clear();
-                    session=null; snapshot=null; lastFailure=null; pendingChatTaskId=null; chatHistory.clear();
+                    session=null; snapshot=null; lastFailure=null; chat.turns.clear(); saveChat();
                     pairing(cleared ? "This phone was revoked and its local key erased." : "Revoked on the workstation, but this phone could not confirm erasing its local key. Clear Bunny A's app data in Android Settings.");
                 });
             } catch(Exception ex){

@@ -5,7 +5,6 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.UUID;
 import javax.net.ssl.HttpsURLConnection;
 
 /** HTTPS only; no redirects and no workstation credentials or shell commands. */
@@ -69,10 +68,12 @@ final class NativeCompanionClient {
             return snapshot;
         } finally { c.disconnect(); }
     }
-    /** One command bound to the pinned Host and the epoch of the view it came from, with its own operation id. Never retried. */
-    JSONObject command(NativeSessionStore.Session session, String epoch, String action, JSONObject data) throws Exception {
+    /**
+     * One command bound to the pinned Host and the epoch of the view it came from. The caller chooses the operation id
+     * before sending so a lost answer can be looked up by it; each id is used for one send only. Never retried.
+     */
+    JSONObject command(NativeSessionStore.Session session, String epoch, String action, JSONObject data, String operationId) throws Exception {
         HttpsURLConnection c=open(session.origin,"api/bunny-native-v1-state","POST");
-        String operationId=UUID.randomUUID().toString();
         try {
             c.setRequestProperty("Cookie","bunny_device="+session.token);
             JSONObject payload=new JSONObject();

@@ -302,6 +302,8 @@ export type OperationOutcome = {
   status?: number;
   code?: string;
   error?: string;
+  /** MA5-S1R2: the task an applied operation created, so a client that lost the answer can follow it. */
+  taskId?: string;
 };
 export const OPERATION_ID = /^[A-Za-z0-9-]{8,64}$/;
 /**

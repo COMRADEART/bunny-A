@@ -219,6 +219,8 @@ test("T9 F06/F35/F40: Host identity and epoch expectations refuse stale views; o
     const status = await f.api("operation.status", { operationId }, device.token);
     assert.equal(status.body.data!.state, "applied");
     assert.equal(status.body.data!.action, "submit");
+    // MA5-S1R2: the ledger names the task the operation created, so a phone that lost the answer can follow it.
+    assert.equal(status.body.data!.taskId, first.body.task!.id);
     assert.equal((await f.api("operation.status", { operationId: "t9-never-sent" }, device.token)).body.data!.state, "unknown");
     // Another principal cannot read or replay this device's operation.
     const second = await f.pair("Second phone");
