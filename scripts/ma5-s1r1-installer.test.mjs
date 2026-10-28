@@ -4,12 +4,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, lstatSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, lstatSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { createHash } from "node:crypto";
 
 const windows = process.platform === "win32";
+// Launched from PowerShell 7 (e.g. a CI `pwsh` step), Windows PowerShell would inherit PS7's PSModulePath and fail to load
+// its own built-in modules (Get-FileHash "not recognized"); it rebuilds its default path when the variable is absent.
+const psEnv = (extra = {}) => { const env = { ...process.env, ...extra }; for (const k of Object.keys(env)) if (k.toLowerCase() === "psmodulepath") delete env[k]; return env; };
 const installer = process.env.BUNNY_S1R1_INSTALLER ?? join(process.cwd(), "native/windows/install-dev-candidate.ps1");
 const sha = (b) => createHash("sha256").update(b).digest("hex");
 
@@ -43,12 +46,12 @@ function candidate(dir, name, { version = "0.5.1", files = { "BunnyA.exe": "exe-
     foreach ($e in (Get-Content -LiteralPath '${spec.replace(/'/g, "''")}' -Raw | ConvertFrom-Json)) {
       $s = $z.CreateEntry($e.name).Open(); $b = [Text.Encoding]::UTF8.GetBytes($e.content); $s.Write($b, 0, $b.Length); $s.Dispose()
     }
-    $z.Dispose()`], { stdio: "pipe" });
+    $z.Dispose()`], { stdio: "pipe", env: psEnv() });
   return zip;
 }
 
 function run(args, env = {}) {
-  const r = spawnSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", installer, ...args], { encoding: "utf8", env: { ...process.env, ...env }, timeout: 120_000 });
+  const r = spawnSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", installer, ...args], { encoding: "utf8", env: psEnv(env), timeout: 120_000 });
   return { ok: r.status === 0, out: `${r.stdout}${r.stderr}`.replace(/\s+/g, " ").trim() };
 }
 
@@ -82,7 +85,8 @@ test("S1R1 installer 1-2: new install into an empty authorized folder, then upgr
     assert.ok(first.ok, first.out);
     const marker = JSON.parse(readFileSync(join(f.root, "install.json"), "utf8").replace(/^\uFEFF/, ""));
     assert.equal(marker.product, "bunny-a-windows-dev-candidate");
-    assert.equal(marker.installRoot.toLowerCase(), f.root.toLowerCase());
+    // The installer records the full path; a short 8.3 temp path (as on CI runners) is expanded, so compare resolved paths.
+    assert.equal(realpathSync.native(marker.installRoot).toLowerCase(), realpathSync.native(f.root).toLowerCase());
     assert.deepEqual([...marker.files].sort(), ["BunnyA.dll", "BunnyA.exe", "candidate.json"]);
     const second = f.install(candidate(f.base, "v2", { version: "0.5.2", files: { "BunnyA.exe": "exe-v2", "BunnyA.dll": "dll-v2", "runtimes/win/native.dll": "n" } }));
     assert.ok(second.ok, second.out);
@@ -90,7 +94,7 @@ test("S1R1 installer 1-2: new install into an empty authorized folder, then upgr
     assert.equal(readFileSync(join(f.root, "BunnyA.exe"), "utf8"), "exe-v2");
     assert.deepEqual(f.leftovers(), []);
     // The upgraded install (with a sub-folder) is itself provably owned: a further upgrade and the uninstall succeed.
-    assert.ok(f.install(candidate(f.base, "v3", { version: "0.5.3" })).ok);
+    { const r = f.install(candidate(f.base, "v3", { version: "0.5.3" })); assert.ok(r.ok, r.out); }
     const removed = f.uninstall();
     assert.ok(removed.ok, removed.out);
     assert.ok(!existsSync(f.root) && !existsSync(join(f.links, "Bunny A (Dev Candidate).lnk")));
@@ -118,7 +122,7 @@ test("S1R1 installer 3-6: an existing folder without a valid marker for this exa
     }
     // A genuine install with a user file dropped into it is no longer provably ours either.
     rmSync(f.root, { recursive: true, force: true });
-    assert.ok(f.install(pkg).ok);
+    { const r = f.install(pkg); assert.ok(r.ok, r.out); }
     writeFileSync(join(f.root, "my-notes.txt"), "user data");
     const before = tree(f.root);
     refusedUnchanged(f, f.install(candidate(f.base, "v2", { version: "0.5.2" })), before, "upgrade with an unlisted user file");
@@ -129,7 +133,7 @@ test("S1R1 installer 3-6: an existing folder without a valid marker for this exa
 test("S1R1 installer 7-8: manipulated candidates and path traversal are refused before anything changes", { skip: !windows }, () => {
   const f = fixture();
   try {
-    assert.ok(f.install(candidate(f.base, "v1")).ok);
+    { const r = f.install(candidate(f.base, "v1")); assert.ok(r.ok, r.out); }
     const before = tree(f.root);
     const good = candidate(f.base, "v2", { version: "0.5.2" });
     const tampered = candidate(f.base, "tampered", { manifest: { schema: "bunny-windows-dev-candidate.v1", version: "9", files: [{ path: "BunnyA.exe", sha256: sha(Buffer.from("something else")) }] }, files: { "BunnyA.exe": "evil" } });
@@ -167,7 +171,7 @@ test("S1R1 installer 9: junctions and links are refused, never followed", { skip
     assert.deepEqual(tree(victim), victimBefore);
     execFileSync("cmd.exe", ["/c", "rmdir", f.root], { stdio: "pipe" });
     // A genuine install that later gained a junction inside it.
-    assert.ok(f.install(pkg).ok);
+    { const r = f.install(pkg); assert.ok(r.ok, r.out); }
     execFileSync("cmd.exe", ["/c", "mklink", "/J", join(f.root, "runtimes"), victim], { stdio: "pipe" });
     assert.ok(!f.install(candidate(f.base, "v2", { version: "0.5.2" })).ok, "upgrade of an install containing a junction is refused");
     assert.ok(!f.uninstall().ok, "uninstall of an install containing a junction is refused");
@@ -180,7 +184,7 @@ test("S1R1 installer 9: junctions and links are refused, never followed", { skip
 test("S1R1 installer 10-11: a failed replacement restores the previous install exactly", { skip: !windows }, () => {
   const f = fixture();
   try {
-    assert.ok(f.install(candidate(f.base, "v1")).ok);
+    { const r = f.install(candidate(f.base, "v1")); assert.ok(r.ok, r.out); }
     const before = tree(f.root);
     const v2 = candidate(f.base, "v2", { version: "0.5.2", files: { "BunnyA.exe": "exe-v2", "BunnyA.dll": "dll-v2" } });
     for (const point of ["after-backup", "after-swap"]) {
