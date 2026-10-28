@@ -12,17 +12,21 @@ using BunnyA.Models;
 
 namespace BunnyA.Services;
 
-public enum HostFailure { CredentialsMissing, CredentialsInvalid, Unreachable, Timeout, AuthRejected, IdentityChanged, EpochChanged, Refused, Malformed, OutcomeUnknown }
+public enum HostFailure { CredentialsMissing, CredentialsInvalid, Unreachable, Timeout, AuthRejected, IdentityChanged, EpochChanged, Refused, Malformed, OutcomeUnknown, Failed }
 
-/// <summary>A classified Host failure. Only OutcomeUnknown means a command may have run; nothing is ever retried for the caller.</summary>
+/// <summary>
+/// A classified Host failure. OutcomeUnknown means a command may have run; Failed means the Host reports it failed part-way
+/// and it may have partly taken effect. Nothing is ever retried for the caller.
+/// </summary>
 public sealed class HostException : Exception
 {
     public HostFailure Kind { get; }
     public string? Code { get; }
     public string? OperationId { get; }
     public string? EpochAtSend { get; }
-    public HostException(HostFailure kind, string message, string? code = null, string? operationId = null, string? epochAtSend = null, Exception? inner = null)
-        : base(message, inner) { Kind = kind; Code = code; OperationId = operationId; EpochAtSend = epochAtSend; }
+    public string? HostIdAtSend { get; }
+    public HostException(HostFailure kind, string message, string? code = null, string? operationId = null, string? epochAtSend = null, Exception? inner = null, string? hostIdAtSend = null)
+        : base(message, inner) { Kind = kind; Code = code; OperationId = operationId; EpochAtSend = epochAtSend; HostIdAtSend = hostIdAtSend; }
 }
 
 public sealed class HostClient : IDisposable
@@ -36,6 +40,10 @@ public sealed class HostClient : IDisposable
     {
         Timeout = Timeout.InfiniteTimeSpan
     };
+
+    /// <summary>Shown whenever a command's outcome cannot be established; never replaced by a guess either way.</summary>
+    public const string Unconfirmed = "Connection interrupted. Bunny A cannot confirm whether this operation completed. It was not automatically retried. Review the current task and Host state before taking another action.";
+    public const string PartlyApplied = "The operation failed on the Host and may have partly taken effect. It was not automatically retried. Review the current task and Host state before taking another action.";
 
     public string? HostId { get; private set; }
     public string? HostEpoch { get; private set; }
@@ -168,6 +176,11 @@ public sealed class HostClient : IDisposable
         using var req = CreateRequest(HttpMethod.Post, creds, "/command");
         req.Content = JsonContent.Create(payload);
 
+        HostException Uncertain(Exception? inner) =>
+            new(HostFailure.OutcomeUnknown, Unconfirmed, operationId: operationId, epochAtSend: expectedEpoch, inner: inner, hostIdAtSend: expectedHost);
+
+        // Cancelled before anything left this process: truly not sent. Any later cancellation may follow the request.
+        token.ThrowIfCancellationRequested();
         HttpResponseMessage res;
         try
         {
@@ -177,18 +190,19 @@ public sealed class HostClient : IDisposable
         {
             throw new HostException(HostFailure.Unreachable, "The Host is not running. Nothing was sent.", inner: ex);
         }
-        catch (Exception ex) when (ex is HttpRequestException || ex is OperationCanceledException && !token.IsCancellationRequested)
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException)
         {
-            throw new HostException(HostFailure.OutcomeUnknown, "The connection ended after the request was sent; Bunny A did not retry it.", operationId: operationId, epochAtSend: expectedEpoch, inner: ex);
+            throw Uncertain(ex);
         }
 
         using (res)
         {
             string body;
             try { body = await res.Content.ReadAsStringAsync(timeout.Token); }
-            catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException && !token.IsCancellationRequested)
+            catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or IOException)
             {
-                throw new HostException(HostFailure.OutcomeUnknown, "The Host's answer was cut off; Bunny A did not retry it.", operationId: operationId, epochAtSend: expectedEpoch, inner: ex);
+                // The status line arrived but the answer did not; a non-2xx status is still not proof of no effect.
+                throw Uncertain(ex);
             }
 
             JsonElement root;
@@ -199,8 +213,7 @@ public sealed class HostClient : IDisposable
             }
             catch (JsonException ex)
             {
-                if (res.IsSuccessStatusCode)
-                    throw new HostException(HostFailure.OutcomeUnknown, "The Host accepted the request but its answer was malformed.", operationId: operationId, epochAtSend: expectedEpoch, inner: ex);
+                if (res.IsSuccessStatusCode || (int)res.StatusCode >= 500) throw Uncertain(ex);
                 throw new HostException(HostFailure.Refused, $"The Host refused the request (HTTP {(int)res.StatusCode}).");
             }
 
@@ -215,35 +228,52 @@ public sealed class HostClient : IDisposable
                 InvalidateHost();
                 throw new HostException(code == "HOST_IDENTITY_CHANGED" ? HostFailure.IdentityChanged : HostFailure.EpochChanged, message, code);
             }
+            // The Host records these as "failed": the command may have partly applied before it stopped.
+            if (code is "FAILED" or "HOST_UNAVAILABLE" || root.JsonObj("operation").Json("state") == "failed")
+                throw new HostException(HostFailure.Failed, $"{PartlyApplied} (Host: {message})", code, operationId, expectedEpoch, hostIdAtSend: expectedHost);
+            // A replayed or still-running operation id is the Host's ledger speaking, not a fresh refusal.
+            if (code == "OPERATION_IN_PROGRESS")
+                throw new HostException(HostFailure.OutcomeUnknown, $"{Unconfirmed} The Host reports it may still be executing.", code, operationId, expectedEpoch, hostIdAtSend: expectedHost);
             throw new HostException(HostFailure.Refused, message, code);
         }
     }
 
     /// <summary>
-    /// What the Host recorded for an uncertain command. The ledger lives in Host memory, so its answer is authoritative
-    /// only while the epoch is unchanged; after a restart the outcome stays unknown and the user reviews the state.
+    /// Asks the Host, once and with the original operation id, what it recorded for an uncertain command; the command itself
+    /// is never re-sent. The ledger lives in Host memory and is per epoch, so only the same Host in the same epoch can answer,
+    /// and only "applied" and "refused" settle the outcome. Everything else keeps it explicitly unknown.
     /// </summary>
     public async Task<string> ResolveOutcomeAsync(HostException uncertain, CancellationToken token = default)
     {
         if (uncertain.Kind != HostFailure.OutcomeUnknown || uncertain.OperationId == null) return uncertain.Message;
+        var op = $"(operation {uncertain.OperationId})";
         try
         {
             await GetStateAsync(token);
+            if (uncertain.HostIdAtSend == null || HostId != uncertain.HostIdAtSend)
+                return $"{Unconfirmed} A different Host answers now, so it was not asked about this operation {op}.";
             if (HostEpoch != uncertain.EpochAtSend)
-                return $"{uncertain.Message} The Host restarted since, so its outcome cannot be confirmed. Review the current state before trying again.";
-            var status = await SendCommandAsync("operation.status", new { operationId = uncertain.OperationId }, token);
-            var state = status.TryGetProperty("data", out var d) ? d.Json("state") : null;
+                return $"{Unconfirmed} The Host restarted since, and its operation record does not survive a restart {op}.";
+            var data = (await SendCommandAsync("operation.status", new { operationId = uncertain.OperationId }, token)).JsonObj("data");
+            // An answer about another operation or another epoch is not an answer about this one.
+            var state = data.Json("operationId") == uncertain.OperationId && data.Json("epoch") == uncertain.EpochAtSend ? data.Json("state") : null;
             return state switch
             {
-                "applied" => $"{uncertain.Message} The Host confirms it was applied (operation {uncertain.OperationId}).",
-                "failed" => $"{uncertain.Message} The Host recorded it as refused (operation {uncertain.OperationId}); nothing changed.",
-                "in_progress" => $"{uncertain.Message} The Host is still applying it (operation {uncertain.OperationId}).",
-                _ => $"{uncertain.Message} The Host has no record of operation {uncertain.OperationId}; it did not run.",
+                "applied" => $"The Host confirms this operation was applied {op}.",
+                "refused" => $"The Host confirms this operation was refused {op}." + (data.Json("error") is { Length: > 0 } why ? $" {why}" : ""),
+                "failed" => $"{PartlyApplied} {op}",
+                "in_progress" => $"{Unconfirmed} The Host reports it may still be executing {op}.",
+                "unknown" => $"{Unconfirmed} The Host has no record it can match to this operation; the record may have expired or the request may never have arrived {op}.",
+                _ => $"{Unconfirmed} The Host's operation record could not be read {op}.",
             };
         }
         catch (HostException)
         {
-            return $"{uncertain.Message} The Host cannot be asked right now; review the state when it reconnects.";
+            return $"{Unconfirmed} The Host cannot be asked right now {op}.";
+        }
+        catch (OperationCanceledException)
+        {
+            return $"{Unconfirmed} Checking was cancelled {op}.";
         }
     }
 

@@ -49,7 +49,7 @@ public final class NativeCompanionActivity extends Activity {
     private boolean started, pollInFlight;
     private final PollPolicy policy=new PollPolicy();
     private int failures;
-    private NativeCompanionClient.Failure lastFailure;
+    private HostExchange.Failure lastFailure;
     private long lastSyncAt, nextRetryAt;
     private JSONObject snapshot;
     private String renderedSignature="";
@@ -150,15 +150,15 @@ public final class NativeCompanionActivity extends Activity {
     private void onPollFailed(int generation, NativeSessionStore.Session asked, Exception e) {
         pollInFlight=false;
         if(asked!=session) return;
-        lastFailure=e instanceof NativeCompanionClient.Failure ? (NativeCompanionClient.Failure) e
-                : new NativeCompanionClient.Failure(NativeCompanionClient.Failure.NETWORK,"The workstation could not be reached.",null,0);
-        if(lastFailure.kind==NativeCompanionClient.Failure.AUTH || lastFailure.kind==NativeCompanionClient.Failure.IDENTITY) {
+        lastFailure=e instanceof HostExchange.Failure ? (HostExchange.Failure) e
+                : new HostExchange.Failure(HostExchange.Failure.NETWORK,"The workstation could not be reached.",null,0);
+        if(lastFailure.kind==HostExchange.Failure.AUTH || lastFailure.kind==HostExchange.Failure.IDENTITY) {
             // No retry loop: the credential or the Host identity is no longer valid for this phone.
             offline();
             return;
         }
         failures++;
-        long delay=PollPolicy.backoff(failures, lastFailure.kind==NativeCompanionClient.Failure.RATE_LIMITED ? lastFailure.retryAfterMs : 0);
+        long delay=PollPolicy.backoff(failures, lastFailure.kind==HostExchange.Failure.RATE_LIMITED ? lastFailure.retryAfterMs : 0);
         nextRetryAt=System.currentTimeMillis()+delay;
         if(snapshot==null) offline(); else renderCurrentTab(true);
         schedulePoll(delay);
@@ -182,9 +182,12 @@ public final class NativeCompanionActivity extends Activity {
                 post(() -> { if(done!=null) done.ok(result); schedulePoll(0); });
             } catch(Exception e) {
                 post(() -> {
-                    String message=e instanceof NativeCompanionClient.Failure ? e.getMessage() : "The request failed.";
-                    if(e instanceof NativeCompanionClient.Failure && ((NativeCompanionClient.Failure) e).kind==NativeCompanionClient.Failure.AUTH) { lastFailure=(NativeCompanionClient.Failure) e; offline(); return; }
-                    new AlertDialog.Builder(this).setTitle("Not done").setMessage(message).setPositiveButton("OK",null).show();
+                    String message=e instanceof HostExchange.Failure ? e.getMessage() : "The request failed.";
+                    if(e instanceof HostExchange.Failure && ((HostExchange.Failure) e).kind==HostExchange.Failure.AUTH) { lastFailure=(HostExchange.Failure) e; offline(); return; }
+                    int kind=e instanceof HostExchange.Failure ? ((HostExchange.Failure) e).kind : 0;
+                    // Only a Host refusal or a send that never left the phone is "not done"; the rest stay open.
+                    String title=kind==HostExchange.Failure.OUTCOME_UNKNOWN ? "Outcome unknown" : kind==HostExchange.Failure.FAILED ? "Failed, may have partly applied" : "Not done";
+                    new AlertDialog.Builder(this).setTitle(title).setMessage(message).setPositiveButton("OK",null).show();
                     schedulePoll(0);
                 });
             }
@@ -342,8 +345,8 @@ public final class NativeCompanionActivity extends Activity {
                     NativeSessionStore.Session paired=client.pair(origin,pairingCode,"Bunny Android Native Companion");
                     store.save(paired);
                     post(() -> { secure(false); session=paired; activeTab=0; schedulePoll(0); loading("Paired. Loading workstation state…"); });
-                } catch(NativeCompanionClient.Failure f) {
-                    post(() -> pairing(f.kind==NativeCompanionClient.Failure.NETWORK ? "The workstation could not be reached. Check the address and that it is running." : f.getMessage()));
+                } catch(HostExchange.Failure f) {
+                    post(() -> pairing(f.kind==HostExchange.Failure.NETWORK ? "The workstation could not be reached. Check the address and that it is running." : f.getMessage()));
                 } catch(Exception ex){
                     post(() -> pairing("Pairing failed. Check the address, that the workstation is running, and that the code is fresh."));
                 }
@@ -625,9 +628,9 @@ public final class NativeCompanionActivity extends Activity {
     private void offline() {
         main.removeCallbacks(poll);
         secure(false);
-        int kind=lastFailure==null ? NativeCompanionClient.Failure.NETWORK : lastFailure.kind;
-        boolean terminal=kind==NativeCompanionClient.Failure.AUTH || kind==NativeCompanionClient.Failure.IDENTITY;
-        LinearLayout body=page(kind==NativeCompanionClient.Failure.AUTH ? "Pair Again" : kind==NativeCompanionClient.Failure.IDENTITY ? "Workstation Changed" : "Connection Unavailable");
+        int kind=lastFailure==null ? HostExchange.Failure.NETWORK : lastFailure.kind;
+        boolean terminal=kind==HostExchange.Failure.AUTH || kind==HostExchange.Failure.IDENTITY;
+        LinearLayout body=page(kind==HostExchange.Failure.AUTH ? "Pair Again" : kind==HostExchange.Failure.IDENTITY ? "Workstation Changed" : "Connection Unavailable");
         add(body, text(lastFailure==null ? "The workstation could not be reached." : lastFailure.getMessage(), 15, terminal ? WARN : MUTED), 16);
         if(!terminal) add(body, text("Retrying automatically in " + Math.max(0,(nextRetryAt-System.currentTimeMillis())/1000) + " s.", 13, MUTED), 8);
         add(body, button("Try Again Now", !terminal, v -> { lastFailure=null; loading("Connecting securely to workstation…"); schedulePoll(0); }), 24);
@@ -653,7 +656,7 @@ public final class NativeCompanionActivity extends Activity {
             } catch(Exception ex){
                 post(() -> {
                     LinearLayout body=page("Revocation Not Confirmed");
-                    add(body,text("The workstation did not confirm revocation: " + (ex instanceof NativeCompanionClient.Failure ? ex.getMessage() : "the request failed.") + " This phone kept its credential.",14,MUTED),16);
+                    add(body,text("The workstation did not confirm revocation: " + (ex instanceof HostExchange.Failure ? ex.getMessage() : "the request failed.") + " This phone kept its credential.",14,MUTED),16);
                     add(body,button("Try Again",true,v -> revoke()),20);
                     add(body,button("Back",false,v -> { renderCurrentTab(true); schedulePoll(0); }),10);
                 });

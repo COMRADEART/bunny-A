@@ -845,6 +845,10 @@ public partial class MainWindow : Window
         {
             UpdateChatMessage(aiMsgId, await hostClient.ResolveOutcomeAsync(ex, lifetime.Token), "Uncertain", model);
         }
+        catch (HostException ex) when (ex.Kind == HostFailure.Failed)
+        {
+            UpdateChatMessage(aiMsgId, ex.Message, "Failed", model);
+        }
         catch (HostException ex)
         {
             UpdateChatMessage(aiMsgId, $"Host refused: {ex.Message}", "Refused", model);
@@ -1112,6 +1116,11 @@ public partial class MainWindow : Window
             var outcome = await hostClient.ResolveOutcomeAsync(ex, lifetime.Token);
             RecordDecision($"UNCERTAIN · {app.OperationKind} · {app.TaskTitle}: {outcome}");
             Warn("Decision Outcome Uncertain", outcome);
+        }
+        catch (HostException ex) when (ex.Kind == HostFailure.Failed)
+        {
+            RecordDecision($"FAILED, MAY HAVE PARTLY APPLIED · {app.OperationKind} · {app.TaskTitle} · Host operation {ex.OperationId}: {ex.Message}");
+            Warn("Decision Failed", ex.Message);
         }
         catch (HostException ex)
         {
