@@ -107,6 +107,8 @@ public partial class MainWindow : Window
         ScreenChat.Visibility = tabName == "Chat" ? Visibility.Visible : Visibility.Collapsed;
         ScreenAgents.Visibility = tabName == "Agents" ? Visibility.Visible : Visibility.Collapsed;
         ScreenProjects.Visibility = tabName == "Projects" ? Visibility.Visible : Visibility.Collapsed;
+        ScreenConnected.Visibility = tabName == "Connected" ? Visibility.Visible : Visibility.Collapsed;
+        if (tabName == "Connected") _ = LoadConnectedRootsAsync();
         ScreenApprovals.Visibility = tabName == "Approvals" ? Visibility.Visible : Visibility.Collapsed;
         ScreenVoice.Visibility = tabName == "Voice" ? Visibility.Visible : Visibility.Collapsed;
         ScreenHistory.Visibility = tabName == "History" ? Visibility.Visible : Visibility.Collapsed;
@@ -185,6 +187,7 @@ public partial class MainWindow : Window
         inspected.Clear();
         PendingApprovalsList.SelectedItem = null;
         hostRestartedDuringChat = activeInferenceTaskId != null;
+        if (connectedPlan != null) DiscardConnectedPlan("The Host restarted after planning. Generate a new plan.");
         RecordDecision(identityChanged
             ? "A different Bunny A Host is now answering. Pending approvals were cleared for review."
             : "The Host restarted. Pending approvals were cleared for review.");
@@ -412,6 +415,18 @@ public partial class MainWindow : Window
                     ProposedDiff: $"{pending.Json("summary")}\nTarget: {pending.Json("target")}",
                     ExpectedEffects: string.Join(" ", pending.JsonArr("effects").Select(e => e.GetString()))));
             }
+            // MA5-S2: a whole task waiting to start (background or side-effect envelope) had no native approval path.
+            else if (state == "AWAITING_APPROVAL" && actionId == null)
+            {
+                var version = task.JsonLong("version");
+                var models = string.Join(", ", task.JsonArr("models").Select(m => m.GetString()));
+                approvals.Add(new PendingApprovalItem(
+                    TaskId: id, TaskTitle: title, ActionId: version.ToString(System.Globalization.CultureInfo.InvariantCulture), OperationKind: "Start persistent task",
+                    Summary: title, PayloadSha256: "-", Category: "ptask_launch", Reversible: true, ExpiresAt: 0,
+                    Scope: $"{progress.JsonLong("total")} step(s) · {(models.Length > 0 ? models : "no model")} · {(task.JsonBool("background") ? "background" : "foreground")}",
+                    ProposedDiff: $"Start “{title}” under the envelope it was created with.",
+                    ExpectedEffects: "Starts the task's steps. Consequential actions still ask for their own approval when they run."));
+            }
         }
 
         rebinding = true;
@@ -462,6 +477,8 @@ public partial class MainWindow : Window
             .Select(p => new ProjectItem(p.Json("id")!, p.Json("name") ?? p.Json("id")!, p.Json("path") ?? "", p.JsonLong("createdAt"), 0))
             .ToList();
         SetItems(ProjectsList, projects, p => p.Id);
+        // The Host's default project when none is registered, as on the web workstation.
+        RebindConnectedCombo(ConnectedProjectCombo, projects.Count > 0 ? projects.Select(p => p.Id).ToList() : ["personal"]);
     }
 
     private void ApplyLotus(JsonElement root)
@@ -495,6 +512,8 @@ public partial class MainWindow : Window
         SetItems(ModelsList, models, m => m.Id);
         chatModels = models;
         RebuildChatModels();
+        // Connected tasks are local-only by Host contract: only installed, non-hosted Ollama models can be pinned.
+        RebindConnectedCombo(ConnectedModelCombo, models.Where(m => m.IsLocal && m.Provider == "ollama").Select(m => m.Id).ToList());
     }
 
     private void RebuildChatModels()
@@ -1001,6 +1020,7 @@ public partial class MainWindow : Window
         ApprovalScopeText.Text = app.Scope;
         ApprovalPayloadShaText.Text = app.PayloadSha256 != "-" ? app.PayloadSha256
             : app.Category == "task_launch" ? "No payload digest: the Host binds this launch to the task id and its current state."
+            : app.Category == "ptask_launch" ? $"No payload digest: the Host binds this approval to task version {app.ActionId}; if the task changed, it is refused."
             : "No digest supplied by the Host.";
         ApprovalEffectsText.Text = app.ExpectedEffects;
         ApprovalDiffText.Text = app.ProposedDiff;
@@ -1009,6 +1029,7 @@ public partial class MainWindow : Window
             "agent_plan" => "Bound to the plan reference above; a re-planned Mission is refused until reviewed again.",
             "consequential" => "Answers this one request once; a new request needs a new decision.",
             "task_launch" => "Launch only; the task can be stopped from the Agent Dashboard.",
+            "ptask_launch" => "Approves this task for up to 24 hours or until its envelope expires. Deny cancels it.",
             _ => "Loading the Host's recovery rule…",
         };
         if (app.Category == "action")
@@ -1103,7 +1124,9 @@ public partial class MainWindow : Window
                 ("agent_plan", false) => ("mission.stop", new { id = app.TaskId }),
                 ("task_launch", true) => ("approve", new { id = app.TaskId }),
                 ("task_launch", false) => ("stop", new { id = app.TaskId, reason = "User denied task approval." }),
-                ("consequential", _) => ("mission.respond", new { requestId = app.ActionId, decision = approve ? "allow_once" : "deny" }),
+                ("ptask_launch", true) => ("ptask.approve", new { id = app.TaskId, version = long.Parse(app.ActionId, System.Globalization.CultureInfo.InvariantCulture) }),
+                ("ptask_launch", false) => ("ptask.cancel", new { id = app.TaskId }),
+                ("consequential", _) =>("mission.respond", new { requestId = app.ActionId, decision = approve ? "allow_once" : "deny" }),
                 (_, true) => ("action.approve", new { id = app.TaskId, actionId = app.ActionId, payloadSha256 = app.PayloadSha256 }),
                 (_, false) => ("action.deny", new { id = app.TaskId, actionId = app.ActionId }),
             };
@@ -1204,6 +1227,242 @@ public partial class MainWindow : Window
         ProjectMissionObjectiveInput.Clear();
         SelectTab("Agents");
     }
+
+    // ==========================================
+    // MA5-S2 NEW CONNECTED TASK (workstation-only)
+    // describe → folders → ptask.plan → review (Host facts) → explicit ptask.create → monitor
+    // ==========================================
+
+    /// <summary>A Host-validated proposal and the exact envelope it was planned under; Create sends both unchanged.</summary>
+    private sealed record ConnectedPlan(JsonElement Spec, object Envelope, string Signature);
+    private ConnectedPlan? connectedPlan;
+    private List<ConnectedRoot> connectedRoots = new();
+    private bool rebindingConnected;
+
+    private void RebindConnectedCombo(ComboBox combo, List<string> options)
+    {
+        if (combo.ItemsSource is List<string> old && old.SequenceEqual(options)) return;
+        var previous = combo.SelectedItem as string;
+        rebindingConnected = true;
+        try
+        {
+            combo.ItemsSource = options;
+            combo.SelectedItem = previous != null && options.Contains(previous) ? previous : options.FirstOrDefault();
+        }
+        finally { rebindingConnected = false; }
+        ConnectedInput_Changed(combo, new RoutedEventArgs());
+    }
+
+    private List<string> ConnectedCapabilities()
+    {
+        var caps = new List<string>();
+        if (ConnectedCapRead.IsChecked == true) caps.Add("file.read");
+        if (ConnectedCapGenerate.IsChecked == true) caps.Add("local.generate");
+        if (ConnectedCapReview.IsChecked == true) caps.Add("local.review");
+        return caps;
+    }
+
+    private List<ConnectedRoot> ConnectedGrantedRoots() =>
+        ConnectedRootsList.SelectedItems.OfType<ConnectedRoot>().OrderBy(r => r.Id, StringComparer.Ordinal).ToList();
+
+    private string ConnectedSignature() => string.Join("\u001f", ConnectedGoalInput.Text.Trim(), ConnectedProjectCombo.SelectedItem as string ?? "",
+        ConnectedModelCombo.SelectedItem as string ?? "", string.Join(",", ConnectedCapabilities()), string.Join(",", ConnectedGrantedRoots().Select(r => r.Id)));
+
+    private void ConnectedInput_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!IsLoaded || rebindingConnected) return;
+        ConnectedPlanButton.IsEnabled = ConnectedGoalInput.Text.Trim().Length > 0 && ConnectedModelCombo.SelectedItem is string && ConnectedCapabilities().Count > 0;
+        RemoveConnectedRootButton.IsEnabled = ConnectedRootsList.SelectedItems.Count > 0;
+        if (ConnectedModelCombo.Items.Count == 0) ConnectedPlanStatus.Text = "No local Ollama model is installed; the Planner needs one.";
+        // A proposal is bound to the inputs it was planned from: any change means planning again, never creating a stale plan.
+        if (connectedPlan != null && connectedPlan.Signature != ConnectedSignature())
+            DiscardConnectedPlan("The goal, folders, model or permissions changed after planning. Generate a new plan.");
+    }
+
+    private async Task LoadConnectedRootsAsync()
+    {
+        try
+        {
+            var res = await hostClient.SendCommandAsync("connector.roots.list", new { }, lifetime.Token);
+            ApplyConnectedRoots(res.JsonObj("data"));
+            ConnectedRootsStatus.Text = connectedRoots.Count == 0 ? "No folders registered yet. A task can still use the local model without reading files." : "";
+        }
+        catch (HostException ex) { ConnectedRootsStatus.Text = $"Folders unavailable: {ex.Message}"; }
+        catch (OperationCanceledException) { }
+    }
+
+    private void ApplyConnectedRoots(JsonElement data)
+    {
+        var granted = ConnectedGrantedRoots().Select(r => r.Id).ToHashSet();
+        connectedRoots = data.JsonArr("roots").Where(r => r.Json("id") is { Length: > 0 })
+            .Select(r => new ConnectedRoot(r.Json("id")!, r.Json("label") ?? r.Json("id")!, r.Json("path") ?? "")).ToList();
+        rebindingConnected = true;
+        try
+        {
+            ConnectedRootsList.ItemsSource = connectedRoots;
+            foreach (var r in connectedRoots.Where(r => granted.Contains(r.Id))) ConnectedRootsList.SelectedItems.Add(r);
+        }
+        finally { rebindingConnected = false; }
+        ConnectedInput_Changed(ConnectedRootsList, new RoutedEventArgs());
+    }
+
+    private async Task SaveConnectedRootsAsync(List<ConnectedRoot> next)
+    {
+        var res = await RunCommandAsync("connector.roots.set", new { roots = next.Select(r => new { id = r.Id, label = r.Label, path = r.Path }) }, "Folder Not Changed");
+        // After a refusal or an uncertain outcome, show the Host's actual list rather than what was asked for.
+        if (res is JsonElement ok) ApplyConnectedRoots(ok.JsonObj("data")); else await LoadConnectedRootsAsync();
+    }
+
+    /// <summary>Same rule as the web workstation's folderId: a stable, readable id unique among registered folders.</summary>
+    private static string FolderId(string label, IReadOnlyCollection<string> taken)
+    {
+        var slug = System.Text.RegularExpressions.Regex.Replace(label.ToLowerInvariant(), "[^a-z0-9]+", "-");
+        slug = slug[..Math.Min(36, slug.Length)].Trim('-');
+        var stem = slug.Length == 0 ? "folder" : char.IsAsciiLetterLower(slug[0]) ? slug : $"f-{slug}";
+        var id = stem;
+        for (var n = 2; taken.Contains(id); n++) id = $"{stem}-{n}";
+        return id;
+    }
+
+    private void BrowseConnectedRoot_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog { Title = "Select a folder Bunny A may read" };
+        if (dialog.ShowDialog() != true) return;
+        ConnectedRootPathInput.Text = dialog.FolderName;
+        if (ConnectedRootLabelInput.Text.Trim().Length == 0) ConnectedRootLabelInput.Text = Path.GetFileName(dialog.FolderName.TrimEnd('\\', '/'));
+    }
+
+    private async void AddConnectedRoot_Click(object sender, RoutedEventArgs e)
+    {
+        var label = ConnectedRootLabelInput.Text.Trim();
+        var path = ConnectedRootPathInput.Text.Trim();
+        if (label.Length == 0 || path.Length == 0) { ConnectedRootsStatus.Text = "Enter a folder name and its full path."; return; }
+        var root = new ConnectedRoot(FolderId(label, connectedRoots.Select(r => r.Id).ToList()), label, path);
+        await SaveConnectedRootsAsync([.. connectedRoots, root]);
+        if (connectedRoots.Any(r => r.Id == root.Id)) { ConnectedRootLabelInput.Clear(); ConnectedRootPathInput.Clear(); }
+    }
+
+    private async void RemoveConnectedRoot_Click(object sender, RoutedEventArgs e)
+    {
+        var remove = ConnectedGrantedRoots();
+        if (remove.Count == 0) return;
+        if (!Confirm("Remove Folders", $"Stop letting Bunny A read:\n{string.Join("\n", remove.Select(r => r.ToString()))}\n\nTasks that use them will be refused until they are registered again.")) return;
+        await SaveConnectedRootsAsync(connectedRoots.Where(r => remove.All(x => x.Id != r.Id)).ToList());
+    }
+
+    private async void ConnectedPlan_Click(object sender, RoutedEventArgs e)
+    {
+        if (ConnectedModelCombo.SelectedItem is not string model) return;
+        var project = ConnectedProjectCombo.SelectedItem as string ?? "personal";
+        var signature = ConnectedSignature();
+        var caps = ConnectedCapabilities();
+        var roots = ConnectedGrantedRoots();
+        var expiresAt = DateTimeOffset.UtcNow.AddDays(1);
+        // Local-only, no side effects, foreground: the narrowest envelope that can do the work. The Host re-validates it on create.
+        var envelope = new
+        {
+            capabilities = caps, providers = new[] { "ollama" }, localOnly = true, models = new[] { model }, projectScopes = new[] { project },
+            sideEffects = false, background = false, budgets = new { maxModelCalls = 10, maxWallMs = 3_600_000 },
+            expiresAt = expiresAt.ToUnixTimeMilliseconds(),
+            grants = new { files = roots.Select(r => new { root = r.Id, access = "read" }).ToArray(), origins = Array.Empty<string>(), services = Array.Empty<object>() },
+        };
+        var permissions = string.Join("\n",
+            $"Folders (read only): {(roots.Count > 0 ? string.Join(", ", roots.Select(r => r.ToString())) : "none")}",
+            $"Actions allowed:     {string.Join(", ", caps)}",
+            $"Model:               {model} (local Ollama only; never a hosted provider)",
+            "Side effects:        none · runs in the foreground only",
+            $"Budget:              at most 10 model calls and 1 hour · project {project}",
+            $"Envelope expires:    {expiresAt.LocalDateTime:g}");
+        DiscardConnectedPlan(null);
+        ConnectedResultText.Text = "";
+        ConnectedResultActions.Visibility = Visibility.Collapsed;
+        ConnectedPlanButton.IsEnabled = false;
+        ConnectedPlanStatus.Text = $"The Planner is proposing on {model}… (a proposal changes nothing)";
+        try
+        {
+            // A local Planner can take minutes; the Host itself stops it at 5 minutes.
+            var res = await hostClient.SendCommandAsync("ptask.plan", new { request = ConnectedGoalInput.Text.Trim(), projectId = project, model, envelope }, lifetime.Token, TimeSpan.FromMinutes(5.5));
+            if (signature != ConnectedSignature()) { ConnectedPlanStatus.Text = "The inputs changed while planning; that proposal was discarded."; return; }
+            ShowConnectedPlan(res.JsonObj("data"), envelope, signature, permissions);
+            ConnectedPlanStatus.Text = "";
+        }
+        catch (HostException ex) { ConnectedPlanStatus.Text = $"No plan: {ex.Message}"; }
+        catch (OperationCanceledException) { }
+        finally { ConnectedInput_Changed(ConnectedPlanButton, new RoutedEventArgs()); }
+    }
+
+    private void ShowConnectedPlan(JsonElement plan, object envelope, string signature, string permissions)
+    {
+        var spec = plan.JsonObj("spec");
+        var review = plan.JsonObj("review");
+        var ok = plan.JsonBool("ok") && spec.ValueKind == JsonValueKind.Object && review.ValueKind == JsonValueKind.Object;
+        var problems = plan.JsonArr("problems").Select(p => p.GetString()).ToList();
+        var advisories = plan.JsonArr("advisories").Select(p => p.GetString()).ToList();
+        ConnectedReviewTitle.Text = spec.Json("title") ?? "No usable plan";
+        ConnectedReviewVerdict.Text = ok
+            ? "The Host validated this proposal against your folders, model pin and permissions." + (advisories.Count > 0 ? $"\nPlanner notes: {string.Join(" ", advisories)}" : "")
+            : $"The Host did not accept this proposal; it cannot be created:\n{string.Join("\n", problems)}";
+        ConnectedReviewVerdict.Foreground = (Brush)FindResource(ok ? "PositiveBrush" : "NegativeBrush");
+        var facts = review.JsonArr("steps").Where(s => s.Json("id") != null).GroupBy(s => s.Json("id")!).ToDictionary(g => g.Key, g => g.First());
+        ConnectedStepsList.ItemsSource = spec.JsonArr("steps").Select((s, i) =>
+        {
+            var stepId = s.Json("id") ?? "?";
+            var f = facts.GetValueOrDefault(stepId);
+            var effect = f.ValueKind != JsonValueKind.Object ? "not checked by the Host"
+                : !f.JsonBool("registered") ? "NO REGISTERED EXECUTOR" : $"{f.Json("category")?.Replace('_', '-')}{(f.JsonBool("consequential") ? " · asks for your approval when it runs" : "")}";
+            var inputs = s.JsonObj("input").ValueKind == JsonValueKind.Object
+                ? string.Join("; ", s.JsonObj("input").EnumerateObject().Select(p => $"{p.Name}={ClipText(p.Value.ToString(), 90)}")) : "";
+            return $"{i + 1}. {stepId} · {s.Json("kind")}{(s.Json("model") is { } m ? $" · model {m}" : "")} · {effect}\n    {inputs}";
+        }).ToList();
+        ConnectedPermissionsText.Text = permissions;
+        ConnectedApprovalText.Text = !ok ? ""
+            : review.JsonBool("approvalRequired")
+                ? "After Create, the task waits for your approval in the Approval Center before any step runs."
+                : "Create starts this task immediately: every step is read-only on this PC and none needs approval. You can Pause or Cancel it from the Agent Dashboard.";
+        connectedPlan = ok ? new ConnectedPlan(spec.Clone(), envelope, signature) : null;
+        ConnectedReviewedCheck.IsChecked = false;
+        ConnectedReviewedCheck.IsEnabled = ok;
+        ConnectedCreateButton.IsEnabled = false;
+        ConnectedReviewPanel.Visibility = Visibility.Visible;
+    }
+
+    private static string ClipText(string text, int max) => text.Length > max ? text[..max] + "…" : text;
+
+    private void DiscardConnectedPlan(string? reason)
+    {
+        connectedPlan = null;
+        ConnectedReviewPanel.Visibility = Visibility.Collapsed;
+        ConnectedReviewedCheck.IsChecked = false;
+        ConnectedCreateButton.IsEnabled = false;
+        if (reason != null) ConnectedPlanStatus.Text = reason;
+    }
+
+    private void ConnectedReviewed_Changed(object sender, RoutedEventArgs e) =>
+        ConnectedCreateButton.IsEnabled = connectedPlan != null && ConnectedReviewedCheck.IsChecked == true;
+
+    private void ConnectedDiscard_Click(object sender, RoutedEventArgs e) => DiscardConnectedPlan("Proposal discarded; nothing was created.");
+
+    private async void ConnectedCreate_Click(object sender, RoutedEventArgs e)
+    {
+        if (connectedPlan is not { } plan || ConnectedReviewedCheck.IsChecked != true || plan.Signature != ConnectedSignature()) return;
+        // One attempt per reviewed proposal: success, refusal or an uncertain outcome all consume it, so nothing is created twice.
+        DiscardConnectedPlan(null);
+        var res = await RunCommandAsync("ptask.create", new { spec = plan.Spec, envelope = plan.Envelope }, "Task Not Created");
+        ConnectedResultActions.Visibility = Visibility.Visible;
+        if (res is not JsonElement created)
+        {
+            ConnectedResultText.Text = "The Host did not confirm a new task (see the message). Check the Agent Dashboard before planning again.";
+            return;
+        }
+        var t = created.JsonObj("data");
+        ConnectedResultText.Text = t.Json("state") == "AWAITING_APPROVAL"
+            ? $"Created “{t.Json("title")}” ({t.Json("id")}). It waits for your approval in the Approval Center."
+            : $"Created “{t.Json("title")}” ({t.Json("id")}): {t.Json("display") ?? t.Json("state")}.";
+        ConnectedGoalInput.Clear();
+    }
+
+    private void ConnectedMonitor_Click(object sender, RoutedEventArgs e) => SelectTab("Agents");
+    private void ConnectedApprovals_Click(object sender, RoutedEventArgs e) => SelectTab("Approvals");
 
     private void TaskHistoryList_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateHistoryButtons();
 

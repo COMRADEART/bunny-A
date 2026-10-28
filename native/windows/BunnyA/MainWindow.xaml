@@ -55,6 +55,7 @@
             <Button x:Name="NavChat" Content="💬  Chat &amp; Conversation" HorizontalContentAlignment="Left" Click="NavButton_Click" Tag="Chat" Style="{StaticResource PrimaryButtonStyle}" Margin="0,2"/>
             <Button x:Name="NavAgents" Content="🛡️  Agent Dashboard" HorizontalContentAlignment="Left" Click="NavButton_Click" Tag="Agents" Margin="0,2"/>
             <Button x:Name="NavProjects" Content="📁  Projects &amp; Tasks" HorizontalContentAlignment="Left" Click="NavButton_Click" Tag="Projects" Margin="0,2"/>
+            <Button x:Name="NavConnected" Content="🧭  New Connected Task" HorizontalContentAlignment="Left" Click="NavButton_Click" Tag="Connected" Margin="0,2"/>
             <Button x:Name="NavApprovals" Content="⚖️  Approval Center" HorizontalContentAlignment="Left" Click="NavButton_Click" Tag="Approvals" Margin="0,2"/>
             <Button x:Name="NavVoice" Content="🎙️  Voice Studio" HorizontalContentAlignment="Left" Click="NavButton_Click" Tag="Voice" Margin="0,2"/>
             <Button x:Name="NavHistory" Content="📜  Task History" HorizontalContentAlignment="Left" Click="NavButton_Click" Tag="History" Margin="0,2"/>
@@ -294,6 +295,83 @@
           </DockPanel>
         </Border>
       </Grid>
+
+      <!-- 3b. NEW CONNECTED TASK (MA5-S2, workstation-only): describe → folders → plan → review → create → monitor -->
+      <ScrollViewer x:Name="ScreenConnected" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+        <StackPanel>
+          <TextBlock Text="New Connected Task" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,4"/>
+          <TextBlock Text="Runs only on a pinned local model and reads only folders you register. The Planner proposes; nothing is created until you press Create." FontSize="12" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,14"/>
+
+          <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,0,0,14">
+            <StackPanel>
+              <TextBlock Text="1. Folders Bunny A may read" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,6"/>
+              <TextBlock Text="The Host checks every folder and refuses system, application and Bunny A state folders. Select the folders this task may read." FontSize="12" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+              <ListBox x:Name="ConnectedRootsList" SelectionMode="Multiple" MinHeight="40" MaxHeight="140" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" SelectionChanged="ConnectedInput_Changed" AutomationProperties.Name="Registered folders; selected folders are granted read access"/>
+              <Grid Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="160"/>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="ConnectedRootLabelInput" MaxLength="60" Margin="0,0,8,0" ToolTip="Folder name" AutomationProperties.Name="New folder name"/>
+                <TextBox Grid.Column="1" x:Name="ConnectedRootPathInput" MaxLength="400" Margin="0,0,8,0" ToolTip="Full folder path" AutomationProperties.Name="New folder path"/>
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                  <Button Content="Browse…" Click="BrowseConnectedRoot_Click" Margin="0,0,8,0"/>
+                  <Button x:Name="AddConnectedRootButton" Content="Register Folder" Click="AddConnectedRoot_Click" Margin="0,0,8,0"/>
+                  <Button x:Name="RemoveConnectedRootButton" Content="Remove Selected" Style="{StaticResource DangerButtonStyle}" Click="RemoveConnectedRoot_Click"/>
+                </StackPanel>
+              </Grid>
+              <TextBlock x:Name="ConnectedRootsStatus" FontSize="12" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,6,0,0" AutomationProperties.LiveSetting="Polite"/>
+            </StackPanel>
+          </Border>
+
+          <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,0,0,14">
+            <StackPanel>
+              <TextBlock Text="2. Describe the goal" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,8"/>
+              <TextBox x:Name="ConnectedGoalInput" MinHeight="60" MaxLength="2000" TextWrapping="Wrap" AcceptsReturn="True" TextChanged="ConnectedInput_Changed" AutomationProperties.Name="Task goal"/>
+              <WrapPanel Margin="0,10,0,0">
+                <TextBlock Text="Project:" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}" Margin="0,0,6,0"/>
+                <ComboBox x:Name="ConnectedProjectCombo" Width="180" Margin="0,0,16,0" SelectionChanged="ConnectedInput_Changed" AutomationProperties.Name="Task project"/>
+                <TextBlock Text="Local model (pinned):" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}" Margin="0,0,6,0"/>
+                <ComboBox x:Name="ConnectedModelCombo" Width="240" SelectionChanged="ConnectedInput_Changed" AutomationProperties.Name="Pinned local model"/>
+              </WrapPanel>
+              <WrapPanel Margin="0,10,0,0">
+                <CheckBox x:Name="ConnectedCapRead" Content="Read files in the selected folders" IsChecked="True" Foreground="{StaticResource TextBrush}" Margin="0,0,16,0" Checked="ConnectedInput_Changed" Unchecked="ConnectedInput_Changed"/>
+                <CheckBox x:Name="ConnectedCapGenerate" Content="Write text with the local model" IsChecked="True" Foreground="{StaticResource TextBrush}" Margin="0,0,16,0" Checked="ConnectedInput_Changed" Unchecked="ConnectedInput_Changed"/>
+                <CheckBox x:Name="ConnectedCapReview" Content="Check results with the local model" Foreground="{StaticResource TextBrush}" Checked="ConnectedInput_Changed" Unchecked="ConnectedInput_Changed"/>
+              </WrapPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                <Button x:Name="ConnectedPlanButton" Content="⚡ Generate Plan" Style="{StaticResource PrimaryButtonStyle}" Click="ConnectedPlan_Click"/>
+                <TextBlock x:Name="ConnectedPlanStatus" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="12,0,0,0" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <Border x:Name="ConnectedReviewPanel" Visibility="Collapsed" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource GlassEdgeBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,0,0,14">
+            <StackPanel>
+              <TextBlock Text="3. Review the proposal" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,4"/>
+              <TextBlock x:Name="ConnectedReviewTitle" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,6"/>
+              <TextBlock x:Name="ConnectedReviewVerdict" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8" AutomationProperties.LiveSetting="Polite"/>
+              <TextBlock Text="Steps (side effects come from the Host's registered executors, not from the model):" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,4"/>
+              <ListBox x:Name="ConnectedStepsList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="Proposed steps"/>
+              <TextBlock Text="Permissions this task is created with:" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,8,0,4"/>
+              <TextBlock x:Name="ConnectedPermissionsText" FontSize="12" TextWrapping="Wrap" FontFamily="Consolas"/>
+              <TextBlock x:Name="ConnectedApprovalText" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,0"/>
+              <CheckBox x:Name="ConnectedReviewedCheck" Content="I reviewed these steps and permissions" Foreground="{StaticResource TextBrush}" Margin="0,10,0,0" Checked="ConnectedReviewed_Changed" Unchecked="ConnectedReviewed_Changed"/>
+              <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                <Button x:Name="ConnectedCreateButton" Content="Create Task" Style="{StaticResource SuccessButtonStyle}" IsEnabled="False" Click="ConnectedCreate_Click" Margin="0,0,8,0"/>
+                <Button Content="Discard Proposal" Click="ConnectedDiscard_Click"/>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <TextBlock x:Name="ConnectedResultText" FontSize="13" TextWrapping="Wrap" Margin="0,0,0,8" AutomationProperties.LiveSetting="Assertive"/>
+          <StackPanel x:Name="ConnectedResultActions" Orientation="Horizontal" Visibility="Collapsed">
+            <Button Content="Monitor in Agent Dashboard" Click="ConnectedMonitor_Click" Margin="0,0,8,0"/>
+            <Button Content="Open Approval Center" Click="ConnectedApprovals_Click"/>
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
 
       <!-- 4. APPROVAL CENTER SCREEN (Workstation-only) -->
       <Grid x:Name="ScreenApprovals" Visibility="Collapsed">

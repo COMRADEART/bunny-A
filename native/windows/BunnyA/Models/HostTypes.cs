@@ -73,6 +73,12 @@ public sealed record PendingApprovalItem(
     public override string ToString() => $"{OperationKind} · {TaskTitle} · {ActionId}";
 }
 
+/// <summary>MA5-S2: an owner-registered folder (`connector.roots.list`). The path is shown on the workstation only.</summary>
+public sealed record ConnectedRoot(string Id, string Label, string Path)
+{
+    public override string ToString() => $"{Label} — {Path}";
+}
+
 public sealed record ChatMessage(
     string Id,
     string Sender,

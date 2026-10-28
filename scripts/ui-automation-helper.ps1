@@ -337,6 +337,13 @@ switch ($Action) {
     [PSCustomObject]@{ id = $TargetId; text = if ($null -ne $e) { $e.Current.Name } else { $null } } | ConvertTo-Json -Compress
   }
 
+  "read_state" {
+    # MA5-S2: any element's accessible name, enabled state and whether it is on screen (collapsed elements are absent).
+    $win = Get-MainWindow $ProcessId
+    $e = Find-Descendant $win $TargetId
+    [PSCustomObject]@{ id = $TargetId; present = ($null -ne $e); name = if ($null -ne $e) { $e.Current.Name } else { $null }; enabled = ($null -ne $e -and $e.Current.IsEnabled); offscreen = ($null -ne $e -and $e.Current.IsOffscreen) } | ConvertTo-Json -Compress
+  }
+
   "read_approvals" {
     # What the Approval Center actually shows: list rows plus the detail pane for the selected row.
     $win = Get-MainWindow $ProcessId

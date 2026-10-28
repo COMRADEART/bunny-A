@@ -154,7 +154,7 @@ public sealed class HostClient : IDisposable
     /// Sends one command bound to the observed Host identity and epoch with its own operation id. It is never retried:
     /// a dropped connection after sending surfaces as OutcomeUnknown and the caller asks <see cref="ResolveOutcomeAsync"/>.
     /// </summary>
-    public async Task<JsonElement> SendCommandAsync(string action, object data, CancellationToken token = default)
+    public async Task<JsonElement> SendCommandAsync(string action, object data, CancellationToken token = default, TimeSpan? commandTimeout = null)
     {
         var expectedHost = HostId;
         var expectedEpoch = HostEpoch;
@@ -172,7 +172,7 @@ public sealed class HostClient : IDisposable
         };
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
-        timeout.CancelAfter(CommandTimeout);
+        timeout.CancelAfter(commandTimeout ?? CommandTimeout);
         using var req = CreateRequest(HttpMethod.Post, creds, "/command");
         req.Content = JsonContent.Create(payload);
 

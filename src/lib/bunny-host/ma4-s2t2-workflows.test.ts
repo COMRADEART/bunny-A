@@ -77,6 +77,12 @@ test("T2-E2E-A local project analysis: the Planner proposes, the Host validates,
     time("A.plan_ms", performance.now() - t0);
     assert.equal(proposal.ok, true, JSON.stringify(proposal.problems)); assert.deepEqual(proposal.team, ["Coordinator", "Planner", "Worker", "Reviewer"]);
     assert.ok(model.prompts[0].prompt.includes("Folders you may use: atlas (read)"));
+    // MA5-S2: the review comes from Host executor facts and says Create will start this read-only plan at once.
+    assert.equal(proposal.review.approvalRequired, false);
+    assert.deepEqual(proposal.review.steps.map((s: { id: string; category: string; consequential: boolean; registered: boolean }) => [s.id, s.category, s.consequential, s.registered]),
+      [["changes", "read_only", false, true], ["issues", "read_only", false, true], ["summary", "read_only", false, true], ["review", "read_only", false, true]]);
+    const background = b.ok(await b.command("ptask.plan", { request: "Check my Atlas folder and summarize what changed.", projectId: "p1", envelope: { ...env, background: true }, model: MODEL }));
+    assert.equal(background.review.approvalRequired, true, "background work waits for approval");
     t0 = performance.now();
     const created = b.ok(await b.command("ptask.create", { spec: proposal.spec, envelope: env }));
     assert.equal(created.state, "QUEUED", "read-only work needs no approval");

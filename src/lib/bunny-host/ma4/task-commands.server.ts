@@ -4,7 +4,7 @@ import { WorkstationRequiredError } from "../device-authority.server.ts";
 import type { PersistentTaskRuntime } from "./task-runtime.server.ts";
 import type { ConnectedActions } from "./connected-actions.server.ts";
 import { planConnectedTask } from "./connected-workflow.server.ts";
-import { EnvelopeSchema } from "./task-runtime.ts";
+import { EnvelopeSchema, planReview } from "./task-runtime.ts";
 
 /** MA4-S2-T1 Host commands. A paired phone may read, pause, resume, cancel and acknowledge; everything that grants or
  *  resolves authority (create, approve, reconcile, revoke, policy) and reading step outputs stay on the workstation.
@@ -78,7 +78,9 @@ export async function ptaskCommand(rt: PersistentTaskRuntime, action: string, da
         const envelope = EnvelopeSchema.parse(data.envelope);
         if (!envelope.models.includes(data.model)) throw new CommandRefusedError("The Planner's model must be pinned in the envelope.");
         // A proposal only: the owner reviews it and creates (and approves) the task themselves.
-        return planConnectedTask({ request: data.request, projectId: id(data.projectId), envelope, model: data.model, call: rt.modelCall(), catalog: connected.catalog, facts: rt.executorFacts(), signal: AbortSignal.timeout(300_000), now: Date.now() });
+        const plan = await planConnectedTask({ request: data.request, projectId: id(data.projectId), envelope, model: data.model, call: rt.modelCall(), catalog: connected.catalog, facts: rt.executorFacts(), signal: AbortSignal.timeout(300_000), now: Date.now() });
+        // MA5-S2: tells the reviewer whether Create starts work at once or waits for approval; create re-validates regardless.
+        return plan.spec ? { ...plan, review: planReview(plan.spec, envelope, rt.executorFacts()) } : plan;
       }
       default: throw new CommandRefusedError("Unknown task action.");
     }

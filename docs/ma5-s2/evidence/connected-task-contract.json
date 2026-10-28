@@ -1,0 +1,260 @@
+{
+  "schema": "ma5-s2.connected-task-contract.v1",
+  "at": "2026-10-28T22:39:01.483Z",
+  "host": "disposable, Ollama adapter only",
+  "model": "huihui_ai/qwen2.5-abliterate:7b",
+  "planMs": 7338,
+  "finalState": "COMPLETED",
+  "steps": [
+    {
+      "name": "connector.roots.list (empty)",
+      "status": 200,
+      "ok": true,
+      "body": {
+        "data": {
+          "roots": []
+        },
+        "operation": {
+          "id": "0cb3b86b-ef60-4464-bbe9-1e9d218b4bc3",
+          "state": "applied",
+          "replayed": false
+        }
+      }
+    },
+    {
+      "name": "connector.roots.set refuses a system folder",
+      "status": 400,
+      "ok": false,
+      "note": "expected refusal",
+      "body": {
+        "requestId": "ada1f6cf-0121-477f-93a0-fdeffd76e54b",
+        "error": "System and application folders cannot be granted.",
+        "code": "REFUSED",
+        "operation": {
+          "id": "dbcac83c-c8ef-4e62-9976-9e82b0c836d6",
+          "state": "refused",
+          "replayed": false
+        }
+      }
+    },
+    {
+      "name": "connector.roots.set",
+      "status": 200,
+      "ok": true,
+      "body": {
+        "data": {
+          "roots": [
+            {
+              "id": "notes",
+              "label": "Notes",
+              "path": "<registered-folder>"
+            }
+          ]
+        },
+        "operation": {
+          "id": "cd016303-e629-44c2-a1b1-d7a30241ad13",
+          "state": "applied",
+          "replayed": false
+        }
+      }
+    },
+    {
+      "name": "ptask.plan refuses a model not pinned in the envelope",
+      "status": 400,
+      "ok": false,
+      "note": "expected refusal",
+      "body": {
+        "requestId": "e43d5a70-aa1d-4b9e-b88c-0d1875b86ece",
+        "error": "The Planner's model must be pinned in the envelope.",
+        "code": "REFUSED",
+        "operation": {
+          "id": "db129809-39e3-4ab9-bfd9-a169d784b051",
+          "state": "refused",
+          "replayed": false
+        }
+      }
+    },
+    {
+      "name": "ptask.plan refuses a cloud provider envelope",
+      "status": 400,
+      "ok": false,
+      "note": "expected refusal",
+      "body": {
+        "requestId": "5b76c5ed-94b6-4f44-a10f-a948f6bb68d7",
+        "error": "[\n  {\n    \"code\": \"invalid_value\",\n    \"values\": [\n      \"ollama\"\n    ],\n    \"path\": [\n      \"providers\",\n      0\n    ],\n    \"message\": \"Invalid input: expected \\\"ollama\\\"\"\n  },\n  {\n    \"code\": \"invalid_value\",\n    \"values\": [\n      true\n    ],\n    \"path\": [\n      \"localOnly\"\n    ],\n    \"message\": \"Invalid input: expected true\"\n  }\n]",
+        "code": "REFUSED",
+        "operation": {
+          "id": "25d49fc6-8d53-4679-a435-f89e1e088022",
+          "state": "refused",
+          "replayed": false
+        }
+      }
+    },
+    {
+      "name": "ptask.plan",
+      "status": 200,
+      "ok": true,
+      "note": "model huihui_ai/qwen2.5-abliterate:7b",
+      "body": {
+        "data": {
+          "ok": true,
+          "spec": {
+            "title": "Summarize notes.txt in two sentences",
+            "projectId": "personal",
+            "steps": [
+              {
+                "id": "1",
+                "kind": "file.read",
+                "input": {
+                  "root": "notes",
+                  "path": "notes.txt",
+                  "maxChars": 1000
+                },
+                "model": null,
+                "maxAttempts": 2
+              },
+              {
+                "id": "2",
+                "kind": "local.generate",
+                "input": {
+                  "prompt": "Summarize the content of notes.txt in two sentences. The content is: {contextFrom}.",
+                  "contextFrom": "1",
+                  "maxTokens": 50
+                },
+                "model": "huihui_ai/qwen2.5-abliterate:7b",
+                "maxAttempts": 2
+              }
+            ],
+            "dependsOn": [],
+            "acceptance": {
+              "requiredSteps": [
+                "1",
+                "2"
+              ],
+              "description": "Every proposed step succeeds."
+            },
+            "deadlineAt": null
+          },
+          "team": [
+            "Coordinator",
+            "Planner",
+            "Worker",
+            "Reviewer"
+          ],
+          "problems": [],
+          "replanned": true
+        },
+        "operation": {
+          "id": "ab9623aa-e7b5-4761-806e-c0721c4bb162",
+          "state": "applied",
+          "replayed": false
+        }
+      }
+    },
+    {
+      "name": "ptask.create refuses a spec widened after review",
+      "status": 400,
+      "ok": false,
+      "note": "expected refusal",
+      "body": {
+        "requestId": "3baa39bc-39a9-48a5-ac2c-d5eed14abb49",
+        "error": "Task refused: No registered executor for file.write.",
+        "code": "REFUSED",
+        "operation": {
+          "id": "0a074811-f7f1-410f-9a61-34864dc31389",
+          "state": "refused",
+          "replayed": false
+        }
+      }
+    },
+    {
+      "name": "ptask.create",
+      "status": 200,
+      "ok": true,
+      "body": {
+        "data": {
+          "id": "ptask-52632051-1471-48f5-bb0e-ddde635d18bb",
+          "title": "Summarize notes.txt in two sentences",
+          "projectId": "personal",
+          "state": "QUEUED",
+          "display": "Queued",
+          "version": 3,
+          "createdAt": 1793227139346,
+          "updatedAt": 1793227139346,
+          "deadlineAt": null,
+          "progress": {
+            "done": 0,
+            "total": 2,
+            "current": "1"
+          },
+          "approval": {
+            "required": false,
+            "approvedUntil": null
+          },
+          "background": false,
+          "blocked": null,
+          "failure": null,
+          "uncertainOperation": null,
+          "models": [
+            "huihui_ai/qwen2.5-abliterate:7b"
+          ],
+          "dependsOn": [],
+          "evidence": [],
+          "activity": null,
+          "truthState": "Queued",
+          "pendingAction": null
+        },
+        "operation": {
+          "id": "f174b6da-4121-46a3-8cab-32b15f937f2e",
+          "state": "applied",
+          "replayed": false
+        }
+      }
+    },
+    {
+      "name": "ptask.get (final)",
+      "ok": true,
+      "body": {
+        "id": "ptask-52632051-1471-48f5-bb0e-ddde635d18bb",
+        "title": "Summarize notes.txt in two sentences",
+        "projectId": "personal",
+        "state": "COMPLETED",
+        "display": "Completed",
+        "version": 11,
+        "createdAt": 1793227139346,
+        "updatedAt": 1793227141173,
+        "deadlineAt": null,
+        "progress": {
+          "done": 2,
+          "total": 2,
+          "current": null
+        },
+        "approval": {
+          "required": false,
+          "approvedUntil": null
+        },
+        "background": false,
+        "blocked": null,
+        "failure": null,
+        "uncertainOperation": null,
+        "models": [
+          "huihui_ai/qwen2.5-abliterate:7b"
+        ],
+        "dependsOn": [],
+        "evidence": [
+          {
+            "stepId": "1",
+            "outputSha256": "98611c37a41273b16dfed5aa43b803cf3d4c610046bcb2d57559077dcfdef705"
+          },
+          {
+            "stepId": "2",
+            "outputSha256": "eaa077269b519bd820976eea2467dd1c27175d2d6ecc30230d094b526fa49ce5"
+          }
+        ],
+        "activity": "Completed",
+        "truthState": "Completed",
+        "pendingAction": null
+      }
+    }
+  ]
+}
