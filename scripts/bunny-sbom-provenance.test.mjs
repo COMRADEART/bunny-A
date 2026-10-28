@@ -29,18 +29,15 @@ test("T4-ANDROID-1: inspectAndroidReleaseArtifact verifies AndroidManifest harde
   delete process.env.BUNNY_ANDROID_RELEASE_KEYSTORE;
   const android = inspectAndroidReleaseArtifact(repoRoot);
   assert.equal(android.packageId, "com.routeragent.jev");
-  assert.equal(android.versionCode, 3);
-  assert.equal(android.versionName, "2.1");
+  assert.equal(android.versionCode, 4);
+  assert.equal(android.versionName, "2.2");
   assert.equal(android.minSdkVersion, 26);
   assert.equal(android.targetSdkVersion, 35);
   assert.equal(android.securityHardening.allowBackup, false);
   assert.equal(android.securityHardening.usesCleartextTraffic, false);
-  assert.deepEqual([...android.securityHardening.permissions].sort(), [
-    "android.permission.INTERNET",
-    "android.permission.POST_NOTIFICATIONS",
-  ]);
-  // Errata: the MA2/T4 internet-only claim is false after the notification permission was declared.
-  assert.equal(android.securityHardening.leastPrivilegeInternetOnly, false);
+  // MA5-S1 removed POST_NOTIFICATIONS with the WebView notification bridge; the companion is internet-only again.
+  assert.deepEqual([...android.securityHardening.permissions], ["android.permission.INTERNET"]);
+  assert.equal(android.securityHardening.leastPrivilegeInternetOnly, true);
   assert.equal(android.securityHardening.matchesDeclaredAllowlist, true);
   assert.equal(android.signing.productionReleaseGate, "BLOCKED");
   assert.ok(["UNSIGNED", "TEST_SIGNED"].includes(android.signing.status));

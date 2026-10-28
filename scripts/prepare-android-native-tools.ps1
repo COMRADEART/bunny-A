@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $workspace = Split-Path -Parent $PSScriptRoot
 $lock = Get-Content -LiteralPath (Join-Path $workspace 'android/native-preview-toolchain.json') -Raw | ConvertFrom-Json
-if ($lock.schema -ne 'bunny-android-preview-toolchain.v1') { throw 'Unexpected Android toolchain lock schema.' }
+if ($lock.schema -ne 'bunny-android-preview-toolchain.v2') { throw 'Unexpected Android toolchain lock schema.' }
 $scratch = Join-Path $workspace ('test-results/android-tool-download-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $scratch -Force | Out-Null
 function Get-Verified([string]$Url,[string]$Name,[string]$Expected) {

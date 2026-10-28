@@ -1,31 +1,31 @@
-# Native Android companion preview
+# Native Android companion
 
-This draft adds an opt-in native Views screen for HTTPS pairing, a device-scoped
-task snapshot, refresh, and device revocation. The existing `MainActivity`
-remains the launcher. Conversation, live event subscription, agent detail,
-notifications, voice, complete onboarding, and settings are not implemented in
-the native preview. It is not a replacement for the installed companion.
+Since MA5-S1 the launcher opens `NativeCompanionActivity`, a native Views client. The legacy WebView `MainActivity`
+and its notification bridge were removed; the manifest keeps only the old component name, `.MainActivity`, as an
+`activity-alias` of the native activity so home-screen icons pinned by earlier versions still resolve after an upgrade.
+The compiled app references no `android.webkit` class (checked on `classes.dex` by `scripts/build-android.ps1`).
 
-The native preview stores its device credential encrypted with an Android
-Keystore AES-GCM key in its own preferences. It pins the paired Host identity,
-rejects HTTP and redirects, and calls a new read-only, versioned HTTPS gateway
-route. The gateway requires the existing remote-device authorization and forwards
-only that device credential to the loopback Host. Host scope and revocation remain
-authoritative. The preview cannot submit Host commands or approve actions.
+What it does: HTTPS pairing with a one-time code (address prefilled from the WebView build's saved address), a
+supervision list of Missions and persistent tasks with Stop, a count of approvals waiting on Windows, local tool-free
+chat with Stop, Host identity and epoch, and self-revocation that erases the Android Keystore key. Approvals, file
+changes, shell and tools stay on the Windows workstation; the Host refuses them for a paired phone.
 
-For the retained legacy WebView, the JavaScript-to-native notification bridge is
-removed and cross-origin navigation and network resources are blocked. This deliberately makes
-legacy native notifications and embedded tunnel sign-in unavailable in the draft;
-those capabilities must be restored through safe native flows before replacement.
+Session protection is unchanged: the device credential is encrypted with an Android Keystore AES-GCM key, the paired
+Host identity is pinned on every response, HTTP and redirects are refused, and every command carries the pinned Host id
+and the epoch of the view it came from. Failures are classified: revoked or expired access and a changed Host identity
+stop polling and ask to pair again; network and Host outages retry with bounded backoff (2 s doubling to 60 s, a Host
+`Retry-After` is honoured). The pairing screen is `FLAG_SECURE`.
 
-The local APK was built with a newly generated development key in an isolated
-worktree. It is not signed with the existing companion key and is not an upgrade
-candidate. No APK was installed; no physical device, Android lifecycle, TalkBack,
-TLS tunnel, or Keystore behavior has been qualified. User data and the installed
-application were not modified. Public beta remains NO-GO.
+Updates are HTTP polling while the screen is visible (1.5 s during a chat, 5 s on Tasks, 10 s elsewhere); polling stops
+in `onStop` and both worker threads stop in `onDestroy`. Only one state request is in flight; a response older than one
+already shown is dropped (`PollPolicy`, tested on the JVM). This is polling, not streaming.
 
-The preview build checks the Java version and SHA-256 hashes recorded in
-`native-preview-toolchain.json`. `scripts/prepare-android-native-tools.ps1`
-downloads the pinned tools from Google sources and verifies their hashes before
-staging; it does not overwrite mismatched existing tools. The lock does not
-establish release signing or byte-for-byte reproducible APKs.
+The companion posts no notifications and requests only `INTERNET`.
+
+Qualification: the APK builds and its JVM tests pass on Java 21. No physical device was available, so installation,
+upgrade over an installed build, Keystore behaviour on hardware, TalkBack and real network loss remain NOT TESTED.
+APKs are signed with a locally generated development key, not the existing companion key; they cannot upgrade an
+installation signed with another key.
+
+The build accepts Java 21.0.x at or above the patch in `native-preview-toolchain.json` (`java.minimumPatch`); CI pins
+`java.ciPinned`. Tool hashes are verified as before. Public beta remains NO-GO.
