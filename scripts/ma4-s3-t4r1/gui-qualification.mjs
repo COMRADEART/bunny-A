@@ -14,7 +14,7 @@ import { PersistentTaskRuntime } from "../../src/lib/bunny-host/ma4/task-runtime
 async function main() {
   console.log("=== BUNNY A — MA4-S3-T4R1 GENUINE WINDOWS GUI & INTERACTION QUALIFICATION ===");
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "bunny-gui-qual-"));
-  const localAppData = process.env.LOCALAPPDATA || "C:\\Users\\allam\\AppData\\Local";
+  const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
   const userBunnyDir = path.join(localAppData, "Bunny-A");
   
   // Verify safety invariants: zero mutation to user's installation

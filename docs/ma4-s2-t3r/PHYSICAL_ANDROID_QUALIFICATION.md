@@ -6,7 +6,7 @@
 
 | Item | Value |
 |---|---|
-| Device | Samsung SM-S948U (adb serial R3GL1025V4J), Android 17 (SDK 37), 1440×3120 @ 600 dpi |
+| Device | Samsung SM-S948U (adb serial redacted), Android 17 (SDK 37), 1440×3120 @ 600 dpi |
 | App | existing `com.routeragent.jev` 2.1 (versionCode 3) — the secure HTTPS companion wrapper; nothing installed or replaced |
 | Host | installed TEST release `S2T3R4-TEST` (`8802e0c`), isolated, port 43191 |
 | Transport | owner-authorized temporary Cloudflare quick tunnels to the TEST gateway only; closed after use; tunnel records in `evidence/installed/tunnel-records/` (no addresses) |

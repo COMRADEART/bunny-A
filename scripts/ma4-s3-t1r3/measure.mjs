@@ -63,7 +63,7 @@ async function predecessor(port) {
   const dir = join(process.env.LOCALAPPDATA ?? tmpdir(), "Bunny-T1R3-Baseline");
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
-  const child = spawn(process.execPath, ["--experimental-strip-types", "scripts/bunny-host.mjs"], { cwd: "C:\\Users\\allam\\Documents\\new\\bun-router-t1-base", env: { ...process.env, BUNNY_HOST_PORT: String(port), BUNNY_HOST_DATA_DIRECTORY: dir }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+  const child = spawn(process.execPath, ["--experimental-strip-types", "scripts/bunny-host.mjs"], { cwd: process.env.BUNNY_BASELINE_ROOT ?? join(process.cwd(), "..", "bun-router-t1-base"), env: { ...process.env, BUNNY_HOST_PORT: String(port), BUNNY_HOST_DATA_DIRECTORY: dir }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
   let log = "";
   child.stdout.on("data", (c) => { log += c; });
   child.stderr.on("data", (c) => { log += c; });

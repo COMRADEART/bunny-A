@@ -254,7 +254,7 @@ writeFileSync(join(evidenceDir, "planning.json"), JSON.stringify(planning, null,
 report.planning = { valid: planning.rows.filter((row) => row.planningValid).length, total: planning.rows.length, invalid: planning.rows.filter((row) => !row.planningValid).map((row) => row.id) };
 
 writeFileSync(join(evidenceDir, "followup.json"), JSON.stringify({ ...report, c2, edits, baseline: { status: "NOT TESTED" } }, null, 2));
-const baselineRoot = "C:\\Users\\allam\\Documents\\new\\bun-router-t1-base";
+const baselineRoot = process.env.BUNNY_BASELINE_ROOT ?? join(root, "..", "bun-router-t1-base");
 const baselineState = join(process.env.LOCALAPPDATA ?? tmpdir(), "Bunny-T1R2-Baseline");
 const baselinePort = 43741;
 rmSync(baselineState, { recursive: true, force: true });

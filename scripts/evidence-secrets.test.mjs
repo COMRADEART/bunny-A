@@ -42,3 +42,33 @@ test("no tracked evidence or log file carries a credential", () => {
   }
   assert.deepEqual(leaks, []);
 });
+
+// MA5-S2 privacy hygiene: device-test tools and new milestone evidence carry no workstation paths or pinned device serials.
+// Older milestone reports (MA0–MA4) still name the workstation profile folder; see docs/ma5-s2/PRIVACY_HYGIENE.md.
+const IDENTIFYING = [
+  /\b[A-Za-z]:[\\/]+Users[\\/]+(?!Public\b)[^\\/\s"'`<>]+/i,
+  /\/(?:mnt\/)?[a-z]\/Users\/(?!Public\b)[^/\s"'`<>]+/i,
+  /\badb(?:\.exe)?["']?\s+-s\s+[A-Za-z0-9]{8,}/,
+  /\b(?:ANDROID_)?SERIAL\s*=\s*["']?[A-Za-z0-9]{8,}/,
+];
+
+export function findIdentifying(text) {
+  return IDENTIFYING.find((pattern) => pattern.test(text))?.source ?? null;
+}
+
+test("identifying-path scan flags workstation paths and pinned serials, not placeholders", () => {
+  assert.ok(findIdentifying(String.raw`ADB = r"C:\Users\someone\tools\adb.exe"`));
+  assert.ok(findIdentifying(`S="/c/Users/someone/scratch"`));
+  assert.ok(findIdentifying(`adb.exe -s ABCD1234EF shell`));
+  assert.ok(findIdentifying(`SERIAL = "ABCD1234EF"`));
+  assert.equal(findIdentifying(`ADB = os.environ.get("BUNNY_ADB", "adb")`), null);
+  assert.equal(findIdentifying(String.raw`%USERPROFILE%\AppData and C:\Users\Public`), null);
+});
+
+test("device-test tools and MA5 evidence carry no workstation paths or device serials", () => {
+  const files = execFileSync("git", ["ls-files", "-z", "--", "scripts/android-device", "docs/ma5-*"], { encoding: "utf8" })
+    .split("\0").filter((f) => f && !/\.(png|jpe?g|apk|dex|zip)$/i.test(f));
+  assert.ok(files.length > 0);
+  const hits = files.flatMap((file) => { const found = findIdentifying(readFileSync(file, "utf8")); return found ? [`${file}: ${found}`] : []; });
+  assert.deepEqual(hits, []);
+});

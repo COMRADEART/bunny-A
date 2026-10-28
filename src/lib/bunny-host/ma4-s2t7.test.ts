@@ -80,7 +80,7 @@ test("T7-A2 & T7-B: exportSanitizedSupportBundle scrubs prompts, file contents, 
     rawEvents: [
       {
         type: "task.step",
-        detail: "Read C:\\Users\\allam\\Documents\\secret.md for owner@example.com with Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjMifQ.sig and sk-1234567890abcdefghij",
+        detail: "Read C:\\Users\\owner\\Documents\\secret.md for owner@example.com with Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjMifQ.sig and sk-1234567890abcdefghij",
         prompt: "My private prompt",
         fileContent: "Private file body",
         accessToken: "oauth-secret-token",
@@ -89,7 +89,7 @@ test("T7-A2 & T7-B: exportSanitizedSupportBundle scrubs prompts, file contents, 
   });
 
   const serialized = JSON.stringify(bundle);
-  assert.equal(serialized.includes("C:\\Users\\allam"), false, "Windows user path scrubbed");
+  assert.equal(serialized.includes("C:\\Users\\owner"), false, "Windows user path scrubbed");
   assert.equal(serialized.includes("owner@example.com"), false, "email scrubbed");
   assert.equal(serialized.includes("sk-1234567890"), false, "API key scrubbed");
   assert.equal(serialized.includes("eyJhbGci"), false, "JWT scrubbed");
@@ -114,11 +114,11 @@ test("T7-E: LocalBetaFeedbackStore requires opt-in, redacts details on preview/s
   const entry = store.submit({
     now: 1_700_000_000_000,
     category: "usability",
-    summary: "Issue in C:\\Users\\allam\\AppData\\Local\\Bunny-A",
+    summary: "Issue in C:\\Users\\owner\\AppData\\Local\\Bunny-A",
     details: "Contact me at tester@example.org with token gsk_1234567890abcdefghij",
   });
   assert.equal(entry.remoteUploadDispatched, false);
-  assert.equal(entry.summary.includes("C:\\Users\\allam"), false);
+  assert.equal(entry.summary.includes("C:\\Users\\owner"), false);
   assert.equal(entry.details.includes("tester@example.org"), false);
   assert.equal(entry.details.includes("gsk_1234567890"), false);
   assert.equal(store.list().length, 1);

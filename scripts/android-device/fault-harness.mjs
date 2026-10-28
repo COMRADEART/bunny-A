@@ -1,5 +1,5 @@
-// MA5-S1R2 scratch harness: disposable Host + fault proxy between the gateway and the Host + loopback control API.
-// Not part of the PR. Usage: node --experimental-strip-types harness.mjs <worktree> <stateDir>
+// Device-test fault harness (MA5-S1R2, reusable): disposable Host + fault proxy between the gateway and the Host
+// + loopback control API. Never point it at the owner's Host. Usage: node --experimental-strip-types fault-harness.mjs <worktree> <stateDir>
 import { createServer, request as httpRequest } from "node:http";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
