@@ -1492,7 +1492,7 @@ async function openHost(
             const found = ledger.get(actor, id);
             extra = {
               data: found
-                ? { operationId: id, state: found.state, action: found.action, at: found.at, code: found.code ?? null, error: found.error ?? null, epoch: hostIdentity.epoch }
+                ? { operationId: id, state: found.state, action: found.action, at: found.at, code: found.code ?? null, error: found.error ?? null, taskId: found.taskId ?? null, epoch: hostIdentity.epoch }
                 : { operationId: id, state: "unknown", epoch: hostIdentity.epoch },
             };
             break;
@@ -2172,7 +2172,7 @@ async function openHost(
           `${local ? "workstation" : `device ${device!.id}`}: ${String(input.action)}`,
         ),
       );
-      if (began && operationId) ledger.finish(actor, operationId, { state: "applied", status: 200 });
+      if (began && operationId) ledger.finish(actor, operationId, { state: "applied", status: 200, ...(task ? { taskId: task.id } : {}) });
       if (device && action === "device.revoke")
         return json(res, { signedOut: true, ...(operationId ? { operation: { id: operationId, state: "applied", replayed: false } } : {}) });
       // Already-admitted effects may finish, but a revoked device receives no new protected projection.

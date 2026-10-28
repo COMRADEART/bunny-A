@@ -21,3 +21,12 @@ Release gates that must be cleared independently before any beta:
 ## S1R1
 
 S1R1 fixed installer ownership and command-outcome truthfulness, and added fault tests (S1R1_FINAL_ACCEPTANCE.md). It does not clear any release gate above. Gate 1 is now **partly** met on one device (S1R1_ANDROID_DEVICE_ACCEPTANCE.md): upgrade over v3, pairing, Stop, lifecycle polling and revoke were observed. Still missing: TalkBack, confirmation that v3 data survives, and a re-pair path after a Host address change. Public beta remains **NO-GO**; merge is **GO for independent review** once the final-SHA checks pass.
+
+## S1R2
+
+S1R2 repaired Android chat outcome recovery (S1R2_FINAL_MERGE_ACCEPTANCE.md). It adds device evidence for rotation,
+process end (force-stop and update), backgrounding, network loss, gateway restart and Host restart with an unresolved
+chat message. It does not clear any release gate: TalkBack, v3 data retention, the re-pair path, physical voice,
+screen readers, display changes, release signing and the MA4 quality findings remain open. New finding: paired
+devices never receive model output (Host privacy rule), so phone chat cannot show answers. Public beta remains
+**NO-GO**.

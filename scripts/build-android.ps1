@@ -78,6 +78,8 @@ Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.PollPolicyTest')
 # MA5-S1R1: command dispatch against injected network faults (real loopback sockets, no Android runtime).
 Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/HostExchange.java'),(Join-Path $workspace 'android/tests/HostExchangeTest.java'))
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.HostExchangeTest')
+Run-Checked 'javac' @('--release','8','-encoding','UTF-8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/HostExchange.java'),(Join-Path $sourceDirectory 'java/com/routeragent/jev/ChatTurn.java'),(Join-Path $workspace 'android/tests/HostExchangeTest.java'),(Join-Path $workspace 'android/tests/ChatTurnTest.java'))
+Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.ChatTurnTest')
 Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $workspace 'android/tests/ManifestLauncherTest.java'))
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.ManifestLauncherTest',(Join-Path $sourceDirectory 'AndroidManifest.xml'))
 # MA5-S1: the core journeys are native. The compiled app must not reference android.webkit at all.
