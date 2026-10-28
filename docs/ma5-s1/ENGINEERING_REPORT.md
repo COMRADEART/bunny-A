@@ -54,13 +54,15 @@ were found while testing.
 | Android said "Nothing was sent" for failures while sending, and "Not done" after sending | `HostExchange`: only a `connect()` failure is "not sent"; everything after is `OUTCOME_UNKNOWN` with the original operation id; `FAILED` means "may have partly applied" | S1R1_NETWORK_FAULT_TESTS.md: 35 checks |
 | *(found in testing)* A direct `FAILED` / `HOST_UNAVAILABLE` answer was shown as "Host refused" on Windows and as "Not done" on Android | Classified as partly applied on both clients | W4, A8 |
 | *(found in testing)* Android's send had no streaming mode, so the HTTP stack could replay the POST. On the JVM the command arrived twice | `setFixedLengthStreamingMode` | A3 (exactly one receipt); before-repro shows two |
+| *(found on a physical phone)* The native gateway turned a lost Host answer into `503 HOST_UNREACHABLE`, so the phone said "Not done" for an applied command | Gateway returns `504 OUTCOME_UNKNOWN` once the command was delivered; Android maps it to outcome unknown | S1R1_ANDROID_DEVICE_ACCEPTANCE.md D14 → D15; new real-socket gateway test |
 
 Files: `install-dev-candidate.ps1`, `HostClient.cs`, `MainWindow.xaml.cs`, `HostExchange.java` (new),
 `NativeCompanionClient.java`, `NativeCompanionActivity.java`. Tests added: `scripts/ma5-s1r1-installer.test.mjs`,
 `native/windows/BunnyA.OutcomeTests/`, `scripts/verify-ma5-s1r1-outcome.mjs`, `android/tests/HostExchangeTest.java`.
 CI wiring: `scripts/build-android.ps1`, `.github/workflows/native-windows-preview.yml`.
 
-No Host, gateway, routing, approval-policy or device-authority code changed in S1R1. UI layout is unchanged; only
+The gateway file `src/lib/orch/native-companion.server.ts` (added for the native companion in #53) changed in S1R1,
+only in how it reports a lost Host answer. No Host, routing, approval-policy or device-authority code changed. UI layout is unchanged; only
 outcome texts and dialog titles changed. Final acceptance: S1R1_FINAL_ACCEPTANCE.md.
 
 ## Verdicts
@@ -68,13 +70,13 @@ outcome texts and dialog titles changed. Final acceptance: S1R1_FINAL_ACCEPTANCE
 | Area | Verdict |
 |---|---|
 | Windows native | **PARTIAL**: core workflows verified end to end on real renders; persistent connected tasks cannot be authored natively; runtime display changes, physical voice and screen-reader use untested |
-| Android native | **PARTIAL**: launcher migration verified in the built APK; physical device acceptance **BLOCKED** |
+| Android native | **PARTIAL**: launcher migration verified in the built APK. S1R1: one physical device (upgrade over v3, pairing, Stop, polling, revoke, lost-answer fault) — see S1R1_ANDROID_DEVICE_ACCEPTANCE.md; TalkBack and v3 data retention open |
 | Security | No regression found; see SECURITY_REGRESSION.md and FULL_REGRESSION_AND_CI.md |
 | Gates | See ACCEPTANCE_MATRIX.md |
 
 ## Open limitations
 
-1. Android has not run on hardware (no device): upgrade path, pairing, polling, Stop, TalkBack.
+1. Android ran on one device in S1R1 (S1R1_ANDROID_DEVICE_ACCEPTANCE.md). Open: TalkBack, v3 data retention, re-pair after a Host address change.
 2. Windows: no native authoring of persistent connected tasks (`ptask.plan/create`, `connector.roots`); team
    Missions need a coordinator id; History omits steps.
 3. Notch: resolution, scale and taskbar changes and monitor unplug were not driven.

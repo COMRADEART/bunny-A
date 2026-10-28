@@ -16,12 +16,12 @@ Raw outputs: `evidence/s1r1/`.
 | R1-G6 | Failed Host operations do not imply zero effects | **PASS** | W4 (direct `FAILED`, `HOST_UNAVAILABLE`, lost `failed`), A8: "may have partly taken effect" |
 | R1-G7 | Host identity and epoch respected during reconciliation | **PASS** | W8 (new epoch) and W9 (different Host): the ledger is not asked; another epoch's or operation's record is rejected (W10) |
 | R1-G8 | No automatic replay after connection loss | **PASS** | Every Windows scenario and A2-A4, A9-A11 count receipts: at most one per command. R1: the real Host's task list went 0 → 1 → 1 |
-| R1-G9 | Android ambiguous network failures correctly classified | **PASS** (JVM transport) | A1-A11, 35 checks. On a device: NOT TESTED |
+| R1-G9 | Android ambiguous network failures correctly classified | **PASS** (JVM transport + one device) | A1-A11, 37 checks. On a Galaxy SM-S948U (S1R1_ANDROID_DEVICE_ACCEPTANCE.md), an applied command whose answer was lost first showed "Not done" (gateway defect D14). After the gateway fix it shows "Outcome unknown", with exactly one delivery (D15) |
 | R1-G10 | Deterministic fault-injection tests pass | **PASS** | Windows: scripted 114/114 and real Host 10/10. Android: 35/35. Installer: 6/6 |
 | R1-G11 | Windows and Android native regressions pass | **PASS** | See the native rows below: Windows acceptance 8/8 stage flags with no failures; real candidate lifecycle; reproducible candidate; APK build with all JVM suites |
 | R1-G12 | Full MA4 regression remains green | See FULL_REGRESSION_AND_CI.md | Local `npm test` (which includes `test:ma4`) on the S1R1 tree |
 | R1-G13 | All required hosted CI checks pass on the final SHA | **Decided in PR #59** | This file is part of the final commit and cannot cite that commit's runs. The run links are in the PR description and the final report |
-| R1-G14 | Real hardware limitations accurately reported | **PASS** | Android device, physical voice, screen reader and runtime display changes remain BLOCKED / NOT TESTED |
+| R1-G14 | Real hardware limitations accurately reported | **PASS** | One Android device exercised, with its gaps listed: v3 data retention not established; TalkBack, rotation and process death not tested. Physical voice, screen reader and runtime display changes remain NOT TESTED |
 | R1-G15 | No unsupported PASS claims | **PASS** | Each PASS cites a run above. JVM results are not counted as device results |
 | R1-G16 | Corrected PR ready for independent merge review | **PASS**, subject to R1-G13 | — |
 
@@ -33,15 +33,25 @@ Raw outputs: `evidence/s1r1/`.
 | `native/windows/package-dev-candidate.ps1` | 4/4 files identical across two Release builds. `BunnyA.exe` `94aa2257…a894`, `BunnyA.dll` `3db420b3…064c`, zip `36cf9d3d…c077` |
 | `scripts/verify-ma5-s1-windows.mjs` (run `ma5s1-2026-10-28T15-15-45-913Z`, Debug binary `0fc0b287…75b4`) | All stage flags true, `failures: none`. The run covers: chat via local `qwen2.5-coder:7b`, Mission, roles, voice wiring, approvals (exact hash, wrong hash refused, deny, stale disabled, restart re-review), Host restart, notch on two monitors, lifecycle |
 | `scripts/verify-ma5-s1-candidate.mjs` (S1R1 installer, real candidate) | pass |
-| `scripts/build-android.ps1` (Java 21.0.12) | pass: connection policy 21, Keystore erasure 5, PollPolicy 22, HostExchange 35, ManifestLauncherTest; no `android.webkit`; signatures v2 + v3. `classes.dex` `5573629c…eee5`; APK `e5932a0f…ec70` (local test key) |
+| `scripts/build-android.ps1` (Java 21.0.12), after the gateway fix | pass: connection policy 21, Keystore erasure 5, cookie policy, PollPolicy 22, HostExchange 37, ManifestLauncherTest; no `android.webkit`; signatures v2 + v3. `classes.dex` `10bc29f1…e14f`; APK `12482cbc…2b04` (worktree test key) |
+| Android device (Galaxy SM-S948U, Android 17) | Upgrade over v3, launcher, secure pairing, Stop, polling and revoke PASS; lost-answer fault fixed and re-verified (D14 → D15) |
+| Gateway `src/lib/orch/native-companion.test.ts` | 9 / 9, including the new lost-answer case (fails on the old gateway) |
+
+The Windows outcome harness was re-run after its real-Host scenario switched to `mission.create` on a provider-less
+Host: scripted 114/114 and real Host 11/11 (run `ma5s1r1-outcome-2026-10-28T16-12-28-713Z`). See
+FULL_REGRESSION_AND_CI.md for why.
 
 The Windows binaries changed from S1 (`HostClient.cs`, `MainWindow.xaml.cs`), so S1's hashes no longer apply.
 `classes.dex` changed for the same reason (Android client).
 
 ## Remaining limitations
 
-1. Android: physical acceptance BLOCKED (no device). The Android HTTP stack, on-device TLS and Keystore, and Activity
-   lifecycle under real network loss are NOT TESTED. The fault tests run on the JVM.
+1. Android: one device (Galaxy SM-S948U, Android 17) was exercised against a disposable Host
+   (S1R1_ANDROID_DEVICE_ACCEPTANCE.md). Open items:
+   - whether v3's app data survived the upgrade;
+   - no way to re-pair after a Host address change without clearing app data;
+   - phone chat depends on Host routing choosing a local model;
+   - TalkBack, rotation and process death are NOT TESTED.
 2. An install made by the e094a26 installer has no ownership identity, so the S1R1 installer refuses to upgrade or
    remove it. It must be removed by hand. S1 installs were disposable.
 3. A Host `refused` record is shown as confirmed refused. The Host only records `refused` for refusals it raises, and

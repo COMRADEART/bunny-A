@@ -70,17 +70,26 @@ the stale-approval guard are unchanged.
 
 ## Results after the fix
 
-`node --experimental-strip-types scripts/verify-ma5-s1r1-outcome.mjs`, run `ma5s1r1-outcome-2026-10-28T15-12-35-942Z`:
+`node --experimental-strip-types scripts/verify-ma5-s1r1-outcome.mjs`, run `ma5s1r1-outcome-2026-10-28T16-12-28-713Z`:
 - scripted Host: **114 / 114 checks**;
-- real Host: **10 / 10 checks**;
+- real Host: **11 / 11 checks**;
 - exit 0.
+
+The real-Host scenario R1 first used `submit`. On the CI runner, which has no model providers, the real Host recorded
+that submit as `failed`. The client correctly reported "may have partly taken effect", but the test expected
+"applied". R1 now:
+- creates a Mission with explicit steps, which needs no provider;
+- runs against a Host started with `adapters: []`.
+
+So it behaves identically on a workstation and in CI, and never reaches a model provider. An earlier local run
+(`…15-12-35-942Z`, 10/10) used `submit` on a Host with default adapters.
 
 Evidence: `evidence/s1r1/outcome-scripted.json`, `outcome-real-host.json`, `outcome-summary.json`.
 
 | # | Brief requirement | Scenario | Result |
 |---|---|---|---|
 | 1 | Response lost before acknowledgment | W1: TCP reset after the request headers, before the body was read | OutcomeUnknown; ledger `unknown` shown as unknown; 0 commands executed; no re-send |
-| 2 | Applied, response lost | W2 (scripted) and **R1 (real Host)**: the Host executes, then the connection is reset | Reconciled to "applied". The real Host's task list went 0 → 1 and stayed 1 after reconnecting |
+| 2 | Applied, response lost | W2 (scripted) and **R1 (real Host)**: the Host executes, then the connection is reset | Reconciled to "applied". The real Host's mission list went 0 → 1 and stayed 1 after reconnecting |
 | 3 | Refused | W3: direct 409 refusal; and a lost refusal | "Approval required on Windows Host." as worded; lost case reconciled to "refused" |
 | 4 | Failed after partial effect | W4: direct `FAILED`, `HOST_UNAVAILABLE`; lost `failed` | `Failed` / `PartlyApplied`; never "refused" or "no effect" |
 | 5 | In progress | W5 | "may still be executing" |

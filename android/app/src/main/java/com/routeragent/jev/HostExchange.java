@@ -75,6 +75,8 @@ final class HostExchange {
         if (status == 429) return new Failure(Failure.RATE_LIMITED, "The workstation asked this phone to slow down.", code, Math.max(1000, retryAfterMs));
         if ("HOST_IDENTITY_CHANGED".equals(code)) return new Failure(Failure.IDENTITY, "A different workstation answered. Nothing was changed; pair again if this is expected.", code, 0);
         if (command && ("FAILED".equals(code) || "HOST_UNAVAILABLE".equals(code))) return new Failure(Failure.FAILED, PARTLY_APPLIED, code, 0, operationId);
+        // The gateway lost the Host's answer after handing it the command.
+        if (command && "OUTCOME_UNKNOWN".equals(code)) return unknown(operationId);
         if (command && "OPERATION_IN_PROGRESS".equals(code)) return new Failure(Failure.OUTCOME_UNKNOWN, UNCONFIRMED + " The workstation reports it may still be executing.", code, 0, operationId);
         if (command && code == null && status >= 500) return unknown(operationId);
         if (status == 503) return new Failure(Failure.UNAVAILABLE, "The workstation Host is not available right now.", code, 0);

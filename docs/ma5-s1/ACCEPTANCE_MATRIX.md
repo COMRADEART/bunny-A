@@ -32,3 +32,5 @@ The S1R1 gates (R1-G1 to R1-G16), with evidence, are in S1R1_FINAL_ACCEPTANCE.md
 - S1-G5 and S1-G14 were re-run on the S1R1 binary (`ma5s1-2026-10-28T15-15-45-913Z`): all stage flags true, no failures.
 - S1-G12: the install lifecycle was re-run with the ownership-checking installer, and passed.
 - S1-G17: the security rows added for S1R1 are in SECURITY_REGRESSION.md.
+- S1-G15 (Android physical acceptance) moves from BLOCKED to **PARTIAL**. A Galaxy SM-S948U (Android 17) was attached during S1R1: upgrade over v3, native launcher, secure pairing, Stop, background polling and revoke were observed (S1R1_ANDROID_DEVICE_ACCEPTANCE.md). Still missing: TalkBack, v3 data retention, re-pair after an address change.
+- S1-G8 to S1-G11 now also have device observations (same document). Their verdicts stay PARTIAL.

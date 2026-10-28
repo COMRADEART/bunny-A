@@ -42,11 +42,11 @@ namespace BunnyA.OutcomeTests
         }
 
         /// <summary>Sends one consequential command expecting an uncertain outcome, then asks the Host once.</summary>
-        static async Task<(HostException ex, string outcome)> Uncertain(FaultHost h, HostClient hc, List<string> log, CancellationToken resolveToken = default)
+        static async Task<(HostException ex, string outcome)> Uncertain(FaultHost h, HostClient hc, List<string> log, CancellationToken resolveToken = default, string action = "submit", object? data = null)
         {
             HostException? caught = null;
             var (hostAtSend, epochAtSend) = (hc.HostId, hc.HostEpoch);
-            try { await hc.SendCommandAsync("submit", new { prompt = "s1r1", mode = "fast" }); }
+            try { await hc.SendCommandAsync(action, data ?? new { prompt = "s1r1", mode = "fast" }); }
             catch (HostException ex) { caught = ex; }
             Check(caught?.Kind == HostFailure.OutcomeUnknown, $"classified OutcomeUnknown (got {caught?.Kind.ToString() ?? "success"})", log);
             Check(caught?.OperationId != null && caught.HostIdAtSend == hostAtSend && caught.EpochAtSend == epochAtSend, "original operation id, Host id and epoch kept", log);
@@ -357,16 +357,17 @@ namespace BunnyA.OutcomeTests
                 using var res = await upstream.SendAsync(msg);
                 return new Answer((int)res.StatusCode, await res.Content.ReadAsStringAsync());
             }
-            async Task<int> Tasks()
+            // Missions with explicit steps need no model provider, so "applied" is deterministic on any Host (CI has none).
+            async Task<int> Missions()
             {
                 using var msg = new HttpRequestMessage(HttpMethod.Get, "/state");
                 msg.Headers.TryAddWithoutValidation("Authorization", $"Bearer {token}");
                 using var res = await upstream.SendAsync(msg);
                 using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
-                return doc.RootElement.GetProperty("tasks").GetArrayLength();
+                return doc.RootElement.GetProperty("missions").GetProperty("missions").GetArrayLength();
             }
 
-            await Scenario("R1 real Host: submit applied, answer lost, reconciled from the real ledger", async log =>
+            await Scenario("R1 real Host: mission.create applied, answer lost, reconciled from the real ledger", async log =>
             {
                 using var h = new FaultHost();
                 h.OnState = async r => await Forward(r);
@@ -375,13 +376,21 @@ namespace BunnyA.OutcomeTests
                 Creds(h.Port, token);
                 using var hc = new HostClient();
                 await hc.GetStateAsync();
-                var before = await Tasks();
-                var (ex, outcome) = await Uncertain(h, hc, log);
-                var after = await Tasks();
-                Check(after == before + 1, $"the real Host created exactly one task ({before} -> {after})", log);
+                using (var enable = new HttpRequestMessage(HttpMethod.Post, "/command") { Content = new StringContent("{\"action\":\"mission.configure\",\"data\":{\"enabled\":true}}", Encoding.UTF8, "application/json") })
+                {
+                    enable.Headers.TryAddWithoutValidation("Authorization", $"Bearer {token}");
+                    using var enabled = await upstream.SendAsync(enable);
+                    Check(enabled.IsSuccessStatusCode, "missions enabled on the disposable Host (fixture)", log);
+                }
+                await hc.GetStateAsync();
+                var before = await Missions();
+                var step = new { role = "Worker", objective = "S1R1 outcome probe", dependsOn = Array.Empty<int>(), executor = new { kind = "model" }, preferences = new { local = true } };
+                var (ex, outcome) = await Uncertain(h, hc, log, default, "mission.create", new { objective = "S1R1 outcome probe", mode = "fast", localOnly = true, steps = new[] { step } });
+                var after = await Missions();
+                Check(after == before + 1, $"the real Host created exactly one mission ({before} -> {after})", log);
                 Check(outcome.StartsWith("The Host confirms this operation was applied"), "reconciled to applied from the real Host's ledger", log);
                 await hc.GetStateAsync();
-                Check(await Tasks() == after, "no second task after reconnecting", log);
+                Check(await Missions() == after, "no second mission after reconnecting", log);
                 NoReplay(h, ex, log);
             });
 

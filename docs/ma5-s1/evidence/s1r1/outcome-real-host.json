@@ -1,17 +1,18 @@
 {
-  "checks": 10,
+  "checks": 11,
   "failures": 0,
   "results": [
     {
-      "scenario": "R1 real Host: submit applied, answer lost, reconciled from the real ledger",
+      "scenario": "R1 real Host: mission.create applied, answer lost, reconciled from the real ledger",
       "checks": [
+        "PASS missions enabled on the disposable Host (fixture)",
         "real Host answered HTTP 200 before the reset",
         "PASS classified OutcomeUnknown (got OutcomeUnknown)",
         "PASS original operation id, Host id and epoch kept",
-        "outcome: The Host confirms this operation was applied (operation 5a6f3680-ce22-4c8e-9cdf-70d932392377).",
-        "PASS the real Host created exactly one task (0 -\u003E 1)",
+        "outcome: The Host confirms this operation was applied (operation 4045a6b8-906b-4af2-8a8f-8f0dc25f200f).",
+        "PASS the real Host created exactly one mission (0 -\u003E 1)",
         "PASS reconciled to applied from the real Host\u0027s ledger",
-        "PASS no second task after reconnecting",
+        "PASS no second mission after reconnecting",
         "PASS the command was never re-sent (Host received 1 command(s))",
         "PASS reconciliation asked only about the original operation, at most once (1)"
       ]
@@ -19,7 +20,7 @@
     {
       "scenario": "R2 real Host: an operation it never received stays unknown",
       "checks": [
-        "outcome: Connection interrupted. Bunny A cannot confirm whether this operation completed. It was not automatically retried. Review the current task and Host state before taking another action. The Host has no record it can match to this operation; the record may have expired or the request may never have arrived (operation c4afeb0f-2c86-4ac1-9d12-70044fd24cce).",
+        "outcome: Connection interrupted. Bunny A cannot confirm whether this operation completed. It was not automatically retried. Review the current task and Host state before taking another action. The Host has no record it can match to this operation; the record may have expired or the request may never have arrived (operation 60412391-83e5-4fc6-a65e-2293728746f2).",
         "PASS user sees the outcome-unknown message",
         "PASS no wording claims it did not run",
         "PASS real Host\u0027s \u0027unknown\u0027 is shown as unknown"

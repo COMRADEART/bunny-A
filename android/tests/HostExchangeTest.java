@@ -151,6 +151,8 @@ public final class HostExchangeTest {
             check(HostExchange.refusal(502, null, "", 0, "a8").kind == HostExchange.Failure.OUTCOME_UNKNOWN, "unreadable 5xx on a command is outcome unknown");
             check(HostExchange.refusal(409, "OPERATION_IN_PROGRESS", "", 0, "a8").kind == HostExchange.Failure.OUTCOME_UNKNOWN, "still in progress is outcome unknown");
             check(HostExchange.refusal(503, null, "", 0, null).kind == HostExchange.Failure.UNAVAILABLE, "for a read, 503 is only 'unavailable'");
+            check(HostExchange.refusal(504, "OUTCOME_UNKNOWN", "The Host did not confirm this command.", 0, "a8").kind == HostExchange.Failure.OUTCOME_UNKNOWN, "the gateway's lost Host answer is outcome unknown");
+            check(HostExchange.refusal(503, "HOST_UNREACHABLE", "Host command unavailable.", 0, "a8").kind == HostExchange.Failure.UNAVAILABLE, "a Host the gateway could not reach at all stays 'unavailable'");
 
             System.out.println("A9 accepted but the answer was cut off");
             server.received.set(0); server.mode = Mode.CUT_ANSWER; server.status = 200; server.answer = "{\"snapshot\":";

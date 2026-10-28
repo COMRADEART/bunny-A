@@ -86,8 +86,23 @@ the transport only: production connections are still opened by `NativeCompanionC
 | – | Partial effect / unknown codes | A8: `FAILED`, `HOST_UNAVAILABLE`, 502 unreadable, `OPERATION_IN_PROGRESS`; 503 on a read | `FAILED` / `OUTCOME_UNKNOWN`; reads stay `UNAVAILABLE` |
 | – | Accepted, answer cut off | A9 | `OUTCOME_UNKNOWN`; received once |
 
-**Limits.** These are JVM transport tests, not device tests:
-- Activity lifecycle (onStart/onStop polling, the dialogs) was reviewed in source only;
-- Android's platform HTTP stack, TLS on a device and Keystore on a device are **NOT TESTED**.
+After the gateway fix below, `HostExchangeTest` has **37 checks**. The two new checks are:
+- the gateway's `OUTCOME_UNKNOWN` → outcome unknown;
+- `HOST_UNREACHABLE` → unavailable.
 
-Physical Android acceptance remains **BLOCKED** (no device), as in S1.
+**Limits.** These are JVM transport tests. A physical device was later attached; see S1R1_ANDROID_DEVICE_ACCEPTANCE.md.
+
+## Gateway hop (found on the device)
+
+On a Galaxy SM-S948U, a command the Host applied, whose answer the Host connection then lost, still showed "Not done —
+The workstation Host is not available right now." The phone's transport was correct; the gateway
+(`native-companion.server.ts`) turned the lost Host answer into `503 HOST_UNREACHABLE`.
+
+Fixed:
+- the gateway now returns `504 OUTCOME_UNKNOWN` once the command was handed to the Host, and `503` only for a refused
+  connection;
+- `HostExchange.refusal` maps `OUTCOME_UNKNOWN` to outcome unknown.
+
+New real-socket test in `src/lib/orch/native-companion.test.ts`: it fails on the old gateway (`503 !== 504`) and
+passes on the new one; the command is delivered once with its operation id. On the device the same fault now shows
+"Outcome unknown", with exactly one delivery.

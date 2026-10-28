@@ -40,7 +40,8 @@ out.scriptedExit = dotnetRun(["run", "--project", project, "-c", "Release", "--n
 
 const base = mkdtempSync(join(tmpdir(), "bunny-s1r1-outcome-"));
 const PORT = 43193;
-const host = await startHost({ port: PORT, dataDirectory: join(base, "host") });
+// No model adapters: the run is identical on a workstation and on a CI runner, and never reaches a model provider.
+const host = await startHost({ port: PORT, dataDirectory: join(base, "host"), root: join(base, "host"), adapters: [] });
 const realFile = join(EVIDENCE_DIR, "real-host.json");
 try {
   // Asynchronous: the Host runs in this process and must keep answering while the client runs.

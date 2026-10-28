@@ -125,6 +125,34 @@ test("native companion command forwards authorized device command and returns sc
   assert.equal(json.ok, true);
 });
 
+test("S1R1: a command whose Host answer is lost after delivery is OUTCOME_UNKNOWN; only a refused connection is unreachable", async () => {
+  const device = () => ({ local: false, token: "device-fixture" });
+  const post = () => new Request("https://companion.example/api/bunny-native-v1-state", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action: "submit", operationId: "s1r1-op-0001", data: { prompt: "x" } }),
+  });
+  // A Host that reads the whole command, then drops the connection before answering (real socket reset).
+  const received: string[] = [];
+  const server = (await import("node:http")).createServer((req, res) => {
+    let body = ""; req.on("data", (c) => (body += c)); req.on("end", () => { received.push(body); res.socket?.destroy(); });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = (server.address() as { port: number }).port;
+  try {
+    const lost = await nativeCompanionCommand(post(), { authorize: device, hostPort: () => port, fetchHost: fetch });
+    assert.equal(lost.status, 504);
+    const body = await lost.json() as { code: string; error: string };
+    assert.equal(body.code, "OUTCOME_UNKNOWN");
+    assert.equal(/not available|unreachable|not sent/i.test(body.error), false);
+    assert.equal(received.length, 1, "the gateway delivered the command once and did not retry it");
+    assert.equal(JSON.parse(received[0]!).operationId, "s1r1-op-0001", "the phone's operation id is forwarded unchanged");
+  } finally { await new Promise<void>((resolve) => server.close(() => resolve())); }
+  // Nothing listening now: the connection is refused, so the Host never received the command.
+  const refused = await nativeCompanionCommand(post(), { authorize: device, hostPort: () => port, fetchHost: fetch });
+  assert.equal(refused.status, 503);
+  assert.equal((await refused.json() as { code: string }).code, "HOST_UNREACHABLE");
+});
+
 test("native companion command refuses local callers", async () => {
   const deps = {
     authorize: () => ({ local: true, token: "token" }),
