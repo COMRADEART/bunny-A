@@ -123,4 +123,4 @@ description and in the final report. S1-G18 is decided from those runs only.
 | `scripts/prepare-android-native-tools.ps1` | pass (hash-verified downloads) |
 | `scripts/build-android.ps1` | pass; ChatTurn 55, HostExchange 37, PollPolicy 22, Keystore 5, connection policy 21; `classes.dex` `00eb4fa6…4702` |
 
-Hosted CI for the final S1R2 SHA is recorded in PR #59 (a commit cannot cite its own runs).
+Hosted CI for the final S1R2 SHA is recorded in PR #60 (a commit cannot cite its own runs; PR #59 was already merged).

@@ -1,6 +1,7 @@
 # MA5-S1R2: Final merge acceptance
 
-PR #59 (reused), branch `ma5-s1-native-application-productization`, base `b93109a`, previous head `cd13801`.
+Branch `ma5-s1-native-application-productization`. PR #59 was merged into `main` at `cd13801` (merge `dad2433`) before
+S1R2 started, so the S1R2 commits are reviewed in follow-up **PR #60** (same branch, base `main`).
 Details: S1R2_CHAT_OUTCOME_RECOVERY.md, S1R2_ANDROID_LIFECYCLE.md, S1R2_FAULT_INJECTION.md. Device evidence:
 `evidence/s1r2/android-device/`.
 
@@ -19,10 +20,10 @@ Details: S1R2_CHAT_OUTCOME_RECOVERY.md, S1R2_ANDROID_LIFECYCLE.md, S1R2_FAULT_IN
 | R2-G9 | Real-socket lost-answer regression passes | **PASS** | ChatTurnTest C1 (JVM, real socket reset after the body; one delivery); gateway `native-companion.test.ts` 9/9; device A-after |
 | R2-G10 | Android native build and tests pass | **PASS** | `scripts/build-android.ps1`: connection policy 21, Keystore erasure 5, PollPolicy 22, HostExchange 37, ChatTurn 55, manifest launcher; no `android.webkit`; `classes.dex` `00eb4fa6…4702` |
 | R2-G11 | Existing Windows functionality remains intact | **PASS** | No Windows source changed. `native/windows/build.ps1` 0 warnings / 0 errors; Windows outcome harness against the modified Host: scripted 114/114, real Host 11/11 (`ma5s1r1-outcome-2026-10-28T20-42-32-698Z`) |
-| R2-G12 | Five hosted CI jobs pass on the exact final SHA | **Decided in PR #59** | This file is part of the final commit and cannot cite its runs; the links are in the PR and the final report |
+| R2-G12 | Five hosted CI jobs pass on the exact final SHA | **Decided in PR #60** | This file is part of the final commit and cannot cite its runs; the links are in the PR and the final report |
 | R2-G13 | Physical claims supported by device evidence | **PASS** | Every device row cites `evidence/s1r2/android-device/` dumps, screenshots and the proxy log. JVM results are not counted as device results |
 | R2-G14 | No release or installation over production | **PASS** | Disposable Host only; the owner's Host, state and Windows install untouched. The phone's Bunny A (previously the owner-approved S1R1 build) is now the S1R2 build, unpaired. Nothing released |
-| R2-G15 | PR #59 ready for independent merge review | **PASS**, subject to R2-G12 | — |
+| R2-G15 | Ready for independent merge review | **PASS**, subject to R2-G12 | PR #59 was already merged; review happens in PR #60 |
 
 ## Local regression (final tree)
 

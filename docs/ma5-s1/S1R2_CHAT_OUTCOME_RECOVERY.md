@@ -1,6 +1,6 @@
 # MA5-S1R2: Android chat outcome recovery
 
-PR #59, branch `ma5-s1-native-application-productization`, previous head `cd13801`.
+Branch `ma5-s1-native-application-productization` after `cd13801` (merged as PR #59); reviewed in PR #60.
 
 ## Defect (reproduced on the device before the fix)
 
