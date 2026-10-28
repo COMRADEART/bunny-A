@@ -8,7 +8,11 @@ public sealed record AppConfiguration
 {
     public string NotchEdge { get; init; } = "Top";
     public double NotchOffsetRatio { get; init; } = 0.5;
-    public bool NotchExpanded { get; init; } = false;
+    // Older builds wrote an unused NotchExpanded=false; a new name keeps their notch expanded.
+    public bool NotchCollapsed { get; init; } = false;
+    // Physical pixels of the notch's last top-left corner; it picks the monitor to restore to.
+    public double? NotchLeft { get; init; }
+    public double? NotchTop { get; init; }
     public bool ReducedMotion { get; init; } = false;
     public string PinnedModel { get; init; } = "auto";
     public bool StartupLaunch { get; init; } = false;

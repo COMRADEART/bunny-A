@@ -8,7 +8,9 @@ param(
   [string]$LocalOnly = "",
   [string]$TargetId = "",
   [string]$Match = "",
-  [string]$ConfigPath = ""
+  [string]$ConfigPath = "",
+  [int]$TargetX = 0,
+  [int]$TargetY = 0
 )
 
 # R1R2: per-monitor DPI awareness so UIA rectangles and the work area are both physical pixels.
@@ -16,6 +18,14 @@ Add-Type -Namespace R1R2 -Name Dpi -MemberDefinition @"
 [DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr value);
 [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
 [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
+[DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+[DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT p);
+[DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
+[DllImport("user32.dll")] public static extern IntPtr MonitorFromPoint(POINT pt, uint flags);
+[DllImport("user32.dll")] public static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
+public struct POINT { public int X; public int Y; }
+public struct RECT { public int Left, Top, Right, Bottom; }
+public struct MONITORINFO { public int cbSize; public RECT rcMonitor; public RECT rcWork; public uint dwFlags; }
 "@
 [void][R1R2.Dpi]::SetProcessDpiAwarenessContext([IntPtr]-4)
 # UI text (e.g. "ollama · model") must reach the caller intact, not in the console code page.
@@ -58,6 +68,22 @@ function Find-Descendant([System.Windows.Automation.AutomationElement]$parent, [
     if ($null -ne $elem) { return $elem }
   }
   return $null
+}
+
+function Get-Notch([int]$targetPid) {
+  $cond = New-Object System.Windows.Automation.AndCondition(
+    (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $targetPid)),
+    (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, "Bunny Island Notch")))
+  return [System.Windows.Automation.AutomationElement]::RootElement.FindFirst([System.Windows.Automation.TreeScope]::Children, $cond)
+}
+
+# Work area (physical px) of the monitor containing a point; the notch may be on any monitor.
+function Get-WorkAreaAt([int]$x, [int]$y) {
+  $pt = New-Object R1R2.Dpi+POINT; $pt.X = $x; $pt.Y = $y
+  $info = New-Object R1R2.Dpi+MONITORINFO; $info.cbSize = [System.Runtime.InteropServices.Marshal]::SizeOf($info)
+  [void][R1R2.Dpi]::GetMonitorInfo([R1R2.Dpi]::MonitorFromPoint($pt, 2), [ref]$info)
+  $w = $info.rcWork; $m = $info.rcMonitor
+  return @{ x = $w.Left; y = $w.Top; width = $w.Right - $w.Left; height = $w.Bottom - $w.Top; monitor = @{ x = $m.Left; y = $m.Top; width = $m.Right - $m.Left; height = $m.Bottom - $m.Top } }
 }
 
 function Invoke-Button([System.Windows.Automation.AutomationElement]$btn) {
@@ -329,8 +355,126 @@ switch ($Action) {
       scope = & $text "ApprovalScopeText"
       payloadSha256 = & $text "ApprovalPayloadShaText"
       effects = & $text "ApprovalEffectsText"
+      context = & $text "ApprovalContextText"
+      plan = & $text "ApprovalDiffText"
+      receipts = & $text "ApprovalReceiptText"
       approveEnabled = (Find-Descendant $win "ApproveActionButton").Current.IsEnabled
+      denyEnabled = (Find-Descendant $win "DenyActionButton").Current.IsEnabled
     } | ConvertTo-Json -Compress -Depth 4
+  }
+
+  "read_list" {
+    # Rows of any ListBox (-TargetId) as their accessible names, plus which is selected.
+    $win = Get-MainWindow $ProcessId
+    $list = Find-Descendant $win $TargetId
+    if ($null -eq $list) { throw "$TargetId not found" }
+    $rows = @()
+    foreach ($it in $list.FindAll([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition)) {
+      $sel = $it.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern) -as [System.Windows.Automation.SelectionItemPattern]
+      $rows += [PSCustomObject]@{ name = $it.Current.Name; selected = ($null -ne $sel -and $sel.Current.IsSelected) }
+    }
+    ConvertTo-Json -Compress -Depth 4 -InputObject @($rows)
+  }
+
+  "select_list_item" {
+    $win = Get-MainWindow $ProcessId
+    $list = Find-Descendant $win $TargetId
+    if ($null -eq $list) { throw "$TargetId not found" }
+    $hit = $null
+    for ($i = 0; $i -lt 40 -and $null -eq $hit; $i++) {
+      foreach ($it in $list.FindAll([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition)) {
+        if ($it.Current.Name -like "*$Match*") { $hit = $it; break }
+      }
+      if ($null -eq $hit) { Start-Sleep -Milliseconds 250 }
+    }
+    if ($null -eq $hit) { throw "No row of $TargetId mentions $Match" }
+    ($hit.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern) -as [System.Windows.Automation.SelectionItemPattern]).Select()
+    Start-Sleep -Milliseconds 300
+    [PSCustomObject]@{ selected = $hit.Current.Name } | ConvertTo-Json -Compress
+  }
+
+  "read_toggle" {
+    $win = Get-MainWindow $ProcessId
+    $e = Find-Descendant $win $TargetId
+    if ($null -eq $e) { throw "$TargetId not found" }
+    $t = $e.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern) -as [System.Windows.Automation.TogglePattern]
+    [PSCustomObject]@{ id = $TargetId; enabled = $e.Current.IsEnabled; on = ($t.Current.ToggleState -eq [System.Windows.Automation.ToggleState]::On) } | ConvertTo-Json -Compress
+  }
+
+  "click_toggle" {
+    # The screen-reader path: TogglePattern.Toggle(), which raises Checked/Unchecked but not Click.
+    $win = Get-MainWindow $ProcessId
+    $e = Find-Descendant $win $TargetId
+    if ($null -eq $e) { throw "$TargetId not found" }
+    ($e.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern) -as [System.Windows.Automation.TogglePattern]).Toggle()
+    Start-Sleep -Milliseconds 500
+    [PSCustomObject]@{ toggled = $TargetId } | ConvertTo-Json -Compress
+  }
+
+  "set_text" {
+    $win = Get-MainWindow $ProcessId
+    $e = Find-Descendant $win $TargetId
+    if ($null -eq $e) { throw "$TargetId not found" }
+    ($e.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern) -as [System.Windows.Automation.ValuePattern]).SetValue($PromptText)
+    [PSCustomObject]@{ set = $TargetId } | ConvertTo-Json -Compress
+  }
+
+  "invoke_notch" {
+    # Invokes a notch control by AutomationId (keyboard/UIA path, no mouse), then reports the foreground owner.
+    $notch = Get-Notch $ProcessId
+    if ($null -eq $notch) { throw "Notch window not found" }
+    $btn = Find-Descendant $notch $TargetId
+    if ($null -eq $btn) { throw "$TargetId not found on the notch" }
+    Invoke-Button $btn; Start-Sleep -Milliseconds 500
+    $fg = [R1R2.Dpi]::GetForegroundWindow(); $fgPid = [uint32]0; [void][R1R2.Dpi]::GetWindowThreadProcessId($fg, [ref]$fgPid)
+    [PSCustomObject]@{ invoked = $TargetId; foregroundPid = $fgPid } | ConvertTo-Json -Compress
+  }
+
+  "close_main_window" {
+    # The title-bar close (WindowPattern.Close), which Bunny A turns into hide-to-notch.
+    $win = Get-MainWindow $ProcessId
+    ($win.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern) -as [System.Windows.Automation.WindowPattern]).Close()
+    Start-Sleep -Milliseconds 800
+    $proc = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+    $cond = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $ProcessId)
+    $names = @([System.Windows.Automation.AutomationElement]::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children, $cond) | ForEach-Object { $_.Current.Name })
+    [PSCustomObject]@{ processAlive = ($null -ne $proc); visibleWindows = $names } | ConvertTo-Json -Compress
+  }
+
+  "drag_notch" {
+    # A real mouse drag (physical px) from the notch's first agent icon to -TargetX/-TargetY, then release.
+    $notch = Get-Notch $ProcessId
+    if ($null -eq $notch) { throw "Notch window not found" }
+    $grip = $null
+    foreach ($id in @("AgentGada","VAgentGada")) { $e = Find-Descendant $notch $id; if ($null -ne $e -and -not $e.Current.IsOffscreen) { $grip = $e; break } }
+    if ($null -eq $grip) { throw "No visible agent icon to grab" }
+    $g = $grip.Current.BoundingRectangle
+    $sx = [int]($g.X + $g.Width / 2); $sy = [int]($g.Y + $g.Height / 2)
+    $saved = New-Object R1R2.Dpi+POINT; [void][R1R2.Dpi]::GetCursorPos([ref]$saved)
+    [void][R1R2.Dpi]::SetCursorPos($sx, $sy); Start-Sleep -Milliseconds 120
+    [R1R2.Dpi]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero) # LEFTDOWN
+    # Let the window enter its move loop before the pointer travels; otherwise the first part of the path is lost.
+    Start-Sleep -Milliseconds 600
+    for ($i = 1; $i -le 40; $i++) {
+      [void][R1R2.Dpi]::SetCursorPos([int]($sx + ($TargetX - $sx) * $i / 40), [int]($sy + ($TargetY - $sy) * $i / 40))
+      Start-Sleep -Milliseconds 30
+    }
+    Start-Sleep -Milliseconds 200
+    $held = $notch.Current.BoundingRectangle
+    [R1R2.Dpi]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero) # LEFTUP
+    Start-Sleep -Milliseconds 700
+    [void][R1R2.Dpi]::SetCursorPos($saved.X, $saved.Y)
+    [PSCustomObject]@{ from = @{ x = $sx; y = $sy }; to = @{ x = $TargetX; y = $TargetY }; whileHeld = @{ x = $held.X; y = $held.Y; width = $held.Width; height = $held.Height } } | ConvertTo-Json -Compress
+  }
+
+  "monitors" {
+    $all = @()
+    foreach ($s in [System.Windows.Forms.Screen]::AllScreens) {
+      $b = $s.Bounds
+      $wa = Get-WorkAreaAt ([int]($b.X + 1)) ([int]($b.Y + 1))
+      $all += [PSCustomObject]@{ device = $s.DeviceName; primary = $s.Primary; monitor = $wa.monitor; workArea = @{ x = $wa.x; y = $wa.y; width = $wa.width; height = $wa.height } }
+    }
+    ConvertTo-Json -Compress -Depth 4 -InputObject @($all)
   }
 
   "select_approval" {
@@ -395,14 +539,25 @@ switch ($Action) {
         $agents += [PSCustomObject]@{ id = $id; x = $b.X; y = $b.Y; width = $b.Width; height = $b.Height }
       }
     }
-    $wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+    # MA5-S1: the work area of the monitor holding the notch's centre (equals the primary one on a single monitor).
+    $wa = Get-WorkAreaAt ([int]($r.X + $r.Width / 2)) ([int]($r.Y + $r.Height / 2))
     $fg = [R1R2.Dpi]::GetForegroundWindow(); $fgPid = [uint32]0; [void][R1R2.Dpi]::GetWindowThreadProcessId($fg, [ref]$fgPid)
     $fgName = ""; try { $fgName = [System.Windows.Automation.AutomationElement]::FromHandle($fg).Current.Name } catch {}
     $persisted = ""
     if ($ConfigPath -and (Test-Path $ConfigPath)) { $persisted = (Get-Content $ConfigPath -Raw | ConvertFrom-Json).NotchEdge }
+    $badges = @()
+    foreach ($id in @("ApprovalBadge","VApprovalBadge","QuickStopButton","VQuickStopButton","CollapseButton","VCollapseButton")) {
+      $e = Find-Descendant $notch $id
+      if ($null -ne $e -and -not $e.Current.IsOffscreen) { $badges += $id }
+    }
+    $title = Find-Descendant $notch "NotchTitle"; $subtitle = Find-Descendant $notch "NotchSubtitle"
     [PSCustomObject]@{
       notch = @{ x = $r.X; y = $r.Y; width = $r.Width; height = $r.Height; offscreen = $notch.Current.IsOffscreen }
-      workArea = @{ x = $wa.X; y = $wa.Y; width = $wa.Width; height = $wa.Height }
+      workArea = @{ x = $wa.x; y = $wa.y; width = $wa.width; height = $wa.height }
+      monitor = $wa.monitor
+      visibleControls = @($badges)
+      title = if ($null -ne $title) { $title.Current.Name } else { $null }
+      subtitle = if ($null -ne $subtitle) { $subtitle.Current.Name } else { $null }
       agents = @($agents)
       foreground = @{ pid = $fgPid; name = $fgName }
       persistedEdge = $persisted

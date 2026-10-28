@@ -1,4 +1,4 @@
-<Window x:Class="BunnyA.NotchWindow"
+﻿<Window x:Class="BunnyA.NotchWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Bunny Island Notch"
@@ -6,104 +6,130 @@
         AllowsTransparency="True"
         Topmost="True"
         ShowInTaskbar="False"
+        ShowActivated="False"
         Background="Transparent"
         FontFamily="Segoe UI"
         SizeToContent="WidthAndHeight"
         MouseLeftButtonDown="Window_MouseLeftButtonDown">
+  <Window.Resources>
+    <!-- Flat glass chip buttons used for every notch control, so each one is focusable and keyboard-operable. -->
+    <Style x:Key="ChipButton" TargetType="Button">
+      <Setter Property="Background" Value="#1C2438"/>
+      <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+      <Setter Property="BorderBrush" Value="#2C3652"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Padding" Value="8,3"/>
+      <Setter Property="MinHeight" Value="28"/>
+      <Setter Property="MinWidth" Value="28"/>
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Chip" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="12" Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Chip" Property="BorderBrush" Value="#5B6CFF"/>
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="Chip" Property="BorderBrush" Value="#B9C6FF"/>
+                <Setter TargetName="Chip" Property="BorderThickness" Value="2"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="AgentBadge" TargetType="Border">
+      <Setter Property="Background" Value="#20FFFFFF"/>
+      <Setter Property="BorderThickness" Value="1.5"/>
+      <Setter Property="BorderBrush" Value="#2C3652"/>
+      <Setter Property="Opacity" Value="0.45"/>
+    </Style>
+  </Window.Resources>
   <Border x:Name="NotchBorder"
           Background="#D8141824"
           BorderBrush="{StaticResource GlassEdgeBrush}"
           BorderThickness="1.5"
           CornerRadius="24"
           Padding="14,8"
-          Margin="12"
-          Effect="{DynamicResource ShadowEffect}">
-    <Border.Resources>
-      <DropShadowEffect x:Key="ShadowEffect" BlurRadius="24" ShadowDepth="4" Direction="270" Color="#000000" Opacity="0.55"/>
-    </Border.Resources>
-    
+          Margin="12">
+    <Border.Effect>
+      <DropShadowEffect BlurRadius="24" ShadowDepth="4" Direction="270" Color="#000000" Opacity="0.55"/>
+    </Border.Effect>
+
     <Grid x:Name="NotchLayoutGrid">
-      <!-- Horizontal Notch Layout (Top / Bottom) -->
+      <!-- Horizontal Notch Layout (Top / Bottom): agent icons sit to the LEFT -->
       <StackPanel x:Name="HorizontalLayout" Orientation="Horizontal" VerticalAlignment="Center">
-        <!-- Agent indicators reflow to the LEFT for horizontal notch -->
         <StackPanel x:Name="HorizontalAgentsPanel" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0">
-          <!-- Gada -->
-          <Border x:Name="GadaBadge" ToolTip="Gada (Slot 1)" Background="#20FFFFFF" CornerRadius="16" Width="32" Height="32" Margin="2,0" BorderThickness="1.5" BorderBrush="#3550D6">
+          <Border x:Name="GadaBadge" Style="{StaticResource AgentBadge}" CornerRadius="16" Width="32" Height="32" Margin="2,0" ToolTip="Gada">
             <Image Source="pack://application:,,,/Assets/characters/gada.compact.png" Stretch="Uniform" Margin="3" AutomationProperties.AutomationId="AgentGada" AutomationProperties.Name="Gada"/>
           </Border>
-          <!-- Spear -->
-          <Border x:Name="SpearBadge" ToolTip="Spear (Slot 2)" Background="#20FFFFFF" CornerRadius="16" Width="32" Height="32" Margin="2,0" BorderThickness="1.5" BorderBrush="#2C3652">
+          <Border x:Name="SpearBadge" Style="{StaticResource AgentBadge}" CornerRadius="16" Width="32" Height="32" Margin="2,0" ToolTip="Spear">
             <Image Source="pack://application:,,,/Assets/characters/spear.compact.png" Stretch="Uniform" Margin="3" AutomationProperties.AutomationId="AgentSpear" AutomationProperties.Name="Spear"/>
           </Border>
-          <!-- Chakra -->
-          <Border x:Name="ChakraBadge" ToolTip="Vishnu Chakra (Slot 3)" Background="#20FFFFFF" CornerRadius="16" Width="32" Height="32" Margin="2,0" BorderThickness="1.5" BorderBrush="#2C3652">
+          <Border x:Name="ChakraBadge" Style="{StaticResource AgentBadge}" CornerRadius="16" Width="32" Height="32" Margin="2,0" ToolTip="Vishnu Chakra">
             <Image Source="pack://application:,,,/Assets/characters/chakra.compact.png" Stretch="Uniform" Margin="3" AutomationProperties.AutomationId="AgentChakra" AutomationProperties.Name="Chakra"/>
           </Border>
-          <!-- Sword -->
-          <Border x:Name="SwordBadge" ToolTip="Sword (Slot 4)" Background="#20FFFFFF" CornerRadius="16" Width="32" Height="32" Margin="2,0" BorderThickness="1.5" BorderBrush="#2C3652">
+          <Border x:Name="SwordBadge" Style="{StaticResource AgentBadge}" CornerRadius="16" Width="32" Height="32" Margin="2,0" ToolTip="Sword">
             <Image Source="pack://application:,,,/Assets/characters/sword.compact.png" Stretch="Uniform" Margin="3" AutomationProperties.AutomationId="AgentSword" AutomationProperties.Name="Sword"/>
           </Border>
         </StackPanel>
 
-        <!-- Bunny Avatar -->
-        <Border CornerRadius="18" Width="36" Height="36" Background="#26304D" BorderThickness="1" BorderBrush="#5B6CFF" Margin="0,0,10,0">
+        <Button x:Name="CollapseButton" Style="{StaticResource ChipButton}" Padding="0" Width="38" Height="38" Margin="0,0,10,0" Background="#26304D" BorderBrush="#5B6CFF"
+                Click="Collapse_Click" AutomationProperties.Name="Collapse or expand the notch" ToolTip="Collapse / expand">
           <Image x:Name="BunnyAvatar" Source="pack://application:,,,/Assets/characters/bunny.idle.png" Stretch="Uniform" Margin="3"/>
-        </Border>
+        </Button>
 
-        <!-- Status & Activity Capsule -->
-        <StackPanel VerticalAlignment="Center" Margin="0,0,12,0" MaxWidth="280">
-          <TextBlock x:Name="NotchTitle" Text="Bunny A · Ready" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextBrush}"/>
-          <TextBlock x:Name="NotchSubtitle" Text="Idle · 4 agents standing by" FontSize="11" Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis"/>
-        </StackPanel>
-
-        <!-- Pending Approval Alert Badge (Visible when approvals wait) -->
-        <Border x:Name="ApprovalBadge" Visibility="Collapsed" Background="{StaticResource WarningBrush}" CornerRadius="12" Padding="8,2" Margin="0,0,8,0" Cursor="Hand" MouseLeftButtonUp="ApprovalBadge_Click">
-          <StackPanel Orientation="Horizontal">
-            <TextBlock Text="⚠️ Approval Needed" FontSize="11" FontWeight="Bold" Foreground="#121726"/>
+        <StackPanel x:Name="HorizontalDetails" Orientation="Horizontal" VerticalAlignment="Center">
+          <StackPanel VerticalAlignment="Center" Margin="0,0,12,0" MaxWidth="280">
+            <TextBlock x:Name="NotchTitle" Text="Bunny A Â· Connecting" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextBrush}"/>
+            <TextBlock x:Name="NotchSubtitle" Text="Waiting for the Host" FontSize="11" Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis"/>
           </StackPanel>
-        </Border>
-
-        <!-- Voice Indicator Pill -->
-        <Border x:Name="VoicePill" Background="#1C2438" CornerRadius="12" Padding="8,4" Margin="0,0,8,0" Cursor="Hand" MouseLeftButtonUp="VoicePill_Click">
-          <TextBlock x:Name="VoiceStatusText" Text="🎙️ Voice" FontSize="11" FontWeight="Medium" Foreground="{StaticResource MutedBrush}"/>
-        </Border>
-
-        <!-- Quick Stop Button -->
-        <Button x:Name="QuickStopButton" Content="⏹ Stop" Style="{StaticResource DangerButtonStyle}" MinHeight="28" Padding="8,2" Margin="0,0,6,0" FontSize="11" Click="QuickStop_Click" Visibility="Collapsed"/>
-
-        <!-- Expand / Window Toggle -->
-        <Button x:Name="OpenWindowButton" Content="⤢ Open" Style="{StaticResource {x:Type Button}}" MinHeight="28" Padding="8,2" FontSize="11" Click="OpenWindow_Click"/>
-        
-        <!-- Edge Switcher Dropdown / Button -->
-        <Button x:Name="DockEdgeButton" Content="⚓ Edge" ToolTip="Switch Dock Edge (Top, Bottom, Left, Right)" MinHeight="28" Padding="6,2" Margin="4,0,0,0" FontSize="11" Click="DockEdge_Click"/>
+          <Button x:Name="ApprovalBadge" Style="{StaticResource ChipButton}" Visibility="Collapsed" Background="{StaticResource WarningBrush}" Foreground="#121726" FontWeight="Bold" Margin="0,0,8,0"
+                  Content="âš ï¸ Approval Needed" Click="ApprovalBadge_Click" AutomationProperties.Name="Open the Approval Center"/>
+          <Button x:Name="VoicePill" Style="{StaticResource ChipButton}" Margin="0,0,8,0" Click="VoicePill_Click" AutomationProperties.Name="Open Voice Studio">
+            <TextBlock x:Name="VoiceStatusText" Text="ðŸŽ™ï¸ Voice" FontWeight="Medium" Foreground="{StaticResource MutedBrush}"/>
+          </Button>
+          <Button x:Name="QuickStopButton" Content="â¹ Stop" Style="{StaticResource DangerButtonStyle}" MinHeight="28" Padding="8,2" Margin="0,0,6,0" FontSize="11" Click="QuickStop_Click" Visibility="Collapsed" AutomationProperties.Name="Stop the running task"/>
+          <Button x:Name="OpenWindowButton" Content="â¤¢ Open" Style="{StaticResource ChipButton}" Click="OpenWindow_Click" AutomationProperties.Name="Open Bunny A"/>
+          <Button x:Name="DockEdgeButton" Content="âš“ Edge" Style="{StaticResource ChipButton}" ToolTip="Move to the next screen edge (Top, Right, Bottom, Left)" Margin="4,0,0,0" Click="DockEdge_Click" AutomationProperties.Name="Move the notch to the next edge"/>
+        </StackPanel>
       </StackPanel>
 
-      <!-- Vertical Notch Layout (Left / Right) -->
+      <!-- Vertical Notch Layout (Left / Right): agent icons sit ABOVE -->
       <StackPanel x:Name="VerticalLayout" Orientation="Vertical" HorizontalAlignment="Center" Visibility="Collapsed">
-        <!-- Agent indicators reflow to the TOP for vertical notch -->
         <StackPanel x:Name="VerticalAgentsPanel" Orientation="Vertical" HorizontalAlignment="Center" Margin="0,0,0,10">
-          <Border x:Name="VGadaBadge" ToolTip="Gada (Slot 1)" Background="#20FFFFFF" CornerRadius="14" Width="28" Height="28" Margin="0,2" BorderThickness="1.5" BorderBrush="#3550D6">
+          <Border x:Name="VGadaBadge" Style="{StaticResource AgentBadge}" CornerRadius="14" Width="28" Height="28" Margin="0,2" ToolTip="Gada">
             <Image Source="pack://application:,,,/Assets/characters/gada.compact.png" Stretch="Uniform" Margin="2" AutomationProperties.AutomationId="VAgentGada" AutomationProperties.Name="Gada"/>
           </Border>
-          <Border x:Name="VSpearBadge" ToolTip="Spear (Slot 2)" Background="#20FFFFFF" CornerRadius="14" Width="28" Height="28" Margin="0,2" BorderThickness="1.5" BorderBrush="#2C3652">
+          <Border x:Name="VSpearBadge" Style="{StaticResource AgentBadge}" CornerRadius="14" Width="28" Height="28" Margin="0,2" ToolTip="Spear">
             <Image Source="pack://application:,,,/Assets/characters/spear.compact.png" Stretch="Uniform" Margin="2" AutomationProperties.AutomationId="VAgentSpear" AutomationProperties.Name="Spear"/>
           </Border>
-          <Border x:Name="VChakraBadge" ToolTip="Vishnu Chakra (Slot 3)" Background="#20FFFFFF" CornerRadius="14" Width="28" Height="28" Margin="0,2" BorderThickness="1.5" BorderBrush="#2C3652">
+          <Border x:Name="VChakraBadge" Style="{StaticResource AgentBadge}" CornerRadius="14" Width="28" Height="28" Margin="0,2" ToolTip="Vishnu Chakra">
             <Image Source="pack://application:,,,/Assets/characters/chakra.compact.png" Stretch="Uniform" Margin="2" AutomationProperties.AutomationId="VAgentChakra" AutomationProperties.Name="Chakra"/>
           </Border>
-          <Border x:Name="VSwordBadge" ToolTip="Sword (Slot 4)" Background="#20FFFFFF" CornerRadius="14" Width="28" Height="28" Margin="0,2" BorderThickness="1.5" BorderBrush="#2C3652">
+          <Border x:Name="VSwordBadge" Style="{StaticResource AgentBadge}" CornerRadius="14" Width="28" Height="28" Margin="0,2" ToolTip="Sword">
             <Image Source="pack://application:,,,/Assets/characters/sword.compact.png" Stretch="Uniform" Margin="2" AutomationProperties.AutomationId="VAgentSword" AutomationProperties.Name="Sword"/>
           </Border>
         </StackPanel>
 
-        <!-- Bunny Avatar -->
-        <Border CornerRadius="16" Width="32" Height="32" Background="#26304D" BorderThickness="1" BorderBrush="#5B6CFF" Margin="0,0,0,8">
+        <Button x:Name="VCollapseButton" Style="{StaticResource ChipButton}" Padding="0" Width="34" Height="34" Margin="0,0,0,8" Background="#26304D" BorderBrush="#5B6CFF"
+                Click="Collapse_Click" AutomationProperties.Name="Collapse or expand the notch" ToolTip="Collapse / expand">
           <Image x:Name="VBunnyAvatar" Source="pack://application:,,,/Assets/characters/bunny.idle.png" Stretch="Uniform" Margin="2"/>
-        </Border>
+        </Button>
 
-        <!-- Vertical Action Buttons -->
-        <Button x:Name="VOpenWindowButton" Content="⤢" ToolTip="Open Bunny A Window" MinHeight="26" Width="26" Padding="0" Click="OpenWindow_Click" Margin="0,2"/>
-        <Button x:Name="VDockEdgeButton" Content="⚓" ToolTip="Switch Dock Edge" MinHeight="26" Width="26" Padding="0" Click="DockEdge_Click" Margin="0,2"/>
+        <StackPanel x:Name="VerticalDetails" HorizontalAlignment="Center">
+          <Button x:Name="VApprovalBadge" Style="{StaticResource ChipButton}" Visibility="Collapsed" Background="{StaticResource WarningBrush}" Foreground="#121726" Content="âš ï¸" Margin="0,2"
+                  Click="ApprovalBadge_Click" ToolTip="Approval needed" AutomationProperties.Name="Open the Approval Center"/>
+          <Button x:Name="VQuickStopButton" Style="{StaticResource DangerButtonStyle}" Content="â¹" MinHeight="26" Width="28" Padding="0" Margin="0,2" Click="QuickStop_Click" Visibility="Collapsed"
+                  ToolTip="Stop the running task" AutomationProperties.Name="Stop the running task"/>
+          <Button x:Name="VOpenWindowButton" Style="{StaticResource ChipButton}" Content="â¤¢" ToolTip="Open Bunny A" Margin="0,2" Click="OpenWindow_Click" AutomationProperties.Name="Open Bunny A"/>
+          <Button x:Name="VDockEdgeButton" Style="{StaticResource ChipButton}" Content="âš“" ToolTip="Move to the next screen edge" Margin="0,2" Click="DockEdge_Click" AutomationProperties.Name="Move the notch to the next edge"/>
+        </StackPanel>
       </StackPanel>
     </Grid>
   </Border>
