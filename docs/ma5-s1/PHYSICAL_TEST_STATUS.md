@@ -15,3 +15,8 @@
 Nothing in this milestone was installed over the owner's active Bunny A.
 
 S1R1: the phone's Bunny A was upgraded from v3 to the S1R1 native companion with the owner's approval, and paired only with a disposable Host.
+
+S1R2 (same phone, disposable Host, owner's Host untouched): rotation, force-stop/update relaunch, backgrounding,
+airplane-mode network loss, gateway restart and Host restart were driven with an unresolved chat message
+(S1R2_ANDROID_LIFECYCLE.md, S1R2_FAULT_INJECTION.md). The phone's Bunny A is now the S1R2 build, **unpaired**
+(revoked on the disposable Host, key erased). TalkBack and low-memory process kill: still NOT TESTED.

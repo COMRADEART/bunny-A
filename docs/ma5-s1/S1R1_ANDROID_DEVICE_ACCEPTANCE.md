@@ -72,7 +72,8 @@ Tests:
    (D6).
 3. **Offline wording.** An HTTP 530 from the tunnel provider is described as "the workstation refused this request".
 4. **Chat line during an unknown outcome.** Behind the "Outcome unknown" dialog, the chat line read "Sending to the
-   workstation…". Its text after the dialog was dismissed was not checked.
+   workstation…". Its text after the dialog was dismissed was not checked. **S1R2:** reproduced (the line stayed "Sending…" and Send
+   was enabled again) and fixed; see S1R2_CHAT_OUTCOME_RECOVERY.md.
 5. **TalkBack / screen reader** was not exercised by a person. Rotation and process death were not driven.
 
 ## State left on the device

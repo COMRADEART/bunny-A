@@ -108,3 +108,19 @@ Intermediate head `394f4d1` (code complete, before these documents):
 **These runs do not cover the final PR commit.** This document is part of the final commit, so it cannot record
 the CI runs of that same commit. The run IDs and conclusions for the exact final head are recorded in the PR #59
 description and in the final report. S1-G18 is decided from those runs only.
+
+## S1R2 (local, final tree)
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | pass |
+| `npm test` (includes `test:ma4`) | 2,534 tests: 2,533 pass, 0 fail, 1 opt-in skip. Phases: 474 / 1,680 / 62 / 318 (`test:ma4`) |
+| `npm run test:ui` | 421 / 421 |
+| `npm run build` | pass |
+| `npm audit --omit=dev --audit-level=high` | 0 vulnerabilities |
+| `native/windows/build.ps1` | 0 warnings, 0 errors |
+| `scripts/verify-ma5-s1r1-outcome.mjs` | scripted 114/114, real Host 11/11 (`ma5s1r1-outcome-2026-10-28T20-42-32-698Z`) |
+| `scripts/prepare-android-native-tools.ps1` | pass (hash-verified downloads) |
+| `scripts/build-android.ps1` | pass; ChatTurn 55, HostExchange 37, PollPolicy 22, Keystore 5, connection policy 21; `classes.dex` `00eb4fa6…4702` |
+
+Hosted CI for the final S1R2 SHA is recorded in PR #59 (a commit cannot cite its own runs).
