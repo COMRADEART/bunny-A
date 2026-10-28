@@ -1,0 +1,73 @@
+{
+  "ok": true,
+  "approve": {
+    "taskId": "ptask-63f06e15-2fa8-4779-beaf-2083edc880ca",
+    "actionId": "act-79f329d4-2cbe-4b8c-92c6-96dd6b96f32f",
+    "hostPayloadSha256": "ae3389a2706f79381e2c04e9fee5b260614b3dc7677ec9a2fe129339f583d458",
+    "uiPayloadSha256": "ae3389a2706f79381e2c04e9fee5b260614b3dc7677ec9a2fe129339f583d458",
+    "uiScope": "Folder ma5s1 (write)",
+    "uiEffects": "idempotent, consequential, reversible. Changes one file on this PC. The previous version is kept in Bunny's backup folder.",
+    "uiContext": "Worker · apply (step 2 of 3). If Bunny-A stops while this runs, it first checks (by this action's key) whether it was already applied, and only then tries once more. Approval window ends 2:38:13 AM. 3 prior receipt(s) for this task.",
+    "beforeSha256": "7343cfef0ce09677cead36165deb0c48537d42de4273b61f83fdf343c650dd58",
+    "afterSha256": "5f54d62876ce612e1e1565651ca2df19274f0d1f843359d67047e5e56d940740",
+    "uiDialog": {
+      "invoked": "ApproveActionButton",
+      "dialogTitle": null,
+      "dialogText": null
+    },
+    "finalState": "COMPLETED",
+    "testReceipt": "receipt:test-exec:test-1793168600411-45eb7796:dcf056ed7ab75b7bfd190b8b5d15f53dbd4af9c05df0e861069ead6be71ae9d5",
+    "testExitCode": 0,
+    "actionReceipts": 6,
+    "ledgerVerified": {
+      "ok": true,
+      "entries": 6
+    }
+  },
+  "incorrectHash": {
+    "channel": "Host command (contract the UI calls)",
+    "httpStatus": 400,
+    "refusal": "The action changed since you reviewed it; nothing was approved. Inspect it again."
+  },
+  "deny": {
+    "taskId": "ptask-3372c2aa-da98-4cdd-8385-b0da6df17dda",
+    "uiDialog": {
+      "invoked": "DenyActionButton",
+      "dialogTitle": null,
+      "dialogText": null
+    },
+    "finalState": "FAILED",
+    "fileUnchanged": true
+  },
+  "stale": {
+    "taskId": "ptask-f774b917-3329-4602-bb0d-ef2b4c47dbc8",
+    "uiDialog": {
+      "invoked": "ApproveActionButton",
+      "dialogTitle": null,
+      "dialogText": null
+    },
+    "uiRowGoneAfterCancel": true,
+    "approveEnabledAfterCancel": false,
+    "uiDecision": "2:23:41 AM  DENIED · file.apply · MA5 deny · digest 6a574358bbbf14e9… · Host operation b6abf322-be18-4f57-823d-744b14cf9317 applied",
+    "hostCommandsAfterCancel": [
+      "workstation: ptask.cancel"
+    ],
+    "approveReachedHost": false,
+    "finalState": "CANCELLED",
+    "fileUnchanged": true
+  },
+  "restart": {
+    "epochChanged": true,
+    "pendingActionSurvived": true,
+    "selectionClearedByUi": true,
+    "approveEnabledWithoutReview": false,
+    "uiDialog": {
+      "invoked": "ApproveActionButton",
+      "dialogTitle": null,
+      "dialogText": null
+    },
+    "finalState": "COMPLETED",
+    "fileAfter": "{\"state\":\"updated\"}"
+  },
+  "decisionLog": "2:23:41 AM  DENIED · file.apply · MA5 deny · digest 6a574358bbbf14e9… · Host operation b6abf322-be18-4f57-823d-744b14cf9317 applied\n2:23:20 AM  APPROVED · file.apply · MA5 approve · digest ae3389a2706f7938… · Host operation 7664b20a-7ef4-4838-a675-b93c9844aa46 applied\n2:21:19 AM  APPROVED · mission.approve · MA5-S1 roles 1793168471202: is 17 prime? · digest 6edfdbace3e1a122… · Host operation 5afdbf73-8506-4161-9207-20630e9428a4 applied\n2:20:38 AM  APPROVED · mission.approve · MA5-S1 mission 1793168415944: list three prime numbers below 20 and check them. · digest 06df0679b409ac66… · Host operation 1258ded9-aacd-4cf3-b032-d930733baa0b applied"
+}
