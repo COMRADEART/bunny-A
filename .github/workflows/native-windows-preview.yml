@@ -6,6 +6,9 @@ on:
       - 'native/windows/**'
       - 'scripts/verify-ma5-s1r1-outcome.mjs'
       - 'scripts/ma5-s1r1-installer.test.mjs'
+      # The real-Host outcome test runs against the Host's command and operation-ledger contract.
+      - 'src/lib/bunny-host/http.server.ts'
+      - 'src/lib/bunny-host/device-authority.server.ts'
       - '.github/workflows/native-windows-preview.yml'
   push:
     branches: ['codex/ma4-s3-t5-native-windows']
