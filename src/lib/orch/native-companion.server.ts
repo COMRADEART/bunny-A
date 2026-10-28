@@ -34,10 +34,12 @@ export async function nativeCompanionCommand(request: Request, deps: Deps): Prom
   catch { return Response.json({ error: "Companion connection refused.", code: "GATEWAY_REFUSED" }, { status: 403, headers: { "cache-control": "no-store" } }); }
   if (access.local) return Response.json({ error: "Use the configured HTTPS companion origin." }, { status: 403, headers: { "cache-control": "no-store" } });
   if (!access.token) return Response.json({ error: "Pair this device first.", code: "PAIRING_REQUIRED" }, { status: 401, headers: { "cache-control": "no-store" } });
+  let dispatched = false;
   try {
     const port = deps.hostPort();
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Invalid Host port");
     const body = await request.json();
+    dispatched = true;
     const upstream = await deps.fetchHost(`http://127.0.0.1:${port}/command`, {
       method: "POST",
       headers: { authorization: `Bearer ${access.token}`, "content-type": "application/json" },
@@ -50,7 +52,12 @@ export async function nativeCompanionCommand(request: Request, deps: Deps): Prom
     if (upstream.status === 429) return Response.json({ error: "Too many requests; try again later.", code: "RATE_LIMITED" }, { status: 429, headers: { "cache-control": "no-store" } });
     if (!upstream.ok) return Response.json({ error: result.error ?? "Command refused.", code: result.code ?? "COMMAND_REFUSED" }, { status: upstream.status, headers: { "cache-control": "no-store" } });
     return Response.json({ schema: "bunny.native.command.v1", ...result }, { headers: { "cache-control": "no-store" } });
-  } catch {
+  } catch (error) {
+    // Once the command was handed to the Host, a lost, late or unreadable answer leaves its outcome unknown (as
+    // transportFailure does for the dashboard); only a refused connection proves the Host never received it.
+    const refused = (error as { cause?: { code?: string } } | null)?.cause?.code === "ECONNREFUSED";
+    if (dispatched && !refused)
+      return Response.json({ error: "The Host did not confirm this command; its outcome is unknown. It was not retried.", code: "OUTCOME_UNKNOWN" }, { status: 504, headers: { "cache-control": "no-store" } });
     return Response.json({ error: "Host command unavailable.", code: "HOST_UNREACHABLE" }, { status: 503, headers: { "cache-control": "no-store" } });
   }
 }

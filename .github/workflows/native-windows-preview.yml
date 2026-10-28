@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'native/windows/**'
+      - 'scripts/verify-ma5-s1r1-outcome.mjs'
+      - 'scripts/ma5-s1r1-installer.test.mjs'
       - '.github/workflows/native-windows-preview.yml'
   push:
     branches: ['codex/ma4-s3-t5-native-windows']
@@ -15,12 +17,24 @@ jobs:
   build:
     name: Build WPF preview
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.408'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
       - name: Restore and build without package feeds
         shell: pwsh
         run: ./native/windows/build.ps1
+      - name: Reproducible Release development candidate (two clean builds must match)
+        shell: pwsh
+        run: ./native/windows/package-dev-candidate.ps1
+      - name: Installer ownership, traversal, junction and rollback tests (S1R1)
+        run: node --test scripts/ma5-s1r1-installer.test.mjs
+      - run: npm ci
+      - name: Command outcome integrity under injected network faults, scripted and real Host (S1R1)
+        run: node --experimental-strip-types scripts/verify-ma5-s1r1-outcome.mjs

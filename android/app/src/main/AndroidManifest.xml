@@ -1,15 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.routeragent.jev" android:versionCode="3" android:versionName="2.1">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.routeragent.jev" android:versionCode="4" android:versionName="2.2">
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35" />
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application android:label="Bunny-A" android:icon="@drawable/jev_icon" android:theme="@style/JevTheme" android:allowBackup="false" android:usesCleartextTraffic="false" android:supportsRtl="true" android:enableOnBackInvokedCallback="false">
         <activity android:name=".NativeCompanionActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
-        <activity android:name=".MainActivity" android:exported="true" android:windowSoftInputMode="adjustResize">
+        <!-- MA5-S1: the launcher opens the native companion. The alias keeps the previous launcher component name
+             (com.routeragent.jev/.MainActivity) so icons and shortcuts pinned by earlier versions still resolve
+             after an upgrade; the WebView activity it used to name no longer exists. -->
+        <activity-alias android:name=".MainActivity" android:targetActivity="com.routeragent.jev.NativeCompanionActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
     </application>
 </manifest>

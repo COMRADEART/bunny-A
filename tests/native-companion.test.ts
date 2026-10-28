@@ -51,12 +51,9 @@ test("Android Companion 3: Consequential approvals are refused to mobile compani
 // Keystore erasure is now exercised against real java.security.KeyStore behaviour in android/tests/KeystoreErasureTest.java
 // (run by scripts/build-android.ps1 in CI). Physical Android Keystore deletion remains NOT TESTED.
 
-test("Android Companion 8 (source check): WebView launcher is declared in the manifest", () => {
-  const manifest = readFileSync(join(process.cwd(), "android/app/src/main/AndroidManifest.xml"), "utf8");
-  assert.match(manifest, /MainActivity/, "MainActivity must exist in manifest");
-  assert.match(manifest, /android\.intent\.action\.MAIN/, "Main action intent-filter must be present");
-  assert.match(manifest, /NativeCompanionActivity/, "NativeCompanionActivity must be registered");
-});
+// MA5-S1: former test 8 asserted, by source text, that the WebView MainActivity stayed the launcher. The launcher is now
+// the native companion; android/tests/ManifestLauncherTest.java parses the manifest as XML and resolves the one launcher
+// to NativeCompanionActivity, and scripts/build-android.ps1 checks the same on the signed APK (CI: native-android-preview).
 
 test("Android Companion 9 (source check): session storage source uses AES/GCM and no plaintext token key", () => {
   const storeSource = readFileSync(join(process.cwd(), "android/app/src/main/java/com/routeragent/jev/NativeSessionStore.java"), "utf8");

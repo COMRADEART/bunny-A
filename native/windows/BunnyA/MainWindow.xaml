@@ -84,7 +84,7 @@
           <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
             <TextBlock Text="Model: " VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}" FontSize="12"/>
             <ComboBox x:Name="ChatModelCombo" Width="180" Background="{StaticResource ElevatedBrush}" Foreground="{StaticResource TextBrush}" Margin="6,0,12,0" AutomationProperties.Name="Chat model"/>
-            <CheckBox x:Name="LocalOnlyCheck" Content="Local only" VerticalAlignment="Center" Foreground="{StaticResource TextBrush}" Margin="0,0,12,0" ToolTip="Run only on a local model, offline. The Host refuses instead of using a hosted provider."/>
+            <CheckBox x:Name="LocalOnlyCheck" Checked="LocalOnly_Changed" Unchecked="LocalOnly_Changed" Content="Local only" VerticalAlignment="Center" Foreground="{StaticResource TextBrush}" Margin="0,0,12,0" ToolTip="Run only on a local model, offline. The Host refuses instead of using a hosted provider."/>
             <Button Content="New Chat" Padding="12,4" MinHeight="32" Click="NewChat_Click"/>
           </StackPanel>
         </DockPanel>
@@ -103,7 +103,7 @@
 
         <!-- Message History List -->
         <Border Grid.Row="2" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,0,0,14">
-          <ListBox x:Name="ChatHistoryList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBox x:Name="ChatHistoryList" AutomationProperties.Name="Conversation" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
             <ListBox.ItemTemplate>
               <DataTemplate>
                 <Border Background="{Binding BubbleBackground}" BorderBrush="{Binding BubbleBorder}" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,4" MaxWidth="750" HorizontalAlignment="{Binding Alignment}">
@@ -131,7 +131,7 @@
               <ColumnDefinition Width="*"/>
               <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBox x:Name="PromptInput" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="56" MaxHeight="120" VerticalScrollBarVisibility="Auto" KeyDown="PromptInput_KeyDown" ToolTip="Type your prompt or question here (Press Enter to Send, Shift+Enter for newline)"/>
+            <TextBox x:Name="PromptInput" AutomationProperties.Name="Prompt" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="56" MaxHeight="120" VerticalScrollBarVisibility="Auto" KeyDown="PromptInput_KeyDown" ToolTip="Type your prompt or question here (Press Enter to Send, Shift+Enter for newline)"/>
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom" Margin="10,0,0,0">
               <Button x:Name="SendButton" Content="Send" Style="{StaticResource PrimaryButtonStyle}" MinHeight="42" Padding="20,8" Margin="0,0,8,0" Click="SendPrompt_Click"/>
               <Button x:Name="StopButton" Content="Stop" Style="{StaticResource DangerButtonStyle}" MinHeight="42" Padding="14,8" Margin="0,0,8,0" IsEnabled="False" Click="StopInference_Click"/>
@@ -167,7 +167,7 @@
                 <Image Source="pack://application:,,,/Assets/characters/gada.compact.png" Stretch="Uniform" Margin="8"/>
               </Border>
               <TextBlock Text="GADA" FontWeight="Bold" FontSize="15" HorizontalAlignment="Center" Margin="0,8,0,2"/>
-              <TextBlock Text="Worker · Coding &amp; Execution" FontSize="11" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center"/>
+              <TextBlock x:Name="GadaDetailText" Text="Waiting for Host" FontSize="11" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="180"/>
               <Border x:Name="GadaStatusChip" Background="#263450" CornerRadius="8" Padding="8,3" Margin="0,8,0,0" HorizontalAlignment="Center">
                 <TextBlock x:Name="GadaStatusText" Text="IDLE" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource GlowBrush}"/>
               </Border>
@@ -181,7 +181,7 @@
                 <Image Source="pack://application:,,,/Assets/characters/spear.compact.png" Stretch="Uniform" Margin="8"/>
               </Border>
               <TextBlock Text="SPEAR" FontWeight="Bold" FontSize="15" HorizontalAlignment="Center" Margin="0,8,0,2"/>
-              <TextBlock Text="Tester · Test Verification" FontSize="11" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center"/>
+              <TextBlock x:Name="SpearDetailText" Text="Waiting for Host" FontSize="11" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="180"/>
               <Border x:Name="SpearStatusChip" Background="#263450" CornerRadius="8" Padding="8,3" Margin="0,8,0,0" HorizontalAlignment="Center">
                 <TextBlock x:Name="SpearStatusText" Text="IDLE" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource GlowBrush}"/>
               </Border>
@@ -195,7 +195,7 @@
                 <Image Source="pack://application:,,,/Assets/characters/chakra.compact.png" Stretch="Uniform" Margin="8"/>
               </Border>
               <TextBlock Text="VISHNU CHAKRA" FontWeight="Bold" FontSize="15" HorizontalAlignment="Center" Margin="0,8,0,2"/>
-              <TextBlock Text="Reviewer · Security &amp; Audit" FontSize="11" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center"/>
+              <TextBlock x:Name="ChakraDetailText" Text="Waiting for Host" FontSize="11" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="180"/>
               <Border x:Name="ChakraStatusChip" Background="#263450" CornerRadius="8" Padding="8,3" Margin="0,8,0,0" HorizontalAlignment="Center">
                 <TextBlock x:Name="ChakraStatusText" Text="IDLE" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource GlowBrush}"/>
               </Border>
@@ -209,7 +209,7 @@
                 <Image Source="pack://application:,,,/Assets/characters/sword.compact.png" Stretch="Uniform" Margin="8"/>
               </Border>
               <TextBlock Text="SWORD" FontWeight="Bold" FontSize="15" HorizontalAlignment="Center" Margin="0,8,0,2"/>
-              <TextBlock Text="Planner · Architecture" FontSize="11" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center"/>
+              <TextBlock x:Name="SwordDetailText" Text="Waiting for Host" FontSize="11" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="180"/>
               <Border x:Name="SwordStatusChip" Background="#263450" CornerRadius="8" Padding="8,3" Margin="0,8,0,0" HorizontalAlignment="Center">
                 <TextBlock x:Name="SwordStatusText" Text="IDLE" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource GlowBrush}"/>
               </Border>
@@ -222,12 +222,21 @@
           <DockPanel>
             <TextBlock Text="Active Tasks &amp; Workflow Execution" FontSize="16" FontWeight="SemiBold" DockPanel.Dock="Top" Margin="0,0,0,12"/>
             <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,12,0,0">
-              <Button x:Name="RunWithAgentsButton" Content="⚡ Run with Agents" Style="{StaticResource PrimaryButtonStyle}" Click="RunWithAgents_Click" Margin="0,0,8,0"/>
-              <Button x:Name="CancelActiveTaskButton" Content="Cancel Task" Style="{StaticResource DangerButtonStyle}" Click="CancelSelectedTask_Click" Margin="0,0,8,0"/>
-              <Button x:Name="PauseTaskButton" Content="Pause Task" Click="PauseSelectedTask_Click" Margin="0,0,8,0"/>
-              <Button x:Name="ResumeTaskButton" Content="Resume Task" Click="ResumeSelectedTask_Click"/>
+              <Button x:Name="RunWithAgentsButton" Content="⚖️ Review Plan &amp; Approve" Style="{StaticResource PrimaryButtonStyle}" Click="RunWithAgents_Click" Margin="0,0,8,0" IsEnabled="False" ToolTip="Opens this Mission's plan in the Approval Center"/>
+              <Button x:Name="CancelActiveTaskButton" Content="Cancel Task" Style="{StaticResource DangerButtonStyle}" Click="CancelSelectedTask_Click" Margin="0,0,8,0" IsEnabled="False"/>
+              <Button x:Name="PauseTaskButton" Content="Pause Task" Click="PauseSelectedTask_Click" Margin="0,0,8,0" IsEnabled="False"/>
+              <Button x:Name="ResumeTaskButton" Content="Resume Task" Click="ResumeSelectedTask_Click" IsEnabled="False"/>
             </StackPanel>
-            <ListBox x:Name="ActiveTasksList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" SelectionChanged="ActiveTasksList_SelectionChanged"/>
+            <Grid>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+              </Grid.RowDefinitions>
+              <ListBox x:Name="ActiveTasksList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" SelectionChanged="ActiveTasksList_SelectionChanged" AutomationProperties.Name="Active tasks and missions"/>
+              <TextBlock Grid.Row="1" x:Name="MissionStepsHeader" Text="Select a Mission to see its Host-reported steps." FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,8,0,4" TextWrapping="Wrap"/>
+              <ListBox Grid.Row="2" x:Name="MissionStepsList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="Mission steps"/>
+            </Grid>
           </DockPanel>
         </Border>
       </Grid>
@@ -252,9 +261,11 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
               </Grid.ColumnDefinitions>
-              <TextBox x:Name="NewProjectPathInput" Margin="0,0,10,0" ToolTip="Full path to local project folder"/>
-              <Button Grid.Column="1" Content="Browse…" Click="BrowseProjectFolder_Click" Margin="0,0,8,0"/>
-              <Button Grid.Column="1" Content="Register Workspace" Style="{StaticResource PrimaryButtonStyle}" Click="RegisterProject_Click" Margin="90,0,0,0"/>
+              <TextBox x:Name="NewProjectPathInput" Margin="0,0,10,0" ToolTip="Full path to local project folder" AutomationProperties.Name="Project folder path"/>
+              <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="Browse…" Click="BrowseProjectFolder_Click" Margin="0,0,8,0"/>
+                <Button Content="Register Workspace" Style="{StaticResource PrimaryButtonStyle}" Click="RegisterProject_Click"/>
+              </StackPanel>
             </Grid>
           </StackPanel>
         </Border>
@@ -269,7 +280,7 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
               </Grid.ColumnDefinitions>
-              <TextBox x:Name="ProjectMissionObjectiveInput" MinHeight="38" TextWrapping="Wrap" Margin="0,0,10,0" ToolTip="Enter multi-agent mission objective"/>
+              <TextBox x:Name="ProjectMissionObjectiveInput" MinHeight="38" TextWrapping="Wrap" Margin="0,0,10,0" ToolTip="Enter multi-agent mission objective" AutomationProperties.Name="Mission objective"/>
               <Button Grid.Column="1" Content="⚡ Propose Plan" Style="{StaticResource PrimaryButtonStyle}" Click="ProposeProjectMission_Click"/>
             </Grid>
           </StackPanel>
@@ -279,7 +290,7 @@
         <Border Grid.Row="3" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18">
           <DockPanel>
             <TextBlock Text="Registered Project Roots" FontSize="16" FontWeight="SemiBold" DockPanel.Dock="Top" Margin="0,0,0,12"/>
-            <ListBox x:Name="ProjectsList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}"/>
+            <ListBox x:Name="ProjectsList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" AutomationProperties.Name="Registered projects"/>
           </DockPanel>
         </Border>
       </Grid>
@@ -303,7 +314,7 @@
           <Border Grid.Column="0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="14" Margin="0,0,12,0">
             <DockPanel>
               <TextBlock Text="Pending Approvals" FontWeight="SemiBold" FontSize="15" DockPanel.Dock="Top" Margin="0,0,0,10"/>
-              <ListBox x:Name="PendingApprovalsList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" SelectionChanged="PendingApprovalsList_SelectionChanged"/>
+              <ListBox x:Name="PendingApprovalsList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" SelectionChanged="PendingApprovalsList_SelectionChanged" AutomationProperties.Name="Pending approvals"/>
             </DockPanel>
           </Border>
 
@@ -324,6 +335,9 @@
 
                     <TextBlock Text="Expected Side Effects:" FontWeight="SemiBold" Margin="0,10,0,4"/>
                     <TextBlock x:Name="ApprovalEffectsText" Text="-" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+
+                    <TextBlock Text="Host Recovery &amp; Expiry:" FontWeight="SemiBold" Margin="0,10,0,4"/>
+                    <TextBlock x:Name="ApprovalContextText" Text="-" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/>
                   </StackPanel>
                 </Border>
 
@@ -331,15 +345,17 @@
                 <TextBlock Text="Proposed Diff / Code Changes:" FontWeight="SemiBold" Margin="0,0,0,6"/>
                 <Border Background="#080B12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" MinHeight="140" Margin="0,0,0,16">
                   <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" MaxHeight="220">
-                    <TextBlock x:Name="ApprovalDiffText" Text="No diff content available for this action." FontFamily="Consolas" FontSize="12" Foreground="#86E8AB"/>
+                    <TextBlock x:Name="ApprovalDiffText" Text="No diff content available for this action." FontFamily="Consolas" FontSize="12" Foreground="#86E8AB" TextWrapping="Wrap"/>
                   </ScrollViewer>
                 </Border>
 
                 <!-- Approval Decision Controls -->
                 <StackPanel Orientation="Horizontal">
-                  <Button x:Name="ApproveActionButton" Content="✓ Approve Consequential Action" Style="{StaticResource SuccessButtonStyle}" MinHeight="44" Padding="22,8" Margin="0,0,12,0" Click="ApproveAction_Click"/>
-                  <Button x:Name="DenyActionButton" Content="✗ Deny Action" Style="{StaticResource DangerButtonStyle}" MinHeight="44" Padding="20,8" Click="DenyAction_Click"/>
+                  <Button x:Name="ApproveActionButton" Content="✓ Approve" Style="{StaticResource SuccessButtonStyle}" MinHeight="44" Padding="22,8" Margin="0,0,12,0" Click="ApproveAction_Click" IsEnabled="False"/>
+                  <Button x:Name="DenyActionButton" Content="✗ Deny" Style="{StaticResource DangerButtonStyle}" MinHeight="44" Padding="20,8" Click="DenyAction_Click" IsEnabled="False"/>
                 </StackPanel>
+                <TextBlock Text="Decisions recorded by the Host (this session):" FontWeight="SemiBold" Margin="0,16,0,4"/>
+                <TextBlock x:Name="ApprovalReceiptText" Text="No decisions yet." FontFamily="Consolas" FontSize="11" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/>
               </StackPanel>
             </ScrollViewer>
           </Border>
@@ -367,18 +383,19 @@
 
             <!-- Microphone Selection -->
             <StackPanel Grid.Column="0" Margin="0,0,16,0">
-              <TextBlock Text="Microphone Input Device" FontWeight="SemiBold" Margin="0,0,0,6"/>
-              <ComboBox x:Name="VoiceMicCombo" Background="{StaticResource ElevatedBrush}" Foreground="{StaticResource TextBrush}"/>
+              <TextBlock Text="Microphone (Windows default, reported by the voice worker)" FontWeight="SemiBold" Margin="0,0,0,6" TextWrapping="Wrap"/>
+              <TextBlock x:Name="VoiceInputText" Text="Not reported" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
             </StackPanel>
 
             <!-- Speaker Selection -->
             <StackPanel Grid.Column="1" Margin="0,0,16,0">
-              <TextBlock Text="Speaker Output Device" FontWeight="SemiBold" Margin="0,0,0,6"/>
-              <ComboBox x:Name="VoiceSpeakerCombo" Background="{StaticResource ElevatedBrush}" Foreground="{StaticResource TextBrush}"/>
+              <TextBlock Text="Speaker (Windows default, reported by the voice worker)" FontWeight="SemiBold" Margin="0,0,0,6" TextWrapping="Wrap"/>
+              <TextBlock x:Name="VoiceOutputText" Text="Not reported" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
             </StackPanel>
 
             <!-- Voice Session Toggle -->
             <StackPanel Grid.Column="2" VerticalAlignment="Bottom">
+              <TextBlock x:Name="VoiceStateText" Text="Voice: no session" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,6" HorizontalAlignment="Right"/>
               <Button x:Name="VoiceSessionButton" Content="🎙️ Open Voice Session" Style="{StaticResource PrimaryButtonStyle}" Click="ToggleVoiceSession_Click"/>
             </StackPanel>
           </Grid>
@@ -389,10 +406,10 @@
           <DockPanel>
             <!-- Controls Bar -->
             <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,14">
-              <Button x:Name="ListenStartButton" Content="Start Listening" Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,10,0" Click="VoiceListenStart_Click"/>
-              <Button x:Name="ListenEndButton" Content="Stop Listening" Margin="0,0,10,0" Click="VoiceListenEnd_Click"/>
-              <Button x:Name="VoiceBargeInButton" Content="⚡ Barge-In (Interrupt)" Style="{StaticResource DangerButtonStyle}" Margin="0,0,10,0" Click="VoiceInterrupt_Click"/>
-              <Button x:Name="VoiceMuteButton" Content="Mute Mic" Click="VoiceMute_Click"/>
+              <Button x:Name="ListenStartButton" Content="Start Listening" Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,10,0" Click="VoiceListenStart_Click" IsEnabled="False"/>
+              <Button x:Name="ListenEndButton" Content="Stop Listening" Margin="0,0,10,0" Click="VoiceListenEnd_Click" IsEnabled="False"/>
+              <Button x:Name="VoiceBargeInButton" Content="⚡ Barge-In (Interrupt)" Style="{StaticResource DangerButtonStyle}" Margin="0,0,10,0" Click="VoiceInterrupt_Click" IsEnabled="False"/>
+              <Button x:Name="VoiceMuteButton" Content="Mute Mic" Click="VoiceMute_Click" IsEnabled="False"/>
             </StackPanel>
 
             <TextBlock Text="Live Voice Transcription &amp; Dialogue" FontSize="15" FontWeight="SemiBold" DockPanel.Dock="Top" Margin="0,0,0,8"/>
@@ -414,11 +431,11 @@
           <DockPanel>
             <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,12,0,0">
               <TextBlock Text="Reconcile Uncertain Task:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-              <Button Content="Mark as Happened" Margin="0,0,8,0" Click="ReconcileHappened_Click"/>
-              <Button Content="Mark as Not Happened" Margin="0,0,8,0" Click="ReconcileNotHappened_Click"/>
-              <Button Content="Abandon" Style="{StaticResource DangerButtonStyle}" Click="ReconcileAbandon_Click"/>
+              <Button x:Name="ReconcileHappenedButton" Content="Mark as Happened" Margin="0,0,8,0" Click="ReconcileHappened_Click" IsEnabled="False"/>
+              <Button x:Name="ReconcileNotHappenedButton" Content="Mark as Not Happened" Margin="0,0,8,0" Click="ReconcileNotHappened_Click" IsEnabled="False"/>
+              <Button x:Name="ReconcileAbandonButton" Content="Abandon" Style="{StaticResource DangerButtonStyle}" Click="ReconcileAbandon_Click" IsEnabled="False"/>
             </StackPanel>
-            <ListBox x:Name="TaskHistoryList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}"/>
+            <ListBox x:Name="TaskHistoryList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" SelectionChanged="TaskHistoryList_SelectionChanged" AutomationProperties.Name="Task history"/>
           </DockPanel>
         </Border>
       </Grid>
@@ -442,13 +459,13 @@
               <ColumnDefinition Width="*"/>
               <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <ComboBox x:Name="LotusLayerCombo" SelectedIndex="0" Margin="0,0,10,0" ToolTip="Layer">
+            <ComboBox x:Name="LotusLayerCombo" SelectedIndex="0" Margin="0,0,10,0" ToolTip="Layer" AutomationProperties.Name="Memory layer">
               <ComboBoxItem Content="central"/>
               <ComboBoxItem Content="project"/>
               <ComboBoxItem Content="agent"/>
             </ComboBox>
-            <TextBox Grid.Column="1" x:Name="LotusKeyInput" Margin="0,0,10,0" ToolTip="Memory Key"/>
-            <TextBox Grid.Column="2" x:Name="LotusValueInput" Margin="0,0,10,0" ToolTip="Memory Value"/>
+            <TextBox Grid.Column="1" x:Name="LotusKeyInput" Margin="0,0,10,0" ToolTip="Memory Key" AutomationProperties.Name="Memory key"/>
+            <TextBox Grid.Column="2" x:Name="LotusValueInput" Margin="0,0,10,0" ToolTip="Memory Value" AutomationProperties.Name="Memory value"/>
             <Button Grid.Column="3" Content="Remember Note" Style="{StaticResource PrimaryButtonStyle}" Click="LotusRemember_Click"/>
           </Grid>
         </Border>
@@ -457,11 +474,11 @@
         <Border Grid.Row="2" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18">
           <DockPanel>
             <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,12">
-              <TextBox x:Name="LotusSearchInput" Width="300" Margin="0,0,10,0" ToolTip="Search query"/>
+              <TextBox x:Name="LotusSearchInput" Width="300" Margin="0,0,10,0" ToolTip="Search query" AutomationProperties.Name="Memory search"/>
               <Button Content="Recall / Search" Click="LotusRecall_Click" Margin="0,0,10,0"/>
               <Button Content="Forget Selected" Style="{StaticResource DangerButtonStyle}" Click="LotusForget_Click"/>
             </StackPanel>
-            <ListBox x:Name="LotusMemoriesList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}"/>
+            <ListBox x:Name="LotusMemoriesList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" AutomationProperties.Name="Lotus memories"/>
           </DockPanel>
         </Border>
       </Grid>
@@ -479,9 +496,9 @@
           <DockPanel>
             <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,16">
               <Button Content="Discover Ollama Models" Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,12,0" Click="DiscoverModels_Click"/>
-              <Button Content="Test AI Connection" Click="TestModelConnection_Click"/>
+              <Button Content="Test TypeSafe (hosted) Connection" Click="TestModelConnection_Click" ToolTip="Tests the optional hosted TypeSafe decision service. Local Ollama models are listed below."/>
             </StackPanel>
-            <ListBox x:Name="ModelsList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}"/>
+            <ListBox x:Name="ModelsList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" AutomationProperties.Name="Models and providers"/>
           </DockPanel>
         </Border>
       </Grid>
@@ -515,7 +532,7 @@
           <DockPanel>
             <TextBlock Text="Paired Companion Devices" FontSize="16" FontWeight="SemiBold" DockPanel.Dock="Top" Margin="0,0,0,12"/>
             <Button x:Name="RevokeDeviceButton" Content="Revoke Selected Device" Style="{StaticResource DangerButtonStyle}" DockPanel.Dock="Bottom" HorizontalAlignment="Left" Margin="0,12,0,0" Click="RevokeDevice_Click"/>
-            <ListBox x:Name="PairedDevicesList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}"/>
+            <ListBox x:Name="PairedDevicesList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" AutomationProperties.Name="Paired devices"/>
           </DockPanel>
         </Border>
       </Grid>
@@ -546,11 +563,18 @@
 
               <!-- Thermal & Autostop Policy -->
               <TextBlock Text="Thermal Policy &amp; Safety Autostop" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
-              <CheckBox x:Name="AutoStopThermalCheck" Content="Auto-stop tasks if CPU or GPU reaches critical thermal threshold" Foreground="{StaticResource TextBrush}" IsChecked="True" Margin="0,0,0,18"/>
+              <CheckBox x:Name="AutoStopThermalCheck" Content="Auto-stop tasks if CPU or GPU reaches critical thermal threshold" Foreground="{StaticResource TextBrush}" IsEnabled="False" Margin="0,0,0,4" Checked="AutoStopThermal_Click" Unchecked="AutoStopThermal_Click"/>
+              <TextBlock x:Name="ThermalPolicyText" Text="Host thermal policy not loaded." FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,18"/>
+
+              <!-- Multi-agent Missions -->
+              <TextBlock Text="Multi-Agent Missions" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
+              <CheckBox x:Name="MissionsEnabledCheck" Content="Allow Missions (Planner, Worker, Tester and Reviewer agents) on this Host" Foreground="{StaticResource TextBrush}" IsEnabled="False" Margin="0,0,0,4" Checked="MissionsEnabled_Click" Unchecked="MissionsEnabled_Click"/>
+              <TextBlock Text="Off by default on the Host. Every Mission plan still needs your approval before it runs." FontSize="11" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,18"/>
 
               <!-- Background Persistence Policy -->
               <TextBlock Text="Background Task Policy" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
-              <CheckBox x:Name="ResumeOnStartCheck" Content="Automatically resume incomplete tasks when Bunny A starts" Foreground="{StaticResource TextBrush}" IsChecked="True" Margin="0,0,18,0"/>
+              <CheckBox x:Name="ResumeOnStartCheck" Content="Automatically resume incomplete tasks when the Host restarts" Foreground="{StaticResource TextBrush}" IsEnabled="False" Margin="0,0,18,4" Checked="ResumeOnStart_Click" Unchecked="ResumeOnStart_Click"/>
+              <TextBlock Text="Off by default: recovered tasks wait for you instead of continuing on their own." FontSize="11" Foreground="{StaticResource MutedBrush}"/>
             </StackPanel>
           </ScrollViewer>
         </Border>

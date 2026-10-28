@@ -1,0 +1,197 @@
+{
+  "checks": 114,
+  "failures": 0,
+  "results": [
+    {
+      "scenario": "W1 connection reset after headers, before the body was read",
+      "checks": [
+        "PASS classified OutcomeUnknown (got OutcomeUnknown)",
+        "PASS original operation id, Host id and epoch kept",
+        "outcome: Connection interrupted. Bunny A cannot confirm whether this operation completed. It was not automatically retried. Review the current task and Host state before taking another action. The Host has no record it can match to this operation; the record may have expired or the request may never have arrived (operation 931285d3-46e3-4ead-be0c-02da919e2cae).",
+        "PASS scripted Host never read a command body",
+        "PASS user sees the outcome-unknown message",
+        "PASS no wording claims it did not run",
+        "PASS the command was never re-sent (Host received 0 command(s))",
+        "PASS reconciliation asked only about the original operation, at most once (1)"
+      ]
+    },
+    {
+      "scenario": "W2 command applied, answer lost (reset after the Host read it)",
+      "checks": [
+        "PASS classified OutcomeUnknown (got OutcomeUnknown)",
+        "PASS original operation id, Host id and epoch kept",
+        "outcome: The Host confirms this operation was applied (operation 25d6468b-e46c-462a-a146-ec6bd7ce1362).",
+        "PASS the Host received the command exactly once",
+        "PASS reconciled to applied from the Host ledger",
+        "PASS the command was never re-sent (Host received 1 command(s))",
+        "PASS reconciliation asked only about the original operation, at most once (1)"
+      ]
+    },
+    {
+      "scenario": "W3 command refused by the Host",
+      "checks": [
+        "PASS direct refusal shown as the Host worded it",
+        "PASS classified OutcomeUnknown (got OutcomeUnknown)",
+        "PASS original operation id, Host id and epoch kept",
+        "outcome: The Host confirms this operation was refused (operation 60661407-0a6e-48a7-997f-af5f48f68bf9).",
+        "PASS lost refusal reconciled to refused",
+        "PASS the command was never re-sent (Host received 1 command(s))",
+        "PASS reconciliation asked only about the original operation, at most once (1)"
+      ]
+    },
+    {
+      "scenario": "W4 command failed after a partial effect",
+      "checks": [
+        "PASS a FAILED answer is Failed, not Refused (got Failed)",
+        "PASS says it may have partly taken effect",
+        "PASS HOST_UNAVAILABLE mid-command is Failed as the Host records it",
+        "PASS classified OutcomeUnknown (got OutcomeUnknown)",
+        "PASS original operation id, Host id and epoch kept",
+        "outcome: The operation failed on the Host and may have partly taken effect. It was not automatically retried. Review the current task and Host state before taking another action. (operation 5de63958-81a7-476d-90ab-d7d018e32f96)",
+        "PASS lost failure reconciled to \u0027may have partly taken effect\u0027",
+        "PASS never described as refused or without effect",
+        "PASS the command was never re-sent (Host received 1 command(s))",
+        "PASS reconciliation asked only about the original operation, at most once (1)"
+      ]
+    },
+    {
+      "scenario": "W5 operation still in progress",
+      "checks": [
+        "PASS classified OutcomeUnknown (got OutcomeUnknown)",
+        "PASS original operation id, Host id and epoch kept",
+        "outcome: Connection interrupted. Bunny A cannot confirm whether this operation completed. It was not automatically retried. Review the current task and Host state before taking another action. The Host reports it may still be executing (operation b57b437a-5315-49b4-8adb-767d16cd53f5).",
+        "PASS user sees the outcome-unknown message",
+        "PASS no wording claims it did not run",
+        "PASS says it may still be executing",
+        "PASS the command was never re-sent (Host received 1 command(s))",
+        "PASS reconciliation asked only about the original operation, at most once (1)"
+      ]
+    },
+    {
+      "scenario": "W6 ledger answers unknown",
+      "checks": [
+        "PASS classified OutcomeUnknown (got OutcomeUnknown)",
+        "PASS original operation id, Host id and epoch kept",
+        "outcome: Connection interrupted. Bunny A cannot confirm whether this operation completed. It was not automatically retried. Review the current task and Host state before taking another action. The Host has no record it can match to this operation; the record may have expired or the request may never have arrived (operation 22a08b12-6b75-4f65-bc8f-35fede6ef45b).",
+        "PASS user sees the outcome-unknown message",
+        "PASS no wording claims it did not run",
+        "PASS unknown is reported as unknown, not as non-execution",
+        "PASS the command was never re-sent (Host received 1 command(s))",
+        "PASS reconciliation asked only about the original operation, at most once (1)"
+      ]
+    },
+    {
+      "scenario": "W7 ledger entry expired before reconciliation",
+      "checks": [
+        "PASS classified OutcomeUnknown (got OutcomeUnknown)",
+        "PASS original operation id, Host id and epoch kept",
+        "outcome: Connection interrupted. Bunny A cannot confirm whether this operation completed. It was not automatically retried. Review the current task and Host state before taking another action. The Host has no record it can match to this operation; the record may have expired or the request may never have arrived (operation c6000f1a-98a8-46f7-9f25-dd5be6dbf44f).",
+        "PASS user sees the outcome-unknown message",
+        "PASS no wording claims it did not run",
+        "PASS the command was never re-sent (Host received 1 command(s))",
+        "PASS reconciliation asked only about the original operation, at most once (1)"
+      ]
+    },
+    {
+      "scenario": "W8 Host restarted before reconciliation (new epoch)",
+      "checks": [
+        "outcome: Connection interrupted. Bunny A cannot confirm whether this operation completed. It was not automatically retried. Review the current task and Host state before taking another action. The Host restarted since, and its operation record does not survive a restart (operation b468591f-4f8b-45ad-a3a0-83b5be35d3b3).",
+        "PASS epoch at send preserved",
+        "PASS user sees the outcome-unknown message",
+        "PASS no wording claims it did not run",
+        "PASS says the Host restarted",
+        "PASS the new epoch\u0027s ledger was not asked about the old epoch\u0027s operation",
+        "PASS the command was never re-sent (Host received 1 command(s))",
+        "PASS reconciliation asked only about the original operation, at most once (0)"
+      ]
+    },
+    {
+      "scenario": "W9 a different Host answers reconciliation",
+      "checks": [
+        "outcome: Connection interrupted. Bunny A cannot confirm whether this operation completed. It was not automatically retried. Review the current task and Host state before taking another action. A different Host answers now, so it was not asked about this operation (operation def9d988-14a8-43e6-aeb7-3d11117a055f).",
+        "PASS Host identity at send preserved",
+        "PASS user sees the outcome-unknown message",
+        "PASS no wording claims it did not run",
+        "PASS says a different Host answers",
+        "PASS the different Host was not asked",
+        "PASS the command was never re-sent (Host received 1 command(s))",
+        "PASS reconciliation asked only about the original operation, at most once (0)"
+      ]
+    },
+    {
+      "scenario": "W10 malformed answers",
+      "checks": [
+        "PASS unreadable 2xx answer is OutcomeUnknown",
+        "PASS answer cut off mid-body is OutcomeUnknown",
+        "PASS unreadable 5xx is OutcomeUnknown, not Refused",
+        "[non-JSON] PASS classified OutcomeUnknown (got OutcomeUnknown)",
+        "[non-JSON] PASS original operation id, Host id and epoch kept",
+        "[non-JSON] outcome: Connection interrupted. Bunny A cannot confirm whether this operation completed. It was not automatically retried. Review the current task and Host state before taking another action. The Host cannot be asked right now (operation fe3f8aa5-03f6-49e5-8beb-9f587e00f68e).",
+        "[non-JSON] PASS user sees the outcome-unknown message",
+        "[non-JSON] PASS no wording claims it did not run",
+        "[non-JSON] PASS the command was never re-sent (Host received 1 command(s))",
+        "[non-JSON] PASS reconciliation asked only about the original operation, at most once (1)",
+        "[state missing] PASS classified OutcomeUnknown (got OutcomeUnknown)",
+        "[state missing] PASS original operation id, Host id and epoch kept",
+        "[state missing] outcome: Connection interrupted. Bunny A cannot confirm whether this operation completed. It was not automatically retried. Review the current task and Host state before taking another action. The Host\u0027s operation record could not be read (operation 7a7de168-688e-4d37-8e3d-1ac554be3c6d).",
+        "[state missing] PASS user sees the outcome-unknown message",
+        "[state missing] PASS no wording claims it did not run",
+        "[state missing] PASS the command was never re-sent (Host received 1 command(s))",
+        "[state missing] PASS reconciliation asked only about the original operation, at most once (1)",
+        "[state not a string] PASS classified OutcomeUnknown (got OutcomeUnknown)",
+        "[state not a string] PASS original operation id, Host id and epoch kept",
+        "[state not a string] outcome: Connection interrupted. Bunny A cannot confirm whether this operation completed. It was not automatically retried. Review the current task and Host state before taking another action. The Host\u0027s operation record could not be read (operation 0b38935e-8aeb-4860-9d51-81e52336603b).",
+        "[state not a string] PASS user sees the outcome-unknown message",
+        "[state not a string] PASS no wording claims it did not run",
+        "[state not a string] PASS the command was never re-sent (Host received 1 command(s))",
+        "[state not a string] PASS reconciliation asked only about the original operation, at most once (1)",
+        "[unrecognised state] PASS classified OutcomeUnknown (got OutcomeUnknown)",
+        "[unrecognised state] PASS original operation id, Host id and epoch kept",
+        "[unrecognised state] outcome: Connection interrupted. Bunny A cannot confirm whether this operation completed. It was not automatically retried. Review the current task and Host state before taking another action. The Host\u0027s operation record could not be read (operation 7c2977b1-bec4-46d0-9748-02ac94c463f1).",
+        "[unrecognised state] PASS user sees the outcome-unknown message",
+        "[unrecognised state] PASS no wording claims it did not run",
+        "[unrecognised state] PASS the command was never re-sent (Host received 1 command(s))",
+        "[unrecognised state] PASS reconciliation asked only about the original operation, at most once (1)",
+        "[another operation\u0027s record] PASS classified OutcomeUnknown (got OutcomeUnknown)",
+        "[another operation\u0027s record] PASS original operation id, Host id and epoch kept",
+        "[another operation\u0027s record] outcome: Connection interrupted. Bunny A cannot confirm whether this operation completed. It was not automatically retried. Review the current task and Host state before taking another action. The Host\u0027s operation record could not be read (operation 2d5a4d65-d0eb-41dc-86aa-d7decf30bc34).",
+        "[another operation\u0027s record] PASS user sees the outcome-unknown message",
+        "[another operation\u0027s record] PASS no wording claims it did not run",
+        "[another operation\u0027s record] PASS the command was never re-sent (Host received 1 command(s))",
+        "[another operation\u0027s record] PASS reconciliation asked only about the original operation, at most once (1)",
+        "[another epoch\u0027s record] PASS classified OutcomeUnknown (got OutcomeUnknown)",
+        "[another epoch\u0027s record] PASS original operation id, Host id and epoch kept",
+        "[another epoch\u0027s record] outcome: Connection interrupted. Bunny A cannot confirm whether this operation completed. It was not automatically retried. Review the current task and Host state before taking another action. The Host\u0027s operation record could not be read (operation 674f71c2-a9a4-4cf8-ba4e-2ea7cecb19e9).",
+        "[another epoch\u0027s record] PASS user sees the outcome-unknown message",
+        "[another epoch\u0027s record] PASS no wording claims it did not run",
+        "[another epoch\u0027s record] PASS the command was never re-sent (Host received 1 command(s))",
+        "[another epoch\u0027s record] PASS reconciliation asked only about the original operation, at most once (1)"
+      ]
+    },
+    {
+      "scenario": "W11 user cancellation",
+      "checks": [
+        "PASS cancelled before sending: nothing reached the Host",
+        "PASS the Host had received the command when the user cancelled",
+        "PASS cancellation after sending is OutcomeUnknown, not \u0027cancelled\u0027 (got OutcomeUnknown)",
+        "outcome: Connection interrupted. Bunny A cannot confirm whether this operation completed. It was not automatically retried. Review the current task and Host state before taking another action. Checking was cancelled (operation 29b6ce26-9f4d-4c52-8fff-64f5f4835b91).",
+        "PASS user sees the outcome-unknown message",
+        "PASS no wording claims it did not run",
+        "PASS the command was never re-sent (Host received 1 command(s))",
+        "PASS reconciliation asked only about the original operation, at most once (0)"
+      ]
+    },
+    {
+      "scenario": "W12 connection refused before dispatch; no duplicate after reconnect",
+      "checks": [
+        "PASS connection refused is the one \u0027Nothing was sent\u0027 case (got Unreachable: The Host is not running. Nothing was sent.)",
+        "PASS classified OutcomeUnknown (got OutcomeUnknown)",
+        "PASS original operation id, Host id and epoch kept",
+        "outcome: The Host confirms this operation was applied (operation 3cb6a2fa-95af-4eed-a9d7-cd4686488c5c).",
+        "PASS exactly one copy of the command after reconnecting",
+        "PASS the command was never re-sent (Host received 1 command(s))",
+        "PASS reconciliation asked only about the original operation, at most once (1)"
+      ]
+    }
+  ]
+}

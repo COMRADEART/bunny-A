@@ -4,7 +4,7 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { classifyTranscript, isSpokenCorrection } from "./voice-intent.ts";
 import { isUnfinishedChat } from "./voice-session.server.ts";
 import { VoiceTurnTaking, echoMatch, echoTokens } from "./voice-turn-taking.ts";
@@ -87,8 +87,11 @@ test("T2-12 simulator: speech cannot approve, grant, or claim a pass", () => {
 
 test("T2-15 source audit: Android does not declare microphone capture", () => {
   const manifest = readFileSync(new URL("../../../../android/app/src/main/AndroidManifest.xml", import.meta.url), "utf8");
-  const activity = readFileSync(new URL("../../../../android/app/src/main/java/com/routeragent/jev/MainActivity.java", import.meta.url), "utf8");
+  // MA5-S1: the WebView MainActivity is gone; every Java source of the app is checked instead.
+  const sources = new URL("../../../../android/app/src/main/java/com/routeragent/jev/", import.meta.url);
+  const java = readdirSync(sources).filter((name) => name.endsWith(".java"));
+  assert.ok(java.includes("NativeCompanionActivity.java"));
   assert.doesNotMatch(manifest, /RECORD_AUDIO|MODIFY_AUDIO_SETTINGS/);
-  assert.doesNotMatch(activity, /onPermissionRequest|RECORD_AUDIO/);
+  for (const name of java) assert.doesNotMatch(readFileSync(new URL(name, sources), "utf8"), /onPermissionRequest|RECORD_AUDIO/, name);
   assert.match(manifest, /INTERNET/);
 });

@@ -9,8 +9,6 @@ namespace BunnyA.Models;
 
 public sealed record HostCredentials(int Port, string Token);
 
-public sealed record HostIdentity(string HostId, string Epoch);
-
 public sealed record TaskRow(
     string Id,
     string Title,
@@ -29,10 +27,14 @@ public sealed record TaskRow(
     string? PendingActionPayloadSha256 = null,
     bool CanCancel = false,
     bool CanPause = false,
-    bool CanResume = false
+    bool CanResume = false,
+    // "orch" (direct task), "mission" or "ptask": the one Host command family that may act on this row.
+    string Kind = "orch",
+    string? Progress = null
 )
 {
-    public override string ToString() => $"{Title} · {State}";
+    public override string ToString() =>
+        $"{Title} · {State}{(Progress is { Length: > 0 } ? $" · {Progress}" : "")}{(Model is { Length: > 0 } ? $" · {Model}" : "")}{(Error is { Length: > 0 } ? $" · {Error}" : "")}";
 }
 
 public sealed record StepRow(
@@ -44,7 +46,12 @@ public sealed record StepRow(
     string? Error,
     string? Output,
     string? Receipt
-);
+)
+{
+    public override string ToString() =>
+        $"{Kind} · {Role} · {State}{(Model is { Length: > 0 } ? $" · {Model}" : "")}{(Receipt is { Length: > 0 } ? $" · {Receipt}" : "")}" +
+        (Output is { Length: > 0 } ? $"\n   {Output}" : "") + (Error is { Length: > 0 } ? $"\n   {Error}" : "");
+}
 
 public sealed record PendingApprovalItem(
     string TaskId,
@@ -59,17 +66,12 @@ public sealed record PendingApprovalItem(
     string Scope,
     string ProposedDiff,
     string ExpectedEffects
-);
-
-public sealed record PersonalAgentSlot(
-    int Slot,
-    string Weapon,
-    string Name,
-    string State,
-    string? ActiveRole,
-    string? CurrentTaskTitle,
-    int WorkingMissionsCount
-);
+)
+{
+    /// <summary>What the user reviewed. A changed digest or a different request is a different approval, never the same one.</summary>
+    public string Key => $"{Category}|{TaskId}|{ActionId}|{PayloadSha256}";
+    public override string ToString() => $"{OperationKind} · {TaskTitle} · {ActionId}";
+}
 
 public sealed record ChatMessage(
     string Id,
@@ -99,7 +101,10 @@ public sealed record ProjectItem(
     string Path,
     long CreatedAt,
     int ActiveMissions
-);
+)
+{
+    public override string ToString() => $"{Name} · {Path}";
+}
 
 public sealed record LotusMemoryRow(
     string Id,
@@ -110,7 +115,10 @@ public sealed record LotusMemoryRow(
     string Trust,
     string Provenance,
     long UpdatedAt
-);
+)
+{
+    public override string ToString() => $"[{Layer}] {Key}: {Value} · {Trust}/{Provenance}";
+}
 
 public sealed record ModelItem(
     string Id,
@@ -118,25 +126,21 @@ public sealed record ModelItem(
     string Provider,
     bool IsAvailable,
     bool IsDefault,
-    string? Details
-);
-
-public sealed record VoiceState(
-    string Mode,
-    bool IsListening,
-    bool IsSpeaking,
-    bool IsMuted,
-    string Transcript,
-    string LastTurnId,
-    List<string> Microphones,
-    List<string> Speakers,
-    string SelectedMicrophone,
-    string SelectedSpeaker
-);
+    string? Details,
+    // True only for models the Host lists as running on this computer (never an Ollama cloud tag).
+    bool IsLocal = false
+)
+{
+    public override string ToString() => $"{Name} · {Details}";
+}
 
 public sealed record DeviceItem(
     string Id,
     string Name,
     long PairedAt,
     bool IsRevoked
-);
+)
+{
+    public override string ToString() =>
+        $"{Name} · paired {(PairedAt > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(PairedAt).LocalDateTime.ToString("g") : "unknown")}{(IsRevoked ? " · REVOKED" : " · active")}";
+}

@@ -23,16 +23,21 @@ foreach ($required in @($platformJar,$aapt,$apksig,$r8)) {
   if (-not (Test-Path -LiteralPath $required)) { throw ('Missing Android build tool: '+$required) }
 }
 $toolchain = Get-Content -LiteralPath (Join-Path $workspace 'android/native-preview-toolchain.json') -Raw | ConvertFrom-Json
-if ($toolchain.schema -ne 'bunny-android-preview-toolchain.v1') { throw 'Unexpected Android toolchain lock schema.' }
+if ($toolchain.schema -ne 'bunny-android-preview-toolchain.v2') { throw 'Unexpected Android toolchain lock schema.' }
 $javaVersionLine = $javaReport | Select-String '^\s*java.version\s*='
 $actualJavaVersion = ($javaVersionLine.ToString() -split '=',2)[1].Trim()
-if ($actualJavaVersion -ne $toolchain.javaVersion) { throw ('Java version does not match the Android toolchain lock: ' + $actualJavaVersion) }
+# MA5-S1: any Java 21.0.x at or above the lock's minimum patch builds (javac --release 8 fixes the bytecode target);
+# CI pins one exact patch for reproducible artifacts, and the dex hash below is comparable across patches.
+if ($actualJavaVersion -notmatch '^(\d+)\.(\d+)\.(\d+)$' -or [int]$Matches[1] -ne $toolchain.java.feature -or [int]$Matches[2] -ne 0 -or [int]$Matches[3] -lt $toolchain.java.minimumPatch) {
+  throw ('Java ' + $actualJavaVersion + ' is outside the Android toolchain policy (' + $toolchain.java.feature + '.0.x, x >= ' + $toolchain.java.minimumPatch + ').')
+}
+Write-Output ('Java ' + $actualJavaVersion + ' (policy ' + $toolchain.java.feature + '.0.x, x >= ' + $toolchain.java.minimumPatch + '; CI pins ' + $toolchain.java.ciPinned + ')')
 try {
   $ErrorActionPreference = 'Continue'
   $javacVersion = (& javac -version 2>&1 | Out-String).Trim()
   $javacExit = $LASTEXITCODE
 } finally { $ErrorActionPreference = $previousErrorPreference }
-if ($javacExit -ne 0 -or $javacVersion -ne ('javac ' + $toolchain.javaVersion)) { throw ('javac version does not match the Android toolchain lock: ' + $javacVersion) }
+if ($javacExit -ne 0 -or $javacVersion -ne ('javac ' + $actualJavaVersion)) { throw ('javac must come from the same JDK as java: ' + $javacVersion) }
 $hashes = @{ androidJar=$platformJar; r8Jar=$r8; apksigJar=$apksig; aapt2Exe=$aapt }
 foreach ($name in $hashes.Keys) {
   $actual=(Get-FileHash -Algorithm SHA256 -LiteralPath $hashes[$name]).Hash.ToLowerInvariant()
@@ -68,6 +73,17 @@ Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'j
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.KeystoreErasureTest')
 Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/NativeCookiePolicy.java'),(Join-Path $workspace 'android/tests/NativeCookiePolicyTest.java'))
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.NativeCookiePolicyTest')
+Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/PollPolicy.java'),(Join-Path $workspace 'android/tests/PollPolicyTest.java'))
+Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.PollPolicyTest')
+# MA5-S1R1: command dispatch against injected network faults (real loopback sockets, no Android runtime).
+Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/HostExchange.java'),(Join-Path $workspace 'android/tests/HostExchangeTest.java'))
+Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.HostExchangeTest')
+Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $workspace 'android/tests/ManifestLauncherTest.java'))
+Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.ManifestLauncherTest',(Join-Path $sourceDirectory 'AndroidManifest.xml'))
+# MA5-S1: the core journeys are native. The compiled app must not reference android.webkit at all.
+$dexBytes = [IO.File]::ReadAllBytes((Join-Path $dex 'classes.dex'))
+if ([Text.Encoding]::ASCII.GetString($dexBytes).Contains('Landroid/webkit/')) { throw 'classes.dex references android.webkit; the companion must not depend on a WebView.' }
+Write-Output ('classes.dex SHA-256: ' + (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $dex 'classes.dex')).Hash.ToLowerInvariant())
 $unsigned = Join-Path $buildDirectory 'unsigned.apk'
 Run-Checked 'java' @('-cp',$helpers,'PackageApk',$resourceApk,(Join-Path $dex 'classes.dex'),$unsigned)
 $signingDirectory = Join-Path $tools 'signing'
@@ -88,6 +104,22 @@ $apkVersionCode = $manifest.manifest.GetAttribute('versionCode', 'http://schemas
 if ($apkVersionCode -notmatch '^[1-9][0-9]*$') { throw 'Android manifest needs a positive integer versionCode.' }
 $signed = Join-Path $workspace ("releases/Bunny-A-Android-v$apkVersionCode.apk")
 Run-Checked 'java' @('-cp',($helpers+';'+$apksig),'SignApk','sign',$keyPath,$passwordPath,$unsigned,$signed)
-Run-Checked $aapt @('dump','badging',$signed)
+$badging = (& $aapt dump badging $signed) -join "`n"
+if ($LASTEXITCODE -ne 0) { throw 'aapt2 could not read the signed APK.' }
+Write-Output $badging
+# The installed artifact, not the source: package identity and the component the launcher starts.
+if ($badging -notmatch "package: name='com\.routeragent\.jev'") { throw 'APK package identity changed.' }
+# aapt2 badging lists no launchable-activity for an activity-alias, so the compiled manifest tree is checked instead:
+# the one exported MAIN/LAUNCHER entry is the alias keeping the old component name, and it opens the native activity.
+$tree = (& $aapt dump xmltree --file AndroidManifest.xml $signed) -join "`n"
+$components = $tree -split '(?=\n\s*E: activity)'
+$launchers = @($components | Where-Object { $_ -match 'android\.intent\.category\.LAUNCHER' })
+if ($launchers.Count -ne 1) { throw ('APK must have exactly one launcher entry; found ' + $launchers.Count + '.') }
+$launcher = $launchers[0]
+if ($launcher -notmatch 'E: activity-alias' -or $launcher -notmatch ':name\([^)]*\)="\.MainActivity"' -or $launcher -notmatch ':exported\([^)]*\)=true' -or
+    $launcher -notmatch ':targetActivity\([^)]*\)="com\.routeragent\.jev\.NativeCompanionActivity"' -or $launcher -notmatch 'android\.intent\.action\.MAIN') {
+  throw 'APK launcher entry does not open com.routeragent.jev.NativeCompanionActivity.'
+}
+Write-Output 'APK launcher: com.routeragent.jev/.MainActivity (alias) -> com.routeragent.jev.NativeCompanionActivity'
 Get-FileHash -LiteralPath $signed -Algorithm SHA256 | Format-List
 Write-Output ('APK: '+$signed)
