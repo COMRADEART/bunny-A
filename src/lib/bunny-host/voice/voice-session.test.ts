@@ -2285,3 +2285,122 @@ test("T13.3 G §21: a persona that cannot be read leaves Bunny speaking exactly 
   assert.ok(h.chat.submits[0].startsWith(`${SPOKEN_CHAT_INSTRUCTION}\n\n`));
   assert.deepEqual(h.session.recentAnswers().map((row) => row.speaker), ["bunny"]);
 });
+
+// MA5-S2 Phase 3: the brief's own spoken examples, a read-only completion notice, and an objective-less plan request.
+const running = (id: string, title: string, updatedAt = 5): MissionFact => ({ id, title, status: "running", updatedAt, steps: [] });
+const spokenTexts = (h: ReturnType<typeof setup>) => h.worker.ofOp("speak").map((command) => command.text).join(" ");
+
+test("P3-V01: the Phase 3 example questions take Host paths; a bare 'bye' is never a close", async () => {
+  const { classifyTranscript } = await import("./voice-intent.ts");
+  const cases: [string, string, string?][] = [
+    ["Bunny, what are my agents working on?", "agent_status"],
+    ["Which agent is reviewing the code?", "agent_team", "role:reviewer"],
+    ["Did the last Mission finish?", "agent_last_mission"],
+    ["What failed?", "agent_team", "any_failed"],
+    ["did anything go wrong", "agent_team", "any_failed"],
+    ["Tell me when this task is completed.", "agent_watch"],
+    ["let me know when the mission finishes", "agent_watch"],
+    ["Prepare a plan for a new task.", "mission_draft", "a new task"],
+    ["Goodbye, Bunny.", "voice_close"],
+    ["that's all for now bunny", "voice_close"],
+  ];
+  for (const [said, kind, target] of cases) {
+    const intent = classifyTranscript(said);
+    assert.equal(intent.kind, kind, said);
+    if (target) assert.equal(intent.target, target, said);
+  }
+  // Recognizer hallucinations of silence ("bye", "thank you") never end a session on their own.
+  for (const said of ["bye", "goodbye", "thank you"]) assert.notEqual(classifyTranscript(said).kind, "voice_close", said);
+  // Approval wording is still refused before any watch or draft rule sees it.
+  assert.equal(classifyTranscript("tell me when you approve the plan").kind, "sensitive_refused");
+});
+
+test("P3-V02: 'what failed?' is answered from canonical Mission records and never reaches the model", async () => {
+  const failed: MissionFact = { id: "m1", title: "Inventory report", status: "failed", updatedAt: 9, steps: [{ title: "Write summary", status: "failed", model: null, checks: [] }] };
+  const h = setup({ missions: [failed, { id: "m2", title: "Docs", status: "completed", updatedAt: 3, steps: [] }] });
+  await h.open();
+  await h.session.text("What failed?");
+  assert.equal(h.chat.submits.length, 0);
+  const snap = h.session.snapshot();
+  assert.equal(snap.answerSource, "host_facts");
+  assert.equal(snap.answer, "The mission Inventory report failed; failed task: Write summary.");
+  const clean = setup({ missions: [{ id: "m2", title: "Docs", status: "completed", updatedAt: 3, steps: [] }] });
+  await clean.open();
+  await clean.session.text("what failed");
+  assert.equal(clean.session.snapshot().answer, "Nothing has failed in the recorded Missions.");
+});
+
+test("P3-V03: a completion notice is spoken from the canonical record when the Mission ends, and never acts on it", async () => {
+  const h = setup({ missionPort: true, missions: [running("m1", "Inventory report")] });
+  await h.open();
+  await h.session.text("Tell me when this task is completed.");
+  assert.equal(h.chat.submits.length, 0);
+  assert.match(h.session.snapshot().answer ?? "", /^I'll tell you when the mission Inventory report finishes/);
+  assert.deepEqual(h.session.snapshot().watches?.map((watch) => watch.missionId), ["m1"]);
+  finishSpeech(h);
+  const before = h.worker.ofOp("speak").length;
+  h.advance(VOICE_LIMITS.watchPollMs);
+  assert.equal(h.worker.ofOp("speak").length, before, "nothing is spoken while the Mission still runs");
+  h.missionRows[0].status = "completed";
+  h.advance(VOICE_LIMITS.watchPollMs);
+  assert.match(spokenTexts(h), /Update: the mission Inventory report has finished\./);
+  const snap = h.session.snapshot();
+  assert.equal(snap.answerSource, "host_facts");
+  assert.equal(snap.turnKind, "agent_watch");
+  assert.deepEqual(snap.watches, []);
+  // Read-only: no Agent command, no Mission stop, no draft.
+  assert.deepEqual(h.commands, []);
+  assert.deepEqual(h.stops, []);
+  assert.deepEqual(h.drafts, []);
+});
+
+test("P3-V04: a notice waits while Bunny is speaking and is spoken once the reply finishes", async () => {
+  const h = setup({ missionPort: true, missions: [running("m1", "Inventory report")] });
+  await h.open();
+  await h.session.text("let me know when the mission is done");
+  const ack = h.session.snapshot();
+  h.worker.emit({ ev: "playback.started", turn: ack.turnId, gen: ack.generation, seq: 0 });
+  h.missionRows[0].status = "failed";
+  const before = h.worker.ofOp("speak").length;
+  h.advance(VOICE_LIMITS.watchPollMs);
+  assert.equal(h.worker.ofOp("speak").length, before, "a notice never talks over Bunny's own reply");
+  h.worker.emit({ ev: "playback.idle", turn: ack.turnId, gen: ack.generation });
+  h.advance(VOICE_LIMITS.watchPollMs);
+  assert.match(spokenTexts(h), /Update: the mission Inventory report has failed\./);
+});
+
+test("P3-V05: closing voice drops every notice; the watched Mission keeps running untouched", async () => {
+  const h = setup({ missionPort: true, missions: [running("m1", "Inventory report")] });
+  await h.open();
+  await h.session.text("tell me when it finishes");
+  finishSpeech(h);
+  await h.session.close("button");
+  const launches = h.workers.length;
+  h.missionRows[0].status = "completed";
+  h.advance(VOICE_LIMITS.watchPollMs * 3);
+  assert.equal(h.workers.length, launches, "no worker is launched for a notice after close");
+  assert.equal(h.session.snapshot().open, false);
+  assert.deepEqual(h.stops, []);
+  assert.deepEqual(h.commands, []);
+});
+
+test("P3-V06: several running Missions are never guessed; no running Mission means nothing to watch", async () => {
+  const h = setup({ missionPort: true, missions: [running("m1", "Inventory report"), running("m2", "Docs refresh", 6)] });
+  await h.open();
+  await h.session.text("Tell me when this task is completed.");
+  assert.match(h.session.snapshot().answer ?? "", /^2 missions are running: /);
+  assert.deepEqual(h.session.snapshot().watches, []);
+  const idle = setup({ missionPort: true, missions: [] });
+  await idle.open();
+  await idle.session.text("tell me when the mission finishes");
+  assert.equal(idle.session.snapshot().answer, "No mission is running right now, so there is nothing to watch.");
+});
+
+test("P3-V07: 'prepare a plan for a new task' asks for the objective and drafts nothing", async () => {
+  const h = setup({ missionPort: true });
+  await h.open();
+  await h.session.text("Prepare a plan for a new task.");
+  assert.deepEqual(h.drafts, []);
+  assert.equal(h.chat.submits.length, 0);
+  assert.match(h.session.snapshot().answer ?? "", /^What should the plan be for\?.*Nothing was created\.$/);
+});

@@ -248,6 +248,10 @@ const TEAM_ROLE_WHAT = /\bwhat(?: is|'s| are) (?:the |my )?(?:planning|planner|r
 // "is the mission done" stays the T10 status answer; only has/did forms and questions naming the team come here.
 const TEAM_FINISHED = /\b(?:has|have|did) (?:the |my )?(?:team|mission|agents|team mission)\b.{0,12}\b(?:finish|finished|complete|completed|end|ended|done)\b|\bis (?:the |my )?team\b.{0,12}\b(?:finished|done|complete|completed)\b/;
 const TEAM_FAILED = [/\b(?:which|what|any) (?:tasks?|steps?)\b.{0,12}\b(?:failed|fail|failing)\b/, /\bdid (?:any|the) (?:tasks?|steps?) fail\b/];
+/** MA5-S2 P3: "tell me / let me know when the mission is done". Sensitive wording is refused before this is reached. */
+const WATCH = /^(?:tell me|let me know|notify me|alert me|ping me|say something|update me)\s+(?:when|once|as soon as|if)\s+(?:(?:the|my|this|that|our|it|they|its|it's)\b\s*)?(?:[\w'-]+\s+){0,4}?(?:is |are |has |have |gets? |got |was )?(?:finish(?:es|ed)?|complete[sd]?|done|ends?|ended|stops?|stopped|fails?|failed|over)\b/;
+/** MA5-S2 P3: a bare "what failed?" is a Host-facts question about every recorded Mission, never chat. */
+const ANY_FAILED = /^(?:what|which|anything|did anything|has anything|did something)\s+(?:has\s+)?(?:failed|fail|went wrong|go wrong|gone wrong)(?:\s+(?:today|recently|yet|so far|in (?:the|my) (?:last )?missions?))?$/;
 const MISSION_DONE = /\b(?:has|have|did|is|are|was|were|does) (?:the |my |that |this )?missions?\b.{0,20}\b(?:finish|finished|finishing|complete|completed|done|stopped|ended|over)\b/;
 function teamQuestion(normalized: string): string | null {
   if (TEAM_COUNT.test(normalized)) return "count";
@@ -256,6 +260,7 @@ function teamQuestion(normalized: string): string | null {
     const role = ROLE_VERB.find(([re]) => re.test(TEAM_ROLE_WHAT.test(normalized) ? normalized : tail))?.[1];
     return role ? `role:${role}` : null;
   }
+  if (ANY_FAILED.test(normalized.replace(/[\s.!?,;:]+$/, ""))) return "any_failed";
   if (TEAM_FAILED.some((re) => re.test(normalized))) return "failed";
   // T12 F5: "is the mission done" is a completion question too; the answer reads every canonical Mission (see answerTeam).
   if (MISSION_DONE.test(normalized) && !/\b(team|agents?)\b/.test(normalized)) return "finished";
@@ -266,7 +271,7 @@ function teamQuestion(normalized: string): string | null {
 /** Review round 3: make + a qualified agent noun ("make the reviewer agent ..."); bare roles stay out. */
 const MAKE_REDIRECT = /\bmake\s+(?:the|my|this|that|our)\s+(?:[\w'-]+\s+){0,2}?agents?\b/;
 /** T12 live: the whole turn asks to end voice. Anchored, so "stop listening to the tester" is not a close. */
-const VOICE_CLOSE = /^(?:(?:end|close|stop|exit|quit|turn off|switch off|shut off|shut down)\s+(?:the\s+|this\s+)?(?:voice|listening|mic|microphone|hands[- ]?free)(?:\s+(?:session|chat|mode|conversation))?|stop listening|(?:you can )?stop listening to me)(?:\s+(?:now|please|bunny|thanks|thank you))*$/;
+const VOICE_CLOSE = /^(?:(?:end|close|stop|exit|quit|turn off|switch off|shut off|shut down)\s+(?:the\s+|this\s+)?(?:voice|listening|mic|microphone|hands[- ]?free)(?:\s+(?:session|chat|mode|conversation))?|stop listening|(?:you can )?stop listening to me|(?:goodbye|good bye|bye(?: bye)?|thats all|that's all|that is all)(?: for now)? bunny)(?:\s+(?:now|please|bunny|thanks|thank you))*$/;
 /**
  * T12 live: an imperative to act on the computer ("open notes", "and save it on desktop", "create a file"). Voice has no
  * computer tools; these get a fixed answer instead of the chat model, which once answered "Done." to "end voice now".
@@ -519,11 +524,15 @@ function draftAction(normalized: string): boolean {
   return DRAFT_START.test(normalized) || sensitiveWord(normalized);
 }
 
+/** MA5-S2 P3: "prepare a plan for a new task" names no objective; the session asks for one instead of chatting. */
+export const GENERIC_OBJECTIVE = /^(?:(?:a|an|the|my|some|this|that)\s+)?(?:new\s+|another\s+|different\s+)?(?:task|mission|plan|project|one|thing|job)$/;
+
 function draftObjective(normalized: string): string | null {
   if (QUESTION.test(normalized)) return null;
   const match = DRAFT.exec(normalized);
   if (!match) return null;
   const objective = match[2].replace(/[\s.!?,;:]+$/, "").trim();
+  if (GENERIC_OBJECTIVE.test(objective)) return objective;
   if (objective.length < 3 || objective.length > 200) return null;
   if (AGENT_NOUN.test(normalized)) return null;
   if (draftAction(normalized)) return null;
@@ -620,6 +629,8 @@ export function classifyTranscript(
   if (CANCEL.test(normalized)) return make("cancel");
   if (CONFIRM.test(normalized) && !pending) return make("confirm");
   if (OPEN_UI.some((re) => re.test(normalized))) return make("open_ui");
+  // MA5-S2 P3: "tell me when this task is completed" registers a read-only completion notice; it never controls anything.
+  if (WATCH.test(normalized)) return make("agent_watch");
   // T12 live: requests to act on the computer get a fixed answer; the tool-free chat model never sees (or "does") them.
   // Review round 3: an Agent-addressed instruction is a redirect, never a computer action.
   if (!QUESTION.test(normalized) && !AGENT_NOUN.test(normalized) && DEVICE_ACTION.some((re) => re.test(normalized))) return make("device_action_unsupported");
