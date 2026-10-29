@@ -1,6 +1,6 @@
 {
   "schema": "ma5-s2.windows-voice.v1",
-  "at": "2026-10-29T05:04:29.380Z",
+  "at": "2026-10-29T17:06:33.840Z",
   "host": "disposable, Ollama adapter only",
   "worker": {
     "flags": [
@@ -47,19 +47,19 @@
       "turnKind": "agent_team",
       "answer": "No mission is recorded.",
       "timing": {
-        "turnId": "t1-typed-dcc7414a",
-        "activatedAt": 1793250279946,
+        "turnId": "t1-typed-89fa52de",
+        "activatedAt": 1793293604234,
         "captureStartedAt": null,
         "firstAudioAt": null,
         "firstPartialAt": null,
         "speechEndAt": null,
-        "finalAt": 1793250279946,
+        "finalAt": 1793293604234,
         "admittedAt": null,
         "firstTokenAt": null,
-        "firstTtsReadyAt": 1793250280043,
-        "firstPlaybackAt": 1793250280044,
-        "inferenceCompletedAt": 1793250279977,
-        "completedAt": 1793250282221,
+        "firstTtsReadyAt": 1793293604325,
+        "firstPlaybackAt": 1793293604326,
+        "inferenceCompletedAt": 1793293604252,
+        "completedAt": 1793293606505,
         "source": "typed",
         "endpointing": null
       }
@@ -67,6 +67,7 @@
     "v4-model-turn-and-barge-in": {
       "ok": true,
       "seen": [
+        "THINKING",
         "SPEAKING",
         "ON"
       ],
@@ -78,17 +79,17 @@
         "glyph": null
       },
       "route": {
-        "taskId": "953ced42-9efd-4bf7-86ac-229de151b53a",
+        "taskId": "8ef6a52b-9292-44e5-90bc-01540c1e5a16",
         "provider": "ollama",
         "model": "huihui_ai/qwen2.5-abliterate:7b"
       },
       "interrupt": {
-        "turnId": "t2-typed-107bad55",
+        "turnId": "t2-typed-192dae1a",
         "gen": 0,
-        "requestedAt": 1793250300984,
+        "requestedAt": 1793293625522,
         "source": "button",
-        "workerResetMs": 13.5408,
-        "workerCancelWaitMs": 13.5408,
+        "workerResetMs": 8.2672,
+        "workerCancelWaitMs": 8.2672,
         "workerResetPending": false,
         "meterSilentMs": null,
         "droppedChunks": 4,
@@ -98,21 +99,98 @@
         "wasPlaying": true
       },
       "timing": {
-        "turnId": "t2-typed-107bad55",
-        "activatedAt": 1793250297237,
+        "turnId": "t2-typed-192dae1a",
+        "activatedAt": 1793293621347,
         "captureStartedAt": null,
         "firstAudioAt": null,
         "firstPartialAt": null,
         "speechEndAt": null,
-        "finalAt": 1793250297237,
-        "admittedAt": 1793250297344,
-        "firstTokenAt": 1793250297859,
-        "firstTtsReadyAt": 1793250298341,
-        "firstPlaybackAt": 1793250298341,
-        "inferenceCompletedAt": 1793250300709,
+        "finalAt": 1793293621347,
+        "admittedAt": 1793293621466,
+        "firstTokenAt": 1793293622146,
+        "firstTtsReadyAt": 1793293622665,
+        "firstPlaybackAt": 1793293622665,
+        "inferenceCompletedAt": 1793293624718,
         "completedAt": null,
         "source": "typed",
         "endpointing": null
+      }
+    },
+    "v11-thinking-while-queued": {
+      "ok": true,
+      "seen": [
+        "THINKING",
+        "SPEAKING",
+        "THINKING",
+        "SPEAKING"
+      ],
+      "delayAckSentMs": 1599,
+      "answerAudioMs": 9216,
+      "agentGeneration": "completed"
+    },
+    "v12-keyboard": {
+      "ok": true,
+      "controls": [
+        {
+          "id": "VoiceSessionButton",
+          "focused": true,
+          "focusable": true,
+          "name": "🎙️ Close Voice Session",
+          "enabled": true
+        },
+        {
+          "id": "HandsFreeButton",
+          "focused": true,
+          "focusable": true,
+          "name": "Start hands-free conversation",
+          "enabled": true
+        },
+        {
+          "id": "ListenStartButton",
+          "focused": true,
+          "focusable": true,
+          "name": "Start Listening",
+          "enabled": true
+        },
+        {
+          "id": "ListenEndButton",
+          "focused": false,
+          "focusable": false,
+          "name": "Stop Listening",
+          "enabled": false
+        },
+        {
+          "id": "VoiceBargeInButton",
+          "focused": false,
+          "focusable": false,
+          "name": "⚡ Barge-In (Interrupt)",
+          "enabled": false
+        },
+        {
+          "id": "VoiceMuteButton",
+          "focused": true,
+          "focusable": true,
+          "name": "Mute Mic",
+          "enabled": true
+        },
+        {
+          "id": "VoiceTextBox",
+          "focused": true,
+          "focusable": true,
+          "name": "Type a question for the voice session",
+          "enabled": true
+        },
+        {
+          "id": "VoiceTextSend",
+          "focused": true,
+          "focusable": true,
+          "name": "Ask Bunny by text in this voice session",
+          "enabled": true
+        }
+      ],
+      "keyboardTurn": {
+        "transcript": "What failed?",
+        "answerSource": "host_facts"
       }
     },
     "v5-hands-free": {
@@ -147,7 +225,7 @@
         "fixture": true,
         "releasing": false,
         "starting": false,
-        "grantExpiresAt": 1793252103008,
+        "grantExpiresAt": 1793295465467,
         "stopped": null
       },
       "seenDuringTypedTurn": [
@@ -167,7 +245,7 @@
       "duplexActive": false,
       "stopped": {
         "reason": "mute",
-        "at": 1793250319838
+        "at": 1793293683334
       }
     },
     "v7-stop-hands-free": {
@@ -195,7 +273,7 @@
       "voiceWorkers": 0,
       "lastClose": {
         "source": "button",
-        "at": 1793250334514
+        "at": 1793293697302
       }
     },
     "v9-vertical-edge": {
@@ -231,13 +309,15 @@
       "hostVoiceOpenAfterRestart": false
     }
   },
-  "model": "huihui_ai/qwen2.5-abliterate:7b",
-  "thinkingObserved": false,
+  "model": "qwen2.5:1.5b",
+  "thinkingObserved": true,
   "verdicts": {
     "v1-start-is-private": "PASS",
     "v2-open-push-to-talk": "PASS",
     "v3-host-facts-turn": "PASS",
     "v4-model-turn-and-barge-in": "PASS",
+    "v11-thinking-while-queued": "PASS",
+    "v12-keyboard": "PASS",
     "v5-hands-free": "PASS",
     "v6-mute-releases-capture": "PASS",
     "v7-stop-hands-free": "PASS",

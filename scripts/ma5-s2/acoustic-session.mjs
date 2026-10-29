@@ -142,7 +142,7 @@ async function main() {
     const opened = await until("session open", async () => { const s = await voice(); return s.open && s.devices?.input ? s : null; });
     const dev = opened?.devices;
     out.devices = { input: dev?.input?.name ?? null, output: dev?.output?.name ?? null, inputMuted: dev?.input?.muted ?? null, micPrivacy: dev?.micPrivacy ?? null, stt: opened?.engines?.stt ?? null };
-    if (!FIXTURE && dev?.input?.name !== auth.microphone || dev?.output?.name !== auth.speakers) throw new Error(`Refused: the default devices (${dev?.input?.name} / ${dev?.output?.name}) are not the authorized ones.`);
+    if (!FIXTURE && (dev?.input?.name !== auth.microphone || dev?.output?.name !== auth.speakers)) throw new Error(`Refused: the default devices (${dev?.input?.name} / ${dev?.output?.name}) are not the authorized ones.`);
     if (dev.micPrivacy === "deny") throw new Error("Refused: Windows microphone privacy denies access. Bunny does not change it.");
     while (!FIXTURE && (await voice()).devices?.input?.muted) {
       if ((await prompt("The microphone is muted. Unmute it yourself in Windows (Bunny never will), then continue.")) === "q") throw new Error("Ended by the owner.");
@@ -154,7 +154,7 @@ async function main() {
       await cmd("voice.listen.start", { source: "button" });
       if (!(await say(phrase))) { await cmd("voice.listen.end", {}); return null; }
       const s = await lastTurn(before, 20_000);
-      return { phrase, recognized: onScript(phrase, s?.finalTranscript), wer: wer(phrase, s?.finalTranscript ?? ""), confidence: s?.finalConfidence ?? null, speechEndToFirstAudioMs: s?.timing?.speechEndAt && s?.timing?.firstPlaybackAt ? s.timing.firstPlaybackAt - s.timing.speechEndAt : null };
+      return { phrase, recognized: onScript(phrase, s?.finalTranscript), wer: wer(phrase, s?.finalTranscript ?? ""), speechEndToFirstAudioMs: s?.timing?.speechEndAt && s?.timing?.firstPlaybackAt ? s.timing.firstPlaybackAt - s.timing.speechEndAt : null };
     };
     const want = (n) => sections.includes(n);
 
