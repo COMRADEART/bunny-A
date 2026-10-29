@@ -190,6 +190,13 @@ export function validateTask(spec: TaskSpec, envelope: Envelope, executors: Read
 export function approvalRequired(spec: TaskSpec, envelope: Envelope, executors: ReadonlyMap<string, ExecutorFacts>): boolean {
   return envelope.background || envelope.sideEffects || spec.steps.some(s => executors.get(s.kind)?.category !== "read_only" || executors.get(s.kind)?.consequential);
 }
+/** MA5-S2: what creating this exact spec under this envelope would do, from Host executor facts (never the model's words). */
+export function planReview(spec: TaskSpec, envelope: Envelope, executors: ReadonlyMap<string, ExecutorFacts>) {
+  return {
+    approvalRequired: approvalRequired(spec, envelope, executors),
+    steps: spec.steps.map(s => { const f = executors.get(s.kind); return { id: s.id, kind: s.kind, model: s.model ?? null, registered: !!f, category: f?.category ?? null, consequential: !!f?.consequential, activity: f?.activity ?? null }; }),
+  };
+}
 
 export const DISPLAY_STATES = ["Queued", "Working", "Waiting for approval", "Paused", "Recovering", "Needs attention", "Completed", "Failed", "Cancelled"] as const;
 export type DisplayState = (typeof DISPLAY_STATES)[number];

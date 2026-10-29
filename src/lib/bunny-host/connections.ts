@@ -1430,7 +1430,7 @@ export type SignInState =
 
 // ------------------------------------------------------------------ redaction ----
 
-/** "allamsetti@gmail.com" -> "al***@gmail.com"; anything else shaped like an id -> first 2 chars + "***". */
+/** "someone@example.com" -> "so***@example.com"; anything else shaped like an id -> first 2 chars + "***". */
 export function maskIdentity(value: string | null | undefined): string | null {
   if (!value) return null;
   const text = value.trim();

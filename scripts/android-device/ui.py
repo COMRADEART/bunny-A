@@ -1,24 +1,23 @@
-"""adb UI helper for the S1R2 device run (scratch only).
+"""adb UI helper for Android device tests (MA5-S1R2, reusable). Env: BUNNY_ADB, ANDROID_SERIAL.
 ui.py dump [out.xml]       -> prints app node texts/descs (and saves the filtered XML)
 ui.py tap <substring>      -> taps the first app node whose text or content-desc contains it
 ui.py type <text>          -> types text into the focused field
 ui.py wait <substring> [s] -> waits until a node contains it
 """
-import re, subprocess, sys, time, xml.etree.ElementTree as ET
-ADB = r"C:\Users\allam\Documents\new\bun-router\test-results\android-tools\platform-tools\adb.exe"
-SERIAL = "R3GL1025V4J"
+import os, re, subprocess, sys, time, xml.etree.ElementTree as ET
+ADB = os.environ.get("BUNNY_ADB", "adb")  # the target device comes from ANDROID_SERIAL, which adb reads itself
 PKG = "com.routeragent.jev"
 
 def adb(*args, check=True):
-    return subprocess.run([ADB, "-s", SERIAL, *args], capture_output=True, text=True, encoding="utf-8", errors="replace", check=check).stdout
+    return subprocess.run([ADB, *args], capture_output=True, text=True, encoding="utf-8", errors="replace", check=check).stdout
 
 def nodes():
     for _ in range(3):
-        adb("shell", "uiautomator", "dump", "/sdcard/s1r2.xml", check=False)
-        raw = adb("exec-out", "cat", "/sdcard/s1r2.xml", check=False)
+        adb("shell", "uiautomator", "dump", "/sdcard/bunny-ui.xml", check=False)
+        raw = adb("exec-out", "cat", "/sdcard/bunny-ui.xml", check=False)
         if raw.strip().startswith("<?xml"):
             root = ET.fromstring(raw[raw.index("<?xml"):])
-            adb("shell", "rm", "-f", "/sdcard/s1r2.xml", check=False)
+            adb("shell", "rm", "-f", "/sdcard/bunny-ui.xml", check=False)
             return [n for n in root.iter("node") if n.get("package") == PKG], root
         time.sleep(1)
     raise SystemExit("ui dump failed")

@@ -1,0 +1,87 @@
+{
+  "schema": "ma5-s2.windows-connected-task.v1",
+  "at": "2026-10-28T22:47:46.640Z",
+  "host": "disposable, Ollama adapter only",
+  "stages": {
+    "c1-register-folder": {
+      "ok": true,
+      "uiRows": [
+        "Notes — <registered-folder>"
+      ],
+      "hostRoots": [
+        {
+          "id": "notes",
+          "label": "Notes",
+          "path": "<registered-folder>"
+        }
+      ]
+    },
+    "c2-system-folder-refused": {
+      "ok": true,
+      "dialog": {
+        "invoked": "AddConnectedRootButton",
+        "dialogTitle": "Folder Not Changed",
+        "dialogText": "System and application folders cannot be granted."
+      },
+      "hostRootIds": [
+        "notes"
+      ]
+    },
+    "c3-plan-and-review": {
+      "ok": true,
+      "title": "Summarize notes.txt in two sentences",
+      "planMs": 7386,
+      "verdict": "The Host validated this proposal against your folders, model pin and permissions.",
+      "steps": [
+        "1. 1 · file.read · read-only\n    root=notes; path=notes.txt; maxChars=1000",
+        "2. 2 · local.generate · model huihui_ai/qwen2.5-abliterate:7b · read-only\n    prompt=Summarize the content of the notes.txt file in two sentences. The content is: {contextFrom…; contextFrom=1; maxTokens=50"
+      ],
+      "permissions": "Folders (read only): Notes — <registered-folder>\nActions allowed:     file.read, local.generate\nModel:               huihui_ai/qwen2.5-abliterate:7b (local Ollama only; never a hosted provider)\nSide effects:        none · runs in the foreground only\nBudget:              at most 10 model calls and 1 hour · project personal\nEnvelope expires:    10/29/2026 6:47 PM",
+      "approval": "Create starts this task immediately: every step is read-only on this PC and none needs approval. You can Pause or Cancel it from the Agent Dashboard.",
+      "createEnabledBeforeReview": false
+    },
+    "c4-stale-input-discards-plan": {
+      "ok": true,
+      "enabledAfterReview": true,
+      "reviewVisibleAfterEdit": false,
+      "status": "The goal, folders, model or permissions changed after planning. Generate a new plan."
+    },
+    "c5-create-and-monitor": {
+      "ok": true,
+      "replanMs": 7083,
+      "uiResult": "Created “Summarize notes.txt in one sentence” (ptask-bcbcbc46-3211-4819-b2df-a264d04e6eb4): Queued.",
+      "taskId": "ptask-bcbcbc46-3211-4819-b2df-a264d04e6eb4",
+      "finalState": "COMPLETED",
+      "models": [
+        "huihui_ai/qwen2.5-abliterate:7b"
+      ],
+      "evidence": [
+        {
+          "stepId": "1",
+          "outputSha256": "f127b6d9c633335d667e4d94762e2d0b30cbc63c9ba2f20c970533345be81fcf"
+        },
+        {
+          "stepId": "2",
+          "outputSha256": "5d7606a1bcfbbe4d4fd3f7e802ac5062f6ecb74351e5f55d503c188e22198b79"
+        }
+      ],
+      "historyRows": [
+        "Summarize notes.txt in one sentence · COMPLETED · 2/2 steps · huihui_ai/qwen2.5-abliterate:7b"
+      ]
+    },
+    "c6-task-level-approval-in-approval-center": {
+      "ok": true,
+      "shown": {
+        "operation": "Operation: Start persistent task",
+        "scope": "1 step(s) · no model · background",
+        "payload": "No payload digest: the Host binds this approval to task version 3; if the task changed, it is refused.",
+        "context": "Approves this task for up to 24 hours or until its envelope expires. Deny cancels it."
+      },
+      "stateAfter": "COMPLETED",
+      "approvalBy": "workstation",
+      "receipt": "6:48:34 PM  APPROVED · Start persistent task · Background read · digest - · Host operation 1bda7825-0ee5-4e5d-ae81-49d6d0dfb49f applied"
+    }
+  },
+  "model": "huihui_ai/qwen2.5-abliterate:7b",
+  "failures": []
+}

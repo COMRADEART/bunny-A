@@ -154,7 +154,7 @@ public sealed class HostClient : IDisposable
     /// Sends one command bound to the observed Host identity and epoch with its own operation id. It is never retried:
     /// a dropped connection after sending surfaces as OutcomeUnknown and the caller asks <see cref="ResolveOutcomeAsync"/>.
     /// </summary>
-    public async Task<JsonElement> SendCommandAsync(string action, object data, CancellationToken token = default)
+    public async Task<JsonElement> SendCommandAsync(string action, object data, CancellationToken token = default, TimeSpan? commandTimeout = null)
     {
         var expectedHost = HostId;
         var expectedEpoch = HostEpoch;
@@ -172,7 +172,7 @@ public sealed class HostClient : IDisposable
         };
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
-        timeout.CancelAfter(CommandTimeout);
+        timeout.CancelAfter(commandTimeout ?? CommandTimeout);
         using var req = CreateRequest(HttpMethod.Post, creds, "/command");
         req.Content = JsonContent.Create(payload);
 
@@ -319,23 +319,5 @@ public sealed class HostClient : IDisposable
     public void Dispose()
     {
         client.Dispose();
-    }
-}
-
-public static class JsonRead
-{
-    /// <summary>A string property, or null when absent or of another kind. Never throws on Host data.</summary>
-    public static string? Json(this JsonElement e, string name) =>
-        e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
-    public static long JsonLong(this JsonElement e, string name) =>
-        e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var n) ? n : 0;
-    public static bool JsonBool(this JsonElement e, string name) =>
-        e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.True;
-    public static JsonElement JsonObj(this JsonElement e, string name) =>
-        e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Object ? v : default;
-    public static IEnumerable<JsonElement> JsonArr(this JsonElement e, string name)
-    {
-        if (e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Array)
-            foreach (var item in v.EnumerateArray()) if (item.ValueKind == JsonValueKind.Object || item.ValueKind == JsonValueKind.String) yield return item;
     }
 }

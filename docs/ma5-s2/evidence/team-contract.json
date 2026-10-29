@@ -1,0 +1,929 @@
+{
+  "schema": "ma5-s2.team-contract.v1",
+  "at": "2026-10-29T00:40:44.901Z",
+  "host": "disposable, Ollama adapter only",
+  "steps": [
+    {
+      "name": "mission.configure",
+      "status": 200,
+      "ok": true,
+      "body": {
+        "data": {
+          "enabled": true,
+          "limits": {
+            "maxConcurrentAgents": 3,
+            "maxSteps": 12,
+            "maxRetriesPerStep": 2,
+            "maxReplans": 2,
+            "maxMissionRuntimeMs": 7200000,
+            "maxActiveMissions": 4
+          },
+          "triggersEnabled": false,
+          "browserHeadless": true
+        },
+        "operation": {
+          "id": "4e80d5ce-5df8-45b9-bd15-c59b3f9e18f3",
+          "state": "applied",
+          "replayed": false
+        }
+      }
+    },
+    {
+      "name": "project.add",
+      "status": 200,
+      "ok": true,
+      "body": {
+        "data": {
+          "id": "8ba0b4db-6696-4fec-bb1a-4b84e4145be0",
+          "name": "Team probe",
+          "path": "<project>",
+          "preferred": "auto",
+          "description": "Disposable",
+          "createdAt": 1793234414439,
+          "updatedAt": 1793234414439,
+          "lastActivityAt": 1793234414439,
+          "lifecycle": "ACTIVE",
+          "sourceType": "existing",
+          "projectType": "folder",
+          "ownerScope": "host-owner",
+          "tags": [],
+          "favorite": false,
+          "rootIdentity": "1309165269:47287796087675426:1793234413072023600",
+          "revision": 1,
+          "schemaVersion": "ma3.projects.v1",
+          "attention": []
+        },
+        "operation": {
+          "id": "6d7df203-3205-4f5f-96da-3f521e8bc7e0",
+          "state": "applied",
+          "replayed": false
+        }
+      }
+    },
+    {
+      "name": "agent.create (team)",
+      "status": 200,
+      "ok": true,
+      "body": {
+        "agents": {
+          "agents": [
+            {
+              "id": "322931eb-ed8d-4300-9e51-ffbcbe7a15a1",
+              "name": "Inventory team",
+              "state": "CREATED",
+              "missionId": "8bacfb56-7397-4907-8a73-1f363ffce842",
+              "createdAt": 1793234414457,
+              "updatedAt": 1793234414457,
+              "failure": null,
+              "run": null,
+              "checkpoints": 0,
+              "lastCheckpoint": null,
+              "pausedAt": null,
+              "stoppedAt": null,
+              "note": null,
+              "team": {
+                "role": "coordinator",
+                "coordinatorId": null,
+                "missionId": "8bacfb56-7397-4907-8a73-1f363ffce842"
+              },
+              "authorization": null
+            },
+            {
+              "id": "be59330e-5540-4650-8ddf-a0ab5fc09873",
+              "name": "Inventory team · Planner",
+              "state": "PLANNING",
+              "missionId": "8bacfb56-7397-4907-8a73-1f363ffce842",
+              "createdAt": 1793234414458,
+              "updatedAt": 1793234414523,
+              "failure": null,
+              "run": {
+                "id": "ba29a017-33e3-499a-b480-245b9c4a0add",
+                "generation": 1,
+                "state": "PLANNING",
+                "startedAt": 1793234414519,
+                "endedAt": null
+              },
+              "checkpoints": 0,
+              "lastCheckpoint": null,
+              "pausedAt": null,
+              "stoppedAt": null,
+              "note": null,
+              "team": {
+                "role": "planner",
+                "coordinatorId": "322931eb-ed8d-4300-9e51-ffbcbe7a15a1",
+                "missionId": "8bacfb56-7397-4907-8a73-1f363ffce842"
+              },
+              "current": {
+                "stepId": "05a72328-dd09-4b3f-8a74-5574795945c5",
+                "role": "Planner",
+                "kind": "plan",
+                "state": "pending",
+                "provider": null,
+                "model": null,
+                "taskId": null
+              },
+              "owned": {
+                "total": 1,
+                "completed": 0,
+                "running": 0,
+                "failed": 0,
+                "verified": 0
+              },
+              "authorization": null
+            }
+          ],
+          "cursor": 15
+        },
+        "operation": {
+          "id": "4f6cd271-f468-4c63-bb84-f8287cfa6ea2",
+          "state": "applied",
+          "replayed": false
+        }
+      }
+    },
+    {
+      "name": "agent.start (coordinator)",
+      "status": 200,
+      "ok": true,
+      "body": {
+        "agents": {
+          "agents": [
+            {
+              "id": "322931eb-ed8d-4300-9e51-ffbcbe7a15a1",
+              "name": "Inventory team",
+              "state": "RUNNING",
+              "missionId": "8bacfb56-7397-4907-8a73-1f363ffce842",
+              "createdAt": 1793234414457,
+              "updatedAt": 1793234414625,
+              "failure": null,
+              "run": {
+                "id": "51dd6273-14a7-4147-97e4-aa6f48f6662a",
+                "generation": 1,
+                "state": "RUNNING",
+                "startedAt": 1793234414567,
+                "endedAt": null
+              },
+              "checkpoints": 1,
+              "lastCheckpoint": {
+                "boundary": "after_approval_decision",
+                "at": 1793234414586,
+                "replaySafety": "NOT_REPLAYABLE"
+              },
+              "pausedAt": null,
+              "stoppedAt": null,
+              "note": null,
+              "team": {
+                "role": "coordinator",
+                "coordinatorId": null,
+                "missionId": "8bacfb56-7397-4907-8a73-1f363ffce842"
+              },
+              "authorization": null
+            },
+            {
+              "id": "be59330e-5540-4650-8ddf-a0ab5fc09873",
+              "name": "Inventory team · Planner",
+              "state": "WAITING_FOR_DEPENDENCY",
+              "missionId": "8bacfb56-7397-4907-8a73-1f363ffce842",
+              "createdAt": 1793234414458,
+              "updatedAt": 1793234414618,
+              "failure": null,
+              "run": {
+                "id": "ba29a017-33e3-499a-b480-245b9c4a0add",
+                "generation": 1,
+                "state": "WAITING_FOR_DEPENDENCY",
+                "startedAt": 1793234414519,
+                "endedAt": null
+              },
+              "checkpoints": 0,
+              "lastCheckpoint": null,
+              "pausedAt": null,
+              "stoppedAt": null,
+              "note": null,
+              "team": {
+                "role": "planner",
+                "coordinatorId": "322931eb-ed8d-4300-9e51-ffbcbe7a15a1",
+                "missionId": "8bacfb56-7397-4907-8a73-1f363ffce842"
+              },
+              "current": {
+                "stepId": "05a72328-dd09-4b3f-8a74-5574795945c5",
+                "role": "Planner",
+                "kind": "plan",
+                "state": "pending",
+                "provider": null,
+                "model": null,
+                "taskId": null
+              },
+              "owned": {
+                "total": 1,
+                "completed": 0,
+                "running": 0,
+                "failed": 0,
+                "verified": 0
+              },
+              "authorization": null
+            }
+          ],
+          "cursor": 26
+        },
+        "operation": {
+          "id": "fb927ccd-f217-4680-96e9-e2191c9de2d6",
+          "state": "applied",
+          "replayed": false
+        }
+      }
+    },
+    {
+      "name": "after planning",
+      "ms": 18586,
+      "missionState": "waiting_for_approval",
+      "phase": "review",
+      "planReference": "team:04781f07f71d8064642d8da6a71cc417d4bdbc9d7f68aec2491fe0f304aa7b3d",
+      "coordinator": {
+        "id": "322931eb-ed8d-4300-9e51-ffbcbe7a15a1",
+        "state": "VERIFYING"
+      },
+      "members": [
+        {
+          "role": "coordinator",
+          "state": "VERIFYING",
+          "current": null,
+          "owned": null,
+          "failure": null
+        },
+        {
+          "role": "planner",
+          "state": "WAITING_FOR_DEPENDENCY",
+          "current": {
+            "kind": "plan",
+            "state": "completed",
+            "model": "huihui_ai/qwen2.5-abliterate:7b"
+          },
+          "owned": {
+            "total": 1,
+            "completed": 1,
+            "running": 0,
+            "failed": 0,
+            "verified": 1
+          },
+          "failure": null
+        },
+        {
+          "role": "researcher",
+          "state": "WAITING_FOR_DEPENDENCY",
+          "current": {
+            "kind": "observe",
+            "state": "pending",
+            "model": null
+          },
+          "owned": {
+            "total": 1,
+            "completed": 0,
+            "running": 0,
+            "failed": 0,
+            "verified": 0
+          },
+          "failure": null
+        },
+        {
+          "role": "implementer",
+          "state": "WAITING_FOR_DEPENDENCY",
+          "current": {
+            "kind": "generate_html",
+            "state": "pending",
+            "model": null
+          },
+          "owned": {
+            "total": 2,
+            "completed": 0,
+            "running": 0,
+            "failed": 0,
+            "verified": 0
+          },
+          "failure": null
+        },
+        {
+          "role": "reviewer",
+          "state": "WAITING_FOR_DEPENDENCY",
+          "current": {
+            "kind": "review",
+            "state": "pending",
+            "model": null
+          },
+          "owned": {
+            "total": 1,
+            "completed": 0,
+            "running": 0,
+            "failed": 0,
+            "verified": 0
+          },
+          "failure": null
+        },
+        {
+          "role": "tester",
+          "state": "WAITING_FOR_DEPENDENCY",
+          "current": {
+            "kind": "verify_output",
+            "state": "pending",
+            "model": null
+          },
+          "owned": {
+            "total": 1,
+            "completed": 0,
+            "running": 0,
+            "failed": 0,
+            "verified": 0
+          },
+          "failure": null
+        }
+      ],
+      "steps": [
+        {
+          "key": "plan",
+          "role": "planner",
+          "kind": "plan",
+          "state": "completed",
+          "verified": true
+        },
+        {
+          "key": "t1",
+          "role": "researcher",
+          "kind": "observe",
+          "state": "pending",
+          "verified": null
+        },
+        {
+          "key": "t2",
+          "role": "implementer",
+          "kind": "generate_html",
+          "state": "pending",
+          "verified": null
+        },
+        {
+          "key": "t3",
+          "role": "implementer",
+          "kind": "write_file",
+          "state": "pending",
+          "verified": null
+        },
+        {
+          "key": "t4",
+          "role": "reviewer",
+          "kind": "review",
+          "state": "pending",
+          "verified": null
+        },
+        {
+          "key": "t5",
+          "role": "tester",
+          "kind": "verify_output",
+          "state": "pending",
+          "verified": null
+        },
+        {
+          "key": "t2_r1",
+          "role": "implementer",
+          "kind": "generate_html",
+          "state": "pending",
+          "verified": null
+        },
+        {
+          "key": "t3_r1",
+          "role": "implementer",
+          "kind": "write_file",
+          "state": "pending",
+          "verified": null
+        },
+        {
+          "key": "t5_r1",
+          "role": "tester",
+          "kind": "verify_output",
+          "state": "pending",
+          "verified": null
+        }
+      ],
+      "handoffs": [],
+      "requirements": [
+        {
+          "id": "R1",
+          "text": "The page has a summary section",
+          "passed": null,
+          "detail": null,
+          "stepId": null,
+          "round": null
+        },
+        {
+          "id": "R2",
+          "text": "The page loads nothing from the internet",
+          "passed": null,
+          "detail": null,
+          "stepId": null,
+          "round": null
+        }
+      ],
+      "rejected": []
+    },
+    {
+      "name": "mission.approve on a team Mission (the old Windows path)",
+      "status": 400,
+      "ok": false,
+      "body": {
+        "requestId": "159eb24f-6b7d-4988-a875-b57a72ac8189",
+        "error": "A team Mission is approved, started and replanned through its Coordinator Agent (agent.team.approve / agent.team.revise).",
+        "code": "REFUSED",
+        "operation": {
+          "id": "17452e13-e38a-4245-aa56-c0f1674ee799",
+          "state": "refused",
+          "replayed": false
+        }
+      }
+    },
+    {
+      "name": "agent.team.approve with a wrong plan reference",
+      "status": 400,
+      "ok": false,
+      "body": {
+        "requestId": "a077cab5-2afc-4e02-9c13-01c894b5610e",
+        "error": "The plan changed after it was reviewed; review the current plan before approving.",
+        "code": "REFUSED",
+        "operation": {
+          "id": "04fa88bf-7d2c-4cd0-ba6f-809c0a806163",
+          "state": "refused",
+          "replayed": false
+        }
+      }
+    },
+    {
+      "name": "agent.team.approve",
+      "status": 200,
+      "ok": true,
+      "body": {
+        "agents": {
+          "agents": [
+            {
+              "id": "322931eb-ed8d-4300-9e51-ffbcbe7a15a1",
+              "name": "Inventory team",
+              "state": "RUNNING",
+              "missionId": "8bacfb56-7397-4907-8a73-1f363ffce842",
+              "createdAt": 1793234414457,
+              "updatedAt": 1793234433175,
+              "failure": null,
+              "run": {
+                "id": "51dd6273-14a7-4147-97e4-aa6f48f6662a",
+                "generation": 1,
+                "state": "RUNNING",
+                "startedAt": 1793234414567,
+                "endedAt": null
+              },
+              "checkpoints": 5,
+              "lastCheckpoint": {
+                "boundary": "after_approval_decision",
+                "at": 1793234433094,
+                "replaySafety": "NOT_REPLAYABLE"
+              },
+              "pausedAt": null,
+              "stoppedAt": null,
+              "note": null,
+              "team": {
+                "role": "coordinator",
+                "coordinatorId": null,
+                "missionId": "8bacfb56-7397-4907-8a73-1f363ffce842"
+              },
+              "authorization": null
+            },
+            {
+              "id": "be59330e-5540-4650-8ddf-a0ab5fc09873",
+              "name": "Inventory team · Planner",
+              "state": "WAITING_FOR_DEPENDENCY",
+              "missionId": "8bacfb56-7397-4907-8a73-1f363ffce842",
+              "createdAt": 1793234414458,
+              "updatedAt": 1793234431003,
+              "failure": null,
+              "run": {
+                "id": "ba29a017-33e3-499a-b480-245b9c4a0add",
+                "generation": 1,
+                "state": "WAITING_FOR_DEPENDENCY",
+                "startedAt": 1793234414519,
+                "endedAt": null
+              },
+              "checkpoints": 2,
+              "lastCheckpoint": {
+                "boundary": "after_verification",
+                "at": 1793234430996,
+                "replaySafety": "VERIFY_BEFORE_REPLAY"
+              },
+              "pausedAt": null,
+              "stoppedAt": null,
+              "note": null,
+              "team": {
+                "role": "planner",
+                "coordinatorId": "322931eb-ed8d-4300-9e51-ffbcbe7a15a1",
+                "missionId": "8bacfb56-7397-4907-8a73-1f363ffce842"
+              },
+              "current": {
+                "stepId": "05a72328-dd09-4b3f-8a74-5574795945c5",
+                "role": "Planner",
+                "kind": "plan",
+                "state": "completed",
+                "provider": "ollama",
+                "model": "huihui_ai/qwen2.5-abliterate:7b",
+                "taskId": "f2d6e7a1-acc4-4c46-9f39-bb46d9846709"
+              },
+              "owned": {
+                "total": 1,
+                "completed": 1,
+                "running": 0,
+                "failed": 0,
+                "verified": 1
+              },
+              "authorization": null
+            },
+            {
+              "id": "ef569478-0ec6-4ed4-a0bc-c708f083817e",
+              "name": "Inventory team · Researcher",
+              "state": "WAITING_FOR_DEPENDENCY",
+              "missionId": "8bacfb56-7397-4907-8a73-1f363ffce842",
+              "createdAt": 1793234431050,
+              "updatedAt": 1793234431093,
+              "failure": null,
+              "run": {
+                "id": "6d2b1b60-55d7-46b8-b32b-3785e83fb619",
+                "generation": 1,
+                "state": "WAITING_FOR_DEPENDENCY",
+                "startedAt": 1793234431088,
+                "endedAt": null
+              },
+              "checkpoints": 0,
+              "lastCheckpoint": null,
+              "pausedAt": null,
+              "stoppedAt": null,
+              "note": null,
+              "team": {
+                "role": "researcher",
+                "coordinatorId": "322931eb-ed8d-4300-9e51-ffbcbe7a15a1",
+                "missionId": "8bacfb56-7397-4907-8a73-1f363ffce842"
+              },
+              "current": {
+                "stepId": "8315083b-0bcd-4e85-a0fa-743140f10c6b",
+                "role": "Researcher",
+                "kind": "observe",
+                "state": "pending",
+                "provider": null,
+                "model": null,
+                "taskId": null
+              },
+              "owned": {
+                "total": 1,
+                "completed": 0,
+                "running": 0,
+                "failed": 0,
+                "verified": 0
+              },
+              "authorization": null
+            },
+            {
+              "id": "7c84976d-e071-4192-8fbc-fd717aeeb526",
+              "name": "Inventory team · Implementer",
+              "state": "WAITING_FOR_DEPENDENCY",
+              "missionId": "8bacfb56-7397-4907-8a73-1f363ffce842",
+              "createdAt": 1793234431116,
+              "updatedAt": 1793234431150,
+              "failure": null,
+              "run": {
+                "id": "686f4f7a-732b-4da1-9a14-b40aaa128ce5",
+                "generation": 1,
+                "state": "WAITING_FOR_DEPENDENCY",
+                "startedAt": 1793234431146,
+                "endedAt": null
+              },
+              "checkpoints": 0,
+              "lastCheckpoint": null,
+              "pausedAt": null,
+              "stoppedAt": null,
+              "note": null,
+              "team": {
+                "role": "implementer",
+                "coordinatorId": "322931eb-ed8d-4300-9e51-ffbcbe7a15a1",
+                "missionId": "8bacfb56-7397-4907-8a73-1f363ffce842"
+              },
+              "current": {
+                "stepId": "f80de671-0741-44d5-a441-4bdd5847dbf8",
+                "role": "Implementer",
+                "kind": "generate_html",
+                "state": "pending",
+                "provider": null,
+                "model": null,
+                "taskId": null
+              },
+              "owned": {
+                "total": 2,
+                "completed": 0,
+                "running": 0,
+                "failed": 0,
+                "verified": 0
+              },
+              "authorization": null
+            },
+            {
+              "id": "a634ab7a-18e6-4193-9c0f-2e15334bf97a",
+              "name": "Inventory team · Reviewer",
+              "state": "WAITING_FOR_DEPENDENCY",
+              "missionId": "8bacfb56-7397-4907-8a73-1f363ffce842",
+              "createdAt": 1793234431169,
+              "updatedAt": 1793234431199,
+              "failure": null,
+              "run": {
+                "id": "8f0a7ce9-0bba-4090-bcb9-fae65b25a736",
+                "generation": 1,
+                "state": "WAITING_FOR_DEPENDENCY",
+                "startedAt": 1793234431196,
+                "endedAt": null
+              },
+              "checkpoints": 0,
+              "lastCheckpoint": null,
+              "pausedAt": null,
+              "stoppedAt": null,
+              "note": null,
+              "team": {
+                "role": "reviewer",
+                "coordinatorId": "322931eb-ed8d-4300-9e51-ffbcbe7a15a1",
+                "missionId": "8bacfb56-7397-4907-8a73-1f363ffce842"
+              },
+              "current": {
+                "stepId": "2e3f9ef2-10f4-4655-b253-2b3d63954dc0",
+                "role": "Reviewer",
+                "kind": "review",
+                "state": "pending",
+                "provider": null,
+                "model": null,
+                "taskId": null
+              },
+              "owned": {
+                "total": 1,
+                "completed": 0,
+                "running": 0,
+                "failed": 0,
+                "verified": 0
+              },
+              "authorization": null
+            },
+            {
+              "id": "ad236fff-b41b-47a6-a53d-d99594595f04",
+              "name": "Inventory team · Tester",
+              "state": "WAITING_FOR_DEPENDENCY",
+              "missionId": "8bacfb56-7397-4907-8a73-1f363ffce842",
+              "createdAt": 1793234431217,
+              "updatedAt": 1793234431265,
+              "failure": null,
+              "run": {
+                "id": "d34fc3dc-6dc3-4780-9f18-867612b6a06d",
+                "generation": 1,
+                "state": "WAITING_FOR_DEPENDENCY",
+                "startedAt": 1793234431261,
+                "endedAt": null
+              },
+              "checkpoints": 0,
+              "lastCheckpoint": null,
+              "pausedAt": null,
+              "stoppedAt": null,
+              "note": null,
+              "team": {
+                "role": "tester",
+                "coordinatorId": "322931eb-ed8d-4300-9e51-ffbcbe7a15a1",
+                "missionId": "8bacfb56-7397-4907-8a73-1f363ffce842"
+              },
+              "current": {
+                "stepId": "47185390-4389-4167-829a-7937786e5464",
+                "role": "Tester",
+                "kind": "verify_output",
+                "state": "pending",
+                "provider": null,
+                "model": null,
+                "taskId": null
+              },
+              "owned": {
+                "total": 1,
+                "completed": 0,
+                "running": 0,
+                "failed": 0,
+                "verified": 0
+              },
+              "authorization": null
+            }
+          ],
+          "cursor": 112
+        },
+        "operation": {
+          "id": "d4fda9ad-2632-4745-80bb-19fe848fee67",
+          "state": "applied",
+          "replayed": false
+        }
+      }
+    },
+    {
+      "name": "after execution",
+      "ms": 11212,
+      "missionState": "completed",
+      "phase": "ended",
+      "planReference": null,
+      "coordinator": {
+        "id": "322931eb-ed8d-4300-9e51-ffbcbe7a15a1",
+        "state": "COMPLETED"
+      },
+      "members": [
+        {
+          "role": "coordinator",
+          "state": "COMPLETED",
+          "current": null,
+          "owned": null,
+          "failure": null
+        },
+        {
+          "role": "planner",
+          "state": "COMPLETED",
+          "current": {
+            "kind": "plan",
+            "state": "completed",
+            "model": "huihui_ai/qwen2.5-abliterate:7b"
+          },
+          "owned": {
+            "total": 1,
+            "completed": 1,
+            "running": 0,
+            "failed": 0,
+            "verified": 1
+          },
+          "failure": null
+        },
+        {
+          "role": "researcher",
+          "state": "COMPLETED",
+          "current": {
+            "kind": "observe",
+            "state": "completed",
+            "model": null
+          },
+          "owned": {
+            "total": 1,
+            "completed": 1,
+            "running": 0,
+            "failed": 0,
+            "verified": 1
+          },
+          "failure": null
+        },
+        {
+          "role": "implementer",
+          "state": "COMPLETED",
+          "current": {
+            "kind": "write_file",
+            "state": "completed",
+            "model": null
+          },
+          "owned": {
+            "total": 2,
+            "completed": 2,
+            "running": 0,
+            "failed": 0,
+            "verified": 2
+          },
+          "failure": null
+        },
+        {
+          "role": "reviewer",
+          "state": "COMPLETED",
+          "current": {
+            "kind": "review",
+            "state": "completed",
+            "model": "huihui_ai/qwen2.5-abliterate:7b"
+          },
+          "owned": {
+            "total": 1,
+            "completed": 1,
+            "running": 0,
+            "failed": 0,
+            "verified": 1
+          },
+          "failure": null
+        },
+        {
+          "role": "tester",
+          "state": "COMPLETED",
+          "current": {
+            "kind": "verify_output",
+            "state": "completed",
+            "model": null
+          },
+          "owned": {
+            "total": 1,
+            "completed": 1,
+            "running": 0,
+            "failed": 0,
+            "verified": 1
+          },
+          "failure": null
+        }
+      ],
+      "steps": [
+        {
+          "key": "plan",
+          "role": "planner",
+          "kind": "plan",
+          "state": "completed",
+          "verified": true
+        },
+        {
+          "key": "t1",
+          "role": "researcher",
+          "kind": "observe",
+          "state": "completed",
+          "verified": true
+        },
+        {
+          "key": "t2",
+          "role": "implementer",
+          "kind": "generate_html",
+          "state": "completed",
+          "verified": true
+        },
+        {
+          "key": "t3",
+          "role": "implementer",
+          "kind": "write_file",
+          "state": "completed",
+          "verified": true
+        },
+        {
+          "key": "t4",
+          "role": "reviewer",
+          "kind": "review",
+          "state": "completed",
+          "verified": true
+        },
+        {
+          "key": "t5",
+          "role": "tester",
+          "kind": "verify_output",
+          "state": "completed",
+          "verified": true
+        },
+        {
+          "key": "t2_r1",
+          "role": "implementer",
+          "kind": "generate_html",
+          "state": "skipped",
+          "verified": null
+        },
+        {
+          "key": "t3_r1",
+          "role": "implementer",
+          "kind": "write_file",
+          "state": "skipped",
+          "verified": null
+        },
+        {
+          "key": "t5_r1",
+          "role": "tester",
+          "kind": "verify_output",
+          "state": "skipped",
+          "verified": null
+        }
+      ],
+      "handoffs": [
+        {
+          "type": "structured_result",
+          "purpose": "context",
+          "state": "DELIVERED"
+        },
+        {
+          "type": "source_file",
+          "purpose": "content",
+          "state": "DELIVERED"
+        },
+        {
+          "type": "source_file",
+          "purpose": "review_subject",
+          "state": "DELIVERED"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "R1",
+          "text": "The page has a summary section",
+          "passed": true,
+          "detail": "passed — element id \"summary\" present",
+          "stepId": "47185390-4389-4167-829a-7937786e5464",
+          "round": 0
+        },
+        {
+          "id": "R2",
+          "text": "The page loads nothing from the internet",
+          "passed": true,
+          "detail": "passed — no external resources",
+          "stepId": "47185390-4389-4167-829a-7937786e5464",
+          "round": 0
+        }
+      ],
+      "rejected": []
+    }
+  ]
+}

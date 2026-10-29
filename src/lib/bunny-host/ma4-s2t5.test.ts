@@ -67,7 +67,7 @@ test("T5-B & T5-C: native notifications enforce opt-in, deduplication, quiet hou
     category: "approval_needed" as const,
     sourceId: "ptask-42",
     revision: 1,
-    title: "Write C:\\Users\\allam\\Documents\\secret.txt",
+    title: "Write C:\\Users\\owner\\Documents\\secret.txt",
     detail: "Contact owner@example.com with token sk-1234567890abcdefghijklmnop",
     localHour: 14,
   };
@@ -87,7 +87,7 @@ test("T5-B & T5-C: native notifications enforce opt-in, deduplication, quiet hou
   assert.equal(first.deliver, true);
   assert.equal(first.impliesCompleted, false, "approval_needed never implies completion");
   assert.ok(first.bannerTitle.startsWith("Approval waiting (not started):"));
-  assert.ok(!first.bannerTitle.includes("C:\\Users\\allam"), "Windows path redacted");
+  assert.ok(!first.bannerTitle.includes("C:\\Users\\owner"), "Windows path redacted");
   assert.ok(!first.bannerBody.includes("owner@example.com"), "email redacted");
   assert.ok(!first.bannerBody.includes("sk-1234567890"), "secret token redacted");
   assert.equal(first.remotePushRelayUsed, false);
@@ -186,5 +186,5 @@ test("T5-E: projectDeviceDiagnostics reports connection state accurately and lea
   assert.equal(diag.exposedSecretsOrTokens, 0);
   assert.equal("token" in diag, false);
   assert.equal("tokenHash" in diag, false);
-  assert.equal(sanitizeNotificationText("Path C:\\Users\\allam\\secret.json"), "Path [redacted]");
+  assert.equal(sanitizeNotificationText("Path C:\\Users\\owner\\secret.json"), "Path [redacted]");
 });

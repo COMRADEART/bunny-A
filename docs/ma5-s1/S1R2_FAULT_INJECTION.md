@@ -2,10 +2,10 @@
 
 ## Device setup
 
-Same shape as S1R1 (S1R1_ANDROID_DEVICE_ACCEPTANCE.md), scratch harness copied to `evidence/s1r2/android-device/`
-(`harness.mjs`, `ui.py`, `lifecycle.sh`):
+Same shape as S1R1 (S1R1_ANDROID_DEVICE_ACCEPTANCE.md), harness now kept as reusable, environment-configured tools in `scripts/android-device/`
+(`fault-harness.mjs`, `ui.py`, `lifecycle.sh`; moved there and de-identified in MA5-S2):
 
-- Phone: Galaxy SM-S948U (`R3GL1025V4J`), Android 17. Installed before: the S1R1 build (`classes.dex`
+- Phone: Galaxy SM-S948U (serial redacted), Android 17. Installed before: the S1R1 build (`classes.dex`
   `10bc29f1…e14f`), unpaired. The S1R2 builds were installed over it with `adb install -r`, re-signed with the same
   local key the phone already trusts (`51b965f3…2dd7`).
 - Disposable Host: `startHost` in a temp folder with **only the Ollama adapter**. Never the owner's Host.

@@ -30,7 +30,10 @@ public sealed record TaskRow(
     bool CanResume = false,
     // "orch" (direct task), "mission" or "ptask": the one Host command family that may act on this row.
     string Kind = "orch",
-    string? Progress = null
+    string? Progress = null,
+    // MA5-S2: a team Mission's Coordinator Agent (from the Host's teamView), which owns its start/pause/stop/approval.
+    string? CoordinatorId = null,
+    bool CanStartTeam = false
 )
 {
     public override string ToString() =>
@@ -71,6 +74,12 @@ public sealed record PendingApprovalItem(
     /// <summary>What the user reviewed. A changed digest or a different request is a different approval, never the same one.</summary>
     public string Key => $"{Category}|{TaskId}|{ActionId}|{PayloadSha256}";
     public override string ToString() => $"{OperationKind} · {TaskTitle} · {ActionId}";
+}
+
+/// <summary>MA5-S2: an owner-registered folder (`connector.roots.list`). The path is shown on the workstation only.</summary>
+public sealed record ConnectedRoot(string Id, string Label, string Path)
+{
+    public override string ToString() => $"{Label} — {Path}";
 }
 
 public sealed record ChatMessage(

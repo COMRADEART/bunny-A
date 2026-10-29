@@ -44,6 +44,7 @@ public partial class MainWindow : Window
     private string chatModelSignature = "";
 
     private List<PendingApprovalItem> currentApprovals = new();
+    private List<TaskRow> currentTaskRows = new();
     private readonly Dictionary<string, (bool ok, string scope, string effects, string context)> inspected = new();
     private readonly List<string> decisions = new();
 
@@ -107,6 +108,8 @@ public partial class MainWindow : Window
         ScreenChat.Visibility = tabName == "Chat" ? Visibility.Visible : Visibility.Collapsed;
         ScreenAgents.Visibility = tabName == "Agents" ? Visibility.Visible : Visibility.Collapsed;
         ScreenProjects.Visibility = tabName == "Projects" ? Visibility.Visible : Visibility.Collapsed;
+        ScreenConnected.Visibility = tabName == "Connected" ? Visibility.Visible : Visibility.Collapsed;
+        if (tabName == "Connected") _ = LoadConnectedRootsAsync();
         ScreenApprovals.Visibility = tabName == "Approvals" ? Visibility.Visible : Visibility.Collapsed;
         ScreenVoice.Visibility = tabName == "Voice" ? Visibility.Visible : Visibility.Collapsed;
         ScreenHistory.Visibility = tabName == "History" ? Visibility.Visible : Visibility.Collapsed;
@@ -185,6 +188,7 @@ public partial class MainWindow : Window
         inspected.Clear();
         PendingApprovalsList.SelectedItem = null;
         hostRestartedDuringChat = activeInferenceTaskId != null;
+        if (connectedPlan != null) DiscardConnectedPlan("The Host restarted after planning. Generate a new plan.");
         RecordDecision(identityChanged
             ? "A different Bunny A Host is now answering. Pending approvals were cleared for review."
             : "The Host restarted. Pending approvals were cleared for review.");
@@ -326,12 +330,40 @@ public partial class MainWindow : Window
             var mTitle = mission.Json("title") ?? "Mission";
             var mState = mission.Json("state") ?? "unknown";
             var progress = mission.JsonObj("progress");
-            var row = new TaskRow(mId, $"[Mission] {mTitle}", mState.ToUpperInvariant(),
+            // MA5-S2: a team Mission is controlled through its Coordinator, identified by the Host's teamView (never guessed).
+            var teamView = mission.JsonObj("teamView");
+            var coordinatorId = teamView.ValueKind == JsonValueKind.Object ? teamView.Json("coordinatorAgentId") : null;
+            var coordinator = coordinatorId == null ? default : AgentRow(root, coordinatorId);
+            var cState = coordinator.ValueKind == JsonValueKind.Object ? coordinator.Json("state") : null;
+            var row = new TaskRow(mId, $"[{(coordinatorId != null ? "Team" : "Mission")}] {mTitle}", mState.ToUpperInvariant(),
                 Progress: progress.ValueKind == JsonValueKind.Object ? $"{progress.JsonLong("completed")}/{progress.JsonLong("total")} steps done" : null,
-                CanCancel: mState is "draft" or "planning" or "waiting_for_approval" or "ready" or "running" or "waiting_for_user" or "verifying", Kind: "mission");
+                CanCancel: coordinatorId != null ? cState is not (null or "COMPLETED" or "FAILED" or "STOPPED")
+                    : mState is "draft" or "planning" or "waiting_for_approval" or "ready" or "running" or "waiting_for_user" or "verifying",
+                CanPause: coordinatorId != null && AgentStarted(coordinator)
+                    && cState is "PLANNING" or "RUNNING" or "VERIFYING" or "WAITING_FOR_DEPENDENCY" or "WAITING_FOR_USER",
+                CanResume: cState == "PAUSED",
+                Kind: "mission", CoordinatorId: coordinatorId,
+                CanStartTeam: cState == "CREATED" && !AgentStarted(coordinator));
             (mState is "completed" or "failed" or "stopped" ? historyTasks : activeTasks).Add(row);
 
-            if (mState == "waiting_for_approval")
+            if (coordinatorId != null)
+            {
+                // A team plan is reviewable only once its Planner proposed it; before that the team is started, not approved.
+                var reference = teamView.Json("planReference");
+                if (mState == "waiting_for_approval" && teamView.Json("phase") == "review" && reference != null)
+                {
+                    var plan = string.Join("\n", mission.JsonArr("steps").Where(s => s.JsonObj("team").ValueKind == JsonValueKind.Object && s.Json("state") != "skipped")
+                        .Select(s => $"{s.JsonObj("team").Json("key")} · {s.JsonObj("team").Json("role")} · {s.JsonObj("team").Json("kind")}: {s.Json("objective")}"));
+                    var reqs = string.Join("\n", teamView.JsonArr("requirements").Select(r => $"{r.Json("id")}: {r.Json("text")}"));
+                    approvals.Add(new PendingApprovalItem(
+                        TaskId: mId, TaskTitle: mTitle, ActionId: coordinatorId, OperationKind: "agent.team.approve",
+                        Summary: $"Team plan: {mTitle}", PayloadSha256: reference, Category: "team_plan", Reversible: true, ExpiresAt: 0,
+                        Scope: $"Output folder {teamView.Json("outputDir")} only · {teamView.JsonArr("members").Count()} agents · plan revisions {teamView.JsonLong("planRevisions")}",
+                        ProposedDiff: $"Objective: {mission.Json("objective")}\n\nRequirements:\n{reqs}\n\nPlan:\n{plan}",
+                        ExpectedEffects: "Approves this exact team plan through its Coordinator and starts the members."));
+                }
+            }
+            else if (mState == "waiting_for_approval")
             {
                 var plan = string.Join("\n", mission.JsonArr("steps").Select(s => $"{s.JsonLong("index") + 1}. [{s.Json("role")}] {s.Json("objective")}"));
                 approvals.Add(new PendingApprovalItem(
@@ -412,6 +444,18 @@ public partial class MainWindow : Window
                     ProposedDiff: $"{pending.Json("summary")}\nTarget: {pending.Json("target")}",
                     ExpectedEffects: string.Join(" ", pending.JsonArr("effects").Select(e => e.GetString()))));
             }
+            // MA5-S2: a whole task waiting to start (background or side-effect envelope) had no native approval path.
+            else if (state == "AWAITING_APPROVAL" && actionId == null)
+            {
+                var version = task.JsonLong("version");
+                var models = string.Join(", ", task.JsonArr("models").Select(m => m.GetString()));
+                approvals.Add(new PendingApprovalItem(
+                    TaskId: id, TaskTitle: title, ActionId: version.ToString(System.Globalization.CultureInfo.InvariantCulture), OperationKind: "Start persistent task",
+                    Summary: title, PayloadSha256: "-", Category: "ptask_launch", Reversible: true, ExpiresAt: 0,
+                    Scope: $"{progress.JsonLong("total")} step(s) · {(models.Length > 0 ? models : "no model")} · {(task.JsonBool("background") ? "background" : "foreground")}",
+                    ProposedDiff: $"Start “{title}” under the envelope it was created with.",
+                    ExpectedEffects: "Starts the task's steps. Consequential actions still ask for their own approval when they run."));
+            }
         }
 
         rebinding = true;
@@ -419,6 +463,7 @@ public partial class MainWindow : Window
         {
             SetItems(ActiveTasksList, activeTasks, r => r.Id);
             SetItems(TaskHistoryList, historyTasks, r => r.Id);
+            currentTaskRows = [.. activeTasks, .. historyTasks];
             currentApprovals = approvals;
             SetItems(PendingApprovalsList, approvals, a => a.Key);
         }
@@ -462,6 +507,8 @@ public partial class MainWindow : Window
             .Select(p => new ProjectItem(p.Json("id")!, p.Json("name") ?? p.Json("id")!, p.Json("path") ?? "", p.JsonLong("createdAt"), 0))
             .ToList();
         SetItems(ProjectsList, projects, p => p.Id);
+        // The Host's default project when none is registered, as on the web workstation.
+        RebindConnectedCombo(ConnectedProjectCombo, projects.Count > 0 ? projects.Select(p => p.Id).ToList() : ["personal"]);
     }
 
     private void ApplyLotus(JsonElement root)
@@ -495,6 +542,8 @@ public partial class MainWindow : Window
         SetItems(ModelsList, models, m => m.Id);
         chatModels = models;
         RebuildChatModels();
+        // Connected tasks are local-only by Host contract: only installed, non-hosted Ollama models can be pinned.
+        RebindConnectedCombo(ConnectedModelCombo, models.Where(m => m.IsLocal && m.Provider == "ollama").Select(m => m.Id).ToList());
     }
 
     private void RebuildChatModels()
@@ -624,8 +673,40 @@ public partial class MainWindow : Window
         MessageBox.Show(this, message, title, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes;
 
     /// <summary>Stops one item with the single command its kind accepts; nothing guesses between command families.</summary>
+    /// <summary>
+    /// MA5-S2: a notch chip opens its item in the existing UI: the Approval Center when it waits for the owner, the Agent
+    /// Dashboard while active, History once finished. The notch only navigates; every decision stays in these screens.
+    /// </summary>
+    public void OpenItem(string? kind, string? id, bool needsOwner)
+    {
+        ShowAndActivate();
+        if (needsOwner && id != null && currentApprovals.FirstOrDefault(a => a.TaskId == id) is { } approval)
+        {
+            SelectTab("Approvals");
+            PendingApprovalsList.SelectedItem = approval;
+            return;
+        }
+        var row = id == null ? null : currentTaskRows.FirstOrDefault(r => r.Id == id && (kind == null || r.Kind == kind));
+        if (row != null && ActiveTasksList.Items.Contains(row)) { SelectTab("Agents"); ActiveTasksList.SelectedItem = row; ActiveTasksList.ScrollIntoView(row); }
+        else if (row != null) { SelectTab("History"); TaskHistoryList.SelectedItem = row; TaskHistoryList.ScrollIntoView(row); }
+        else SelectTab("Agents");
+    }
+
+    /// <summary>A run record can exist before anything ran; only a Host start time means the Agent actually started.</summary>
+    private static bool AgentStarted(JsonElement agent) =>
+        agent.ValueKind == JsonValueKind.Object && agent.JsonObj("run").ValueKind == JsonValueKind.Object && agent.JsonObj("run").JsonLong("startedAt") > 0;
+
+    private static JsonElement AgentRow(JsonElement root, string agentId) =>
+        root.JsonObj("agents").JsonArr("agents").FirstOrDefault(a => a.Json("id") == agentId);
+
     public async Task StopItemAsync(string kind, string id, string reason)
     {
+        // A team stops through its Coordinator, which stops every member (scope "team" in the Host's lifecycle).
+        if (kind == "mission" && currentTaskRows.FirstOrDefault(r => r.Id == id)?.CoordinatorId is { } coordinator)
+        {
+            await RunCommandAsync("agent.stop", new { id = coordinator }, "Stop Failed");
+            return;
+        }
         _ = kind switch
         {
             "mission" => await RunCommandAsync("mission.stop", new { id }, "Stop Failed"),
@@ -920,9 +1001,49 @@ public partial class MainWindow : Window
     {
         var row = ActiveTasksList.SelectedItem as TaskRow;
         CancelActiveTaskButton.IsEnabled = row?.CanCancel == true;
-        PauseTaskButton.IsEnabled = row is { Kind: "ptask", CanPause: true };
-        ResumeTaskButton.IsEnabled = row is { Kind: "ptask", CanResume: true };
-        RunWithAgentsButton.IsEnabled = row is { Kind: "mission", State: "WAITING_FOR_APPROVAL" };
+        PauseTaskButton.IsEnabled = row is { Kind: "ptask", CanPause: true } or { Kind: "mission", CoordinatorId: not null, CanPause: true };
+        ResumeTaskButton.IsEnabled = row is { Kind: "ptask", CanResume: true } or { Kind: "mission", CoordinatorId: not null, CanResume: true };
+        StartTeamButton.IsEnabled = row is { CanStartTeam: true };
+        RunWithAgentsButton.IsEnabled = row is { Kind: "mission", State: "WAITING_FOR_APPROVAL" } && currentApprovals.Any(a => a.TaskId == row.Id);
+    }
+
+    /// <summary>
+    /// MA5-S2: a team as the Host reports it. Agent states come from the Agent runtime; a configured or created member is
+    /// never shown as working. Reviewer findings are advisory; requirement verdicts are Bunny's own Tester checks.
+    /// </summary>
+    private string TeamSummary(JsonElement mission, string coordinatorId)
+    {
+        var view = mission.JsonObj("teamView");
+        var agents = lastRoot.JsonObj("agents").JsonArr("agents").ToList();
+        string RoleOf(string? agentId) => agents.FirstOrDefault(a => a.Json("id") == agentId).JsonObj("team").Json("role") ?? "Bunny";
+        var coordinator = agents.FirstOrDefault(a => a.Json("id") == coordinatorId);
+        var lines = new List<string>
+        {
+            $"Team · Coordinator “{coordinator.Json("name") ?? "?"}” {(AgentStarted(coordinator) ? coordinator.Json("state") : "not started")} · phase {view.Json("phase")} · output folder {view.Json("outputDir")}",
+        };
+        foreach (var a in agents.Where(a => a.Json("missionId") == mission.Json("id") && a.JsonObj("team").ValueKind == JsonValueKind.Object && a.Json("id") != coordinatorId))
+        {
+            var current = a.JsonObj("current");
+            var owned = a.JsonObj("owned");
+            var failure = a.JsonObj("failure");
+            // The Agent state names a role phase (a Planner is PLANNING from team creation, with its step still pending);
+            // "working" is claimed only while the Host reports the member's current step running or verifying.
+            var working = current.ValueKind == JsonValueKind.Object && current.Json("state") is "running" or "verifying";
+            lines.Add($"  {a.JsonObj("team").Json("role"),-12} {(working ? "working" : "idle")} · Host state {(AgentStarted(a) ? a.Json("state") : "not started")}" +
+                (current.ValueKind == JsonValueKind.Object ? $" · {current.Json("kind")} ({current.Json("state")}){(current.Json("model") is { } m ? $" · {current.Json("provider")} · {m}" : "")}" : "") +
+                (owned.ValueKind == JsonValueKind.Object ? $" · {owned.JsonLong("verified")}/{owned.JsonLong("total")} verified, {owned.JsonLong("failed")} failed" : "") +
+                (failure.ValueKind == JsonValueKind.Object ? $" · FAILED {failure.Json("code")}: {failure.Json("detail")}" : ""));
+        }
+        var handoffs = view.JsonArr("handoffs").TakeLast(8).Select(h =>
+            $"  {RoleOf(h.Json("sourceAgentId"))} → {RoleOf(h.Json("destinationAgentId"))} · {h.Json("artifactType")} sha {(h.Json("artifactSha256") ?? "")[..Math.Min(12, (h.Json("artifactSha256") ?? "").Length)]} · {h.Json("purpose")} · {h.Json("state")}").ToList();
+        if (handoffs.Count > 0) lines.Add("Handoffs:"); lines.AddRange(handoffs);
+        var requirements = view.JsonArr("requirementResults").Select(r =>
+        {
+            var passed = r.TryGetProperty("passed", out var p) ? p.ValueKind : JsonValueKind.Null;
+            return $"  {r.Json("id")} {(passed == JsonValueKind.True ? "PASSED (Host check)" : passed == JsonValueKind.False ? "FAILED (Host check)" : "not checked yet")} · {r.Json("text")}";
+        }).ToList();
+        if (requirements.Count > 0) lines.Add("Requirements:"); lines.AddRange(requirements);
+        return string.Join("\n", lines);
     }
 
     private void RenderMissionSteps()
@@ -931,9 +1052,12 @@ public partial class MainWindow : Window
         {
             MissionStepsHeader.Text = "Select a Mission to see its Host-reported steps.";
             MissionStepsList.ItemsSource = null;
+            MissionTeamText.Visibility = Visibility.Collapsed;
             return;
         }
         var mission = lastRoot.JsonObj("missions").JsonArr("missions").FirstOrDefault(m => m.Json("id") == row.Id);
+        MissionTeamText.Text = row.CoordinatorId is { } coordinatorId ? TeamSummary(mission, coordinatorId) : "";
+        MissionTeamText.Visibility = row.CoordinatorId != null ? Visibility.Visible : Visibility.Collapsed;
         var steps = mission.JsonArr("steps").Select(s =>
         {
             var result = s.JsonObj("result");
@@ -941,7 +1065,9 @@ public partial class MainWindow : Window
             var verified = result.ValueKind != JsonValueKind.Object ? null
                 : flag == JsonValueKind.True ? "Host-verified" : flag == JsonValueKind.False ? "verification failed" : "not verified";
             var task = s.Json("taskId") is { } tid ? FindTask(tid) : null;
-            return new StepRow(s.Json("id") ?? "", $"Step {s.JsonLong("index") + 1}", (s.Json("state") ?? "unknown").ToUpperInvariant(), s.Json("role"),
+            var team = s.JsonObj("team");
+            var role = team.ValueKind == JsonValueKind.Object ? $"{team.Json("role")} · {team.Json("kind")}{(team.JsonLong("round") > 0 ? $" · rework {team.JsonLong("round")}" : "")}" : s.Json("role");
+            return new StepRow(s.Json("id") ?? "", $"Step {s.JsonLong("index") + 1}", (s.Json("state") ?? "unknown").ToUpperInvariant(), role,
                 task is JsonElement t ? $"{t.Json("provider")} · {t.Json("model")}" : null,
                 null, result.Json("summary") ?? s.Json("objective"), verified);
         }).ToList();
@@ -954,7 +1080,14 @@ public partial class MainWindow : Window
         if (ActiveTasksList.SelectedItem is not TaskRow { Kind: "mission" } row) return;
         // A plan is approved only after its exact steps and reference are shown; this button opens that review.
         SelectTab("Approvals");
-        PendingApprovalsList.SelectedItem = currentApprovals.FirstOrDefault(a => a.Category == "agent_plan" && a.TaskId == row.Id);
+        PendingApprovalsList.SelectedItem = currentApprovals.FirstOrDefault(a => a.Category is "agent_plan" or "team_plan" && a.TaskId == row.Id);
+    }
+
+    private async void StartTeam_Click(object sender, RoutedEventArgs e)
+    {
+        if (ActiveTasksList.SelectedItem is not TaskRow { CanStartTeam: true, CoordinatorId: { } coordinator } row) return;
+        if (!Confirm("Start Team Planning", $"{row.Title}\n\nThe Coordinator starts and its Planner proposes a plan on the local model. No member runs until you approve that exact plan in the Approval Center.")) return;
+        await RunCommandAsync("agent.start", new { id = coordinator }, "Team Not Started");
     }
 
     private async void CancelSelectedTask_Click(object sender, RoutedEventArgs e)
@@ -967,12 +1100,16 @@ public partial class MainWindow : Window
     {
         if (ActiveTasksList.SelectedItem is TaskRow { Kind: "ptask", CanPause: true } row)
             await RunCommandAsync("ptask.pause", new { id = row.Id }, "Pause Failed");
+        else if (ActiveTasksList.SelectedItem is TaskRow { Kind: "mission", CanPause: true, CoordinatorId: { } coordinator })
+            await RunCommandAsync("agent.pause", new { id = coordinator }, "Pause Failed");
     }
 
     private async void ResumeSelectedTask_Click(object sender, RoutedEventArgs e)
     {
         if (ActiveTasksList.SelectedItem is TaskRow { Kind: "ptask", CanResume: true } row)
             await RunCommandAsync("ptask.resume", new { id = row.Id }, "Resume Failed");
+        else if (ActiveTasksList.SelectedItem is TaskRow { Kind: "mission", CanResume: true, CoordinatorId: { } coordinator })
+            await RunCommandAsync("agent.resume", new { id = coordinator }, "Resume Failed");
     }
 
     // ==========================================
@@ -1001,14 +1138,17 @@ public partial class MainWindow : Window
         ApprovalScopeText.Text = app.Scope;
         ApprovalPayloadShaText.Text = app.PayloadSha256 != "-" ? app.PayloadSha256
             : app.Category == "task_launch" ? "No payload digest: the Host binds this launch to the task id and its current state."
+            : app.Category == "ptask_launch" ? $"No payload digest: the Host binds this approval to task version {app.ActionId}; if the task changed, it is refused."
             : "No digest supplied by the Host.";
         ApprovalEffectsText.Text = app.ExpectedEffects;
         ApprovalDiffText.Text = app.ProposedDiff;
         ApprovalContextText.Text = app.Category switch
         {
             "agent_plan" => "Bound to the plan reference above; a re-planned Mission is refused until reviewed again.",
+            "team_plan" => "Approved through the team's Coordinator and bound to the plan reference above; a re-planned team is refused until reviewed again. Deny stops the whole team.",
             "consequential" => "Answers this one request once; a new request needs a new decision.",
             "task_launch" => "Launch only; the task can be stopped from the Agent Dashboard.",
+            "ptask_launch" => "Approves this task for up to 24 hours or until its envelope expires. Deny cancels it.",
             _ => "Loading the Host's recovery rule…",
         };
         if (app.Category == "action")
@@ -1063,7 +1203,7 @@ public partial class MainWindow : Window
         var reviewable = app != null && hostClient.IsConnected && app.Category switch
         {
             "action" => inspected.TryGetValue(app.Key, out var f) && f.ok,
-            "agent_plan" => app.PayloadSha256 != "-",
+            "agent_plan" or "team_plan" => app.PayloadSha256 != "-",
             _ => true,
         };
         ApproveActionButton.IsEnabled = reviewable;
@@ -1101,9 +1241,13 @@ public partial class MainWindow : Window
             {
                 ("agent_plan", true) => ("mission.approve", new { id = app.TaskId, start = true, plan = app.PayloadSha256 }),
                 ("agent_plan", false) => ("mission.stop", new { id = app.TaskId }),
+                ("team_plan", true) => ("agent.team.approve", new { id = app.ActionId, planReference = app.PayloadSha256 }),
+                ("team_plan", false) => ("agent.stop", new { id = app.ActionId }),
                 ("task_launch", true) => ("approve", new { id = app.TaskId }),
                 ("task_launch", false) => ("stop", new { id = app.TaskId, reason = "User denied task approval." }),
-                ("consequential", _) => ("mission.respond", new { requestId = app.ActionId, decision = approve ? "allow_once" : "deny" }),
+                ("ptask_launch", true) => ("ptask.approve", new { id = app.TaskId, version = long.Parse(app.ActionId, System.Globalization.CultureInfo.InvariantCulture) }),
+                ("ptask_launch", false) => ("ptask.cancel", new { id = app.TaskId }),
+                ("consequential", _) =>("mission.respond", new { requestId = app.ActionId, decision = approve ? "allow_once" : "deny" }),
                 (_, true) => ("action.approve", new { id = app.TaskId, actionId = app.ActionId, payloadSha256 = app.PayloadSha256 }),
                 (_, false) => ("action.deny", new { id = app.TaskId, actionId = app.ActionId }),
             };
@@ -1205,7 +1349,434 @@ public partial class MainWindow : Window
         SelectTab("Agents");
     }
 
-    private void TaskHistoryList_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateHistoryButtons();
+    // ==========================================
+    // MA5-S2 NEW CONNECTED TASK (workstation-only)
+    // describe → folders → ptask.plan → review (Host facts) → explicit ptask.create → monitor
+    // ==========================================
+
+    /// <summary>A Host-validated proposal and the exact envelope it was planned under; Create sends both unchanged.</summary>
+    private sealed record ConnectedPlan(JsonElement Spec, object Envelope, string Signature);
+    private ConnectedPlan? connectedPlan;
+    private List<ConnectedRoot> connectedRoots = new();
+    private bool rebindingConnected;
+
+    private void RebindConnectedCombo(ComboBox combo, List<string> options)
+    {
+        if (combo.ItemsSource is List<string> old && old.SequenceEqual(options)) return;
+        var previous = combo.SelectedItem as string;
+        rebindingConnected = true;
+        try
+        {
+            combo.ItemsSource = options;
+            combo.SelectedItem = previous != null && options.Contains(previous) ? previous : options.FirstOrDefault();
+        }
+        finally { rebindingConnected = false; }
+        ConnectedInput_Changed(combo, new RoutedEventArgs());
+    }
+
+    private List<string> ConnectedCapabilities()
+    {
+        var caps = new List<string>();
+        if (ConnectedCapRead.IsChecked == true) caps.Add("file.read");
+        if (ConnectedCapGenerate.IsChecked == true) caps.Add("local.generate");
+        if (ConnectedCapReview.IsChecked == true) caps.Add("local.review");
+        return caps;
+    }
+
+    private List<ConnectedRoot> ConnectedGrantedRoots() =>
+        ConnectedRootsList.SelectedItems.OfType<ConnectedRoot>().OrderBy(r => r.Id, StringComparer.Ordinal).ToList();
+
+    private string ConnectedSignature() => string.Join("\u001f", ConnectedGoalInput.Text.Trim(), ConnectedProjectCombo.SelectedItem as string ?? "",
+        ConnectedModelCombo.SelectedItem as string ?? "", string.Join(",", ConnectedCapabilities()), string.Join(",", ConnectedGrantedRoots().Select(r => r.Id)));
+
+    private void ConnectedInput_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!IsLoaded || rebindingConnected) return;
+        ConnectedPlanButton.IsEnabled = ConnectedGoalInput.Text.Trim().Length > 0 && ConnectedModelCombo.SelectedItem is string && ConnectedCapabilities().Count > 0;
+        RemoveConnectedRootButton.IsEnabled = ConnectedRootsList.SelectedItems.Count > 0;
+        if (ConnectedModelCombo.Items.Count == 0) ConnectedPlanStatus.Text = "No local Ollama model is installed; the Planner needs one.";
+        // A proposal is bound to the inputs it was planned from: any change means planning again, never creating a stale plan.
+        if (connectedPlan != null && connectedPlan.Signature != ConnectedSignature())
+            DiscardConnectedPlan("The goal, folders, model or permissions changed after planning. Generate a new plan.");
+    }
+
+    private async Task LoadConnectedRootsAsync()
+    {
+        try
+        {
+            var res = await hostClient.SendCommandAsync("connector.roots.list", new { }, lifetime.Token);
+            ApplyConnectedRoots(res.JsonObj("data"));
+            ConnectedRootsStatus.Text = connectedRoots.Count == 0 ? "No folders registered yet. A task can still use the local model without reading files." : "";
+        }
+        catch (HostException ex) { ConnectedRootsStatus.Text = $"Folders unavailable: {ex.Message}"; }
+        catch (OperationCanceledException) { }
+    }
+
+    private void ApplyConnectedRoots(JsonElement data)
+    {
+        var granted = ConnectedGrantedRoots().Select(r => r.Id).ToHashSet();
+        connectedRoots = data.JsonArr("roots").Where(r => r.Json("id") is { Length: > 0 })
+            .Select(r => new ConnectedRoot(r.Json("id")!, r.Json("label") ?? r.Json("id")!, r.Json("path") ?? "")).ToList();
+        rebindingConnected = true;
+        try
+        {
+            ConnectedRootsList.ItemsSource = connectedRoots;
+            foreach (var r in connectedRoots.Where(r => granted.Contains(r.Id))) ConnectedRootsList.SelectedItems.Add(r);
+        }
+        finally { rebindingConnected = false; }
+        ConnectedInput_Changed(ConnectedRootsList, new RoutedEventArgs());
+    }
+
+    private async Task SaveConnectedRootsAsync(List<ConnectedRoot> next)
+    {
+        var res = await RunCommandAsync("connector.roots.set", new { roots = next.Select(r => new { id = r.Id, label = r.Label, path = r.Path }) }, "Folder Not Changed");
+        // After a refusal or an uncertain outcome, show the Host's actual list rather than what was asked for.
+        if (res is JsonElement ok) ApplyConnectedRoots(ok.JsonObj("data")); else await LoadConnectedRootsAsync();
+    }
+
+    /// <summary>Same rule as the web workstation's folderId: a stable, readable id unique among registered folders.</summary>
+    private static string FolderId(string label, IReadOnlyCollection<string> taken)
+    {
+        var slug = System.Text.RegularExpressions.Regex.Replace(label.ToLowerInvariant(), "[^a-z0-9]+", "-");
+        slug = slug[..Math.Min(36, slug.Length)].Trim('-');
+        var stem = slug.Length == 0 ? "folder" : char.IsAsciiLetterLower(slug[0]) ? slug : $"f-{slug}";
+        var id = stem;
+        for (var n = 2; taken.Contains(id); n++) id = $"{stem}-{n}";
+        return id;
+    }
+
+    private void BrowseConnectedRoot_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog { Title = "Select a folder Bunny A may read" };
+        if (dialog.ShowDialog() != true) return;
+        ConnectedRootPathInput.Text = dialog.FolderName;
+        if (ConnectedRootLabelInput.Text.Trim().Length == 0) ConnectedRootLabelInput.Text = Path.GetFileName(dialog.FolderName.TrimEnd('\\', '/'));
+    }
+
+    private async void AddConnectedRoot_Click(object sender, RoutedEventArgs e)
+    {
+        var label = ConnectedRootLabelInput.Text.Trim();
+        var path = ConnectedRootPathInput.Text.Trim();
+        if (label.Length == 0 || path.Length == 0) { ConnectedRootsStatus.Text = "Enter a folder name and its full path."; return; }
+        var root = new ConnectedRoot(FolderId(label, connectedRoots.Select(r => r.Id).ToList()), label, path);
+        await SaveConnectedRootsAsync([.. connectedRoots, root]);
+        if (connectedRoots.Any(r => r.Id == root.Id)) { ConnectedRootLabelInput.Clear(); ConnectedRootPathInput.Clear(); }
+    }
+
+    private async void RemoveConnectedRoot_Click(object sender, RoutedEventArgs e)
+    {
+        var remove = ConnectedGrantedRoots();
+        if (remove.Count == 0) return;
+        if (!Confirm("Remove Folders", $"Stop letting Bunny A read:\n{string.Join("\n", remove.Select(r => r.ToString()))}\n\nTasks that use them will be refused until they are registered again.")) return;
+        await SaveConnectedRootsAsync(connectedRoots.Where(r => remove.All(x => x.Id != r.Id)).ToList());
+    }
+
+    private async void ConnectedPlan_Click(object sender, RoutedEventArgs e)
+    {
+        if (ConnectedModelCombo.SelectedItem is not string model) return;
+        var project = ConnectedProjectCombo.SelectedItem as string ?? "personal";
+        var signature = ConnectedSignature();
+        var caps = ConnectedCapabilities();
+        var roots = ConnectedGrantedRoots();
+        var expiresAt = DateTimeOffset.UtcNow.AddDays(1);
+        // Local-only, no side effects, foreground: the narrowest envelope that can do the work. The Host re-validates it on create.
+        var envelope = new
+        {
+            capabilities = caps, providers = new[] { "ollama" }, localOnly = true, models = new[] { model }, projectScopes = new[] { project },
+            sideEffects = false, background = false, budgets = new { maxModelCalls = 10, maxWallMs = 3_600_000 },
+            expiresAt = expiresAt.ToUnixTimeMilliseconds(),
+            grants = new { files = roots.Select(r => new { root = r.Id, access = "read" }).ToArray(), origins = Array.Empty<string>(), services = Array.Empty<object>() },
+        };
+        var permissions = string.Join("\n",
+            $"Folders (read only): {(roots.Count > 0 ? string.Join(", ", roots.Select(r => r.ToString())) : "none")}",
+            $"Actions allowed:     {string.Join(", ", caps)}",
+            $"Model:               {model} (local Ollama only; never a hosted provider)",
+            "Side effects:        none · runs in the foreground only",
+            $"Budget:              at most 10 model calls and 1 hour · project {project}",
+            $"Envelope expires:    {expiresAt.LocalDateTime:g}");
+        DiscardConnectedPlan(null);
+        ConnectedResultText.Text = "";
+        ConnectedResultActions.Visibility = Visibility.Collapsed;
+        ConnectedPlanButton.IsEnabled = false;
+        ConnectedPlanStatus.Text = $"The Planner is proposing on {model}… (a proposal changes nothing)";
+        try
+        {
+            // A local Planner can take minutes; the Host itself stops it at 5 minutes.
+            var res = await hostClient.SendCommandAsync("ptask.plan", new { request = ConnectedGoalInput.Text.Trim(), projectId = project, model, envelope }, lifetime.Token, TimeSpan.FromMinutes(5.5));
+            if (signature != ConnectedSignature()) { ConnectedPlanStatus.Text = "The inputs changed while planning; that proposal was discarded."; return; }
+            ShowConnectedPlan(res.JsonObj("data"), envelope, signature, permissions);
+            ConnectedPlanStatus.Text = "";
+        }
+        catch (HostException ex) { ConnectedPlanStatus.Text = $"No plan: {ex.Message}"; }
+        catch (OperationCanceledException) { }
+        finally { ConnectedInput_Changed(ConnectedPlanButton, new RoutedEventArgs()); }
+    }
+
+    private void ShowConnectedPlan(JsonElement plan, object envelope, string signature, string permissions)
+    {
+        var spec = plan.JsonObj("spec");
+        var review = plan.JsonObj("review");
+        var ok = plan.JsonBool("ok") && spec.ValueKind == JsonValueKind.Object && review.ValueKind == JsonValueKind.Object;
+        var problems = plan.JsonArr("problems").Select(p => p.GetString()).ToList();
+        var advisories = plan.JsonArr("advisories").Select(p => p.GetString()).ToList();
+        ConnectedReviewTitle.Text = spec.Json("title") ?? "No usable plan";
+        ConnectedReviewVerdict.Text = ok
+            ? "The Host validated this proposal against your folders, model pin and permissions." + (advisories.Count > 0 ? $"\nPlanner notes: {string.Join(" ", advisories)}" : "")
+            : $"The Host did not accept this proposal; it cannot be created:\n{string.Join("\n", problems)}";
+        ConnectedReviewVerdict.Foreground = (Brush)FindResource(ok ? "PositiveBrush" : "NegativeBrush");
+        var facts = review.JsonArr("steps").Where(s => s.Json("id") != null).GroupBy(s => s.Json("id")!).ToDictionary(g => g.Key, g => g.First());
+        ConnectedStepsList.ItemsSource = spec.JsonArr("steps").Select((s, i) =>
+        {
+            var stepId = s.Json("id") ?? "?";
+            var f = facts.GetValueOrDefault(stepId);
+            var effect = f.ValueKind != JsonValueKind.Object ? "not checked by the Host"
+                : !f.JsonBool("registered") ? "NO REGISTERED EXECUTOR" : $"{f.Json("category")?.Replace('_', '-')}{(f.JsonBool("consequential") ? " · asks for your approval when it runs" : "")}";
+            var inputs = s.JsonObj("input").ValueKind == JsonValueKind.Object
+                ? string.Join("; ", s.JsonObj("input").EnumerateObject().Select(p => $"{p.Name}={ClipText(p.Value.ToString(), 90)}")) : "";
+            return $"{i + 1}. {stepId} · {s.Json("kind")}{(s.Json("model") is { } m ? $" · model {m}" : "")} · {effect}\n    {inputs}";
+        }).ToList();
+        ConnectedPermissionsText.Text = permissions;
+        ConnectedApprovalText.Text = !ok ? ""
+            : review.JsonBool("approvalRequired")
+                ? "After Create, the task waits for your approval in the Approval Center before any step runs."
+                : "Create starts this task immediately: every step is read-only on this PC and none needs approval. You can Pause or Cancel it from the Agent Dashboard.";
+        connectedPlan = ok ? new ConnectedPlan(spec.Clone(), envelope, signature) : null;
+        ConnectedReviewedCheck.IsChecked = false;
+        ConnectedReviewedCheck.IsEnabled = ok;
+        ConnectedCreateButton.IsEnabled = false;
+        ConnectedReviewPanel.Visibility = Visibility.Visible;
+    }
+
+    private static string ClipText(string text, int max) => text.Length > max ? text[..max] + "…" : text;
+
+    private void DiscardConnectedPlan(string? reason)
+    {
+        connectedPlan = null;
+        ConnectedReviewPanel.Visibility = Visibility.Collapsed;
+        ConnectedReviewedCheck.IsChecked = false;
+        ConnectedCreateButton.IsEnabled = false;
+        if (reason != null) ConnectedPlanStatus.Text = reason;
+    }
+
+    private void ConnectedReviewed_Changed(object sender, RoutedEventArgs e) =>
+        ConnectedCreateButton.IsEnabled = connectedPlan != null && ConnectedReviewedCheck.IsChecked == true;
+
+    private void ConnectedDiscard_Click(object sender, RoutedEventArgs e) => DiscardConnectedPlan("Proposal discarded; nothing was created.");
+
+    private async void ConnectedCreate_Click(object sender, RoutedEventArgs e)
+    {
+        if (connectedPlan is not { } plan || ConnectedReviewedCheck.IsChecked != true || plan.Signature != ConnectedSignature()) return;
+        // One attempt per reviewed proposal: success, refusal or an uncertain outcome all consume it, so nothing is created twice.
+        DiscardConnectedPlan(null);
+        var res = await RunCommandAsync("ptask.create", new { spec = plan.Spec, envelope = plan.Envelope }, "Task Not Created");
+        ConnectedResultActions.Visibility = Visibility.Visible;
+        if (res is not JsonElement created)
+        {
+            ConnectedResultText.Text = "The Host did not confirm a new task (see the message). Check the Agent Dashboard before planning again.";
+            return;
+        }
+        var t = created.JsonObj("data");
+        ConnectedResultText.Text = t.Json("state") == "AWAITING_APPROVAL"
+            ? $"Created “{t.Json("title")}” ({t.Json("id")}). It waits for your approval in the Approval Center."
+            : $"Created “{t.Json("title")}” ({t.Json("id")}): {t.Json("display") ?? t.Json("state")}.";
+        ConnectedGoalInput.Clear();
+    }
+
+    private void ConnectedMonitor_Click(object sender, RoutedEventArgs e) => SelectTab("Agents");
+    private void ConnectedApprovals_Click(object sender, RoutedEventArgs e) => SelectTab("Approvals");
+
+    private static readonly string[] TeamChecks = ["html_id", "html_text", "markdown_heading", "link_to", "dataset_values", "no_external_resources"];
+
+    /// <summary>Same grammar as the web workstation's parseRequirementLines: `check [value] | description`. The Host validates again.</summary>
+    internal static (List<object> Requirements, List<string> Errors) ParseTeamRequirements(string text)
+    {
+        var requirements = new List<object>();
+        var errors = new List<string>();
+        var lines = text.Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var bar = lines[i].IndexOf('|');
+            var spec = (bar < 0 ? lines[i] : lines[i][..bar]).Trim();
+            var description = bar < 0 ? "" : lines[i][(bar + 1)..].Trim();
+            var parts = spec.Split((char[]?)null, 2, StringSplitOptions.RemoveEmptyEntries);
+            var kind = parts.Length > 0 ? parts[0] : "";
+            var value = parts.Length > 1 ? parts[1].Trim() : "";
+            if (!TeamChecks.Contains(kind)) { errors.Add($"Line {i + 1}: unknown check \"{kind}\". Use one of {string.Join(", ", TeamChecks)}."); continue; }
+            var needsValue = kind is not ("dataset_values" or "no_external_resources");
+            if (needsValue && value.Length == 0) { errors.Add($"Line {i + 1}: {kind} needs a value."); continue; }
+            if (description.Length == 0) { errors.Add($"Line {i + 1}: add a description after \"|\"."); continue; }
+            var id = $"R{requirements.Count + 1}";
+            var clipped = description[..Math.Min(200, description.Length)];
+            requirements.Add(needsValue ? new { id, text = clipped, check = new { kind, value } } : new { id, text = clipped, check = new { kind } });
+        }
+        if (requirements.Count > 12) errors.Add("At most 12 requirements.");
+        return (requirements, errors);
+    }
+
+    private async void CreateTeam_Click(object sender, RoutedEventArgs e)
+    {
+        var objective = TeamObjectiveInput.Text.Trim();
+        var (requirements, errors) = ParseTeamRequirements(TeamRequirementsInput.Text);
+        if (objective.Length == 0) errors.Insert(0, "Describe what the team should build.");
+        if (requirements.Count == 0 && errors.Count == 0) errors.Add("Add at least one requirement; the team succeeds only when Bunny's own checks pass.");
+        if (errors.Count > 0) { TeamCreateStatus.Text = string.Join("\n", errors); return; }
+        var projectId = (ProjectsList.SelectedItem as ProjectItem)?.Id;
+        var output = TeamOutputInput.Text.Trim();
+        var team = output.Length > 0 ? (object)new { requirements, outputDir = output } : new { requirements };
+        var res = await RunCommandAsync("agent.create", projectId != null ? new { objective, projectId, team } : new { objective, team }, "Team Not Created");
+        if (res == null) { TeamCreateStatus.Text = "No team was confirmed created (see the message)."; return; }
+        TeamObjectiveInput.Clear(); TeamRequirementsInput.Clear(); TeamOutputInput.Clear();
+        TeamCreateStatus.Text = "Team created. Select it in the Agent Dashboard and press Start Team Planning; nothing runs before that.";
+    }
+
+    private void TaskHistoryList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        UpdateHistoryButtons();
+        _ = RenderHistoryDetailAsync();
+    }
+
+    // ==========================================
+    // MA5-S2 MISSION HISTORY: the selected record as the Host reports it. Nothing is estimated: no progress percentages,
+    // no verdicts the Host did not record. Workstation-only reads (mission.get, ptask.get, action.receipts).
+    // ==========================================
+
+    private string? historyDetailKey;
+
+    private static string When(long ms) => ms > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(ms).LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss") : "—";
+    private static string Span(long from, long to) => from > 0 && to >= from ? $" ({TimeSpan.FromMilliseconds(to - from).TotalSeconds:0.#} s)" : "";
+
+    private async Task RenderHistoryDetailAsync()
+    {
+        if (TaskHistoryList.SelectedItem is not TaskRow row) { historyDetailKey = null; HistoryDetailText.Text = "Select an item to see its Host record."; return; }
+        // Refreshes rebind the list every few seconds; refetch only when the selection or its Host state changed.
+        var key = $"{row.Kind}|{row.Id}|{row.State}|{row.Progress}";
+        if (key == historyDetailKey) return;
+        historyDetailKey = key;
+        string text;
+        try
+        {
+            text = row.Kind switch
+            {
+                "mission" => MissionDetail((await hostClient.SendCommandAsync("mission.get", new { id = row.Id }, lifetime.Token)).JsonObj("data")),
+                "ptask" => PtaskDetail((await hostClient.SendCommandAsync("ptask.get", new { id = row.Id }, lifetime.Token)).JsonObj("data"),
+                    (await hostClient.SendCommandAsync("action.receipts", new { id = row.Id }, lifetime.Token)).JsonObj("data")),
+                _ => DirectTaskDetail(row.Id),
+            };
+        }
+        catch (HostException ex) { text = $"The Host record is unavailable: {ex.Message}"; historyDetailKey = null; }
+        catch (OperationCanceledException) { return; }
+        // A newer selection may have rendered while this one was loading.
+        if (historyDetailKey == key) HistoryDetailText.Text = text;
+    }
+
+    private string MissionDetail(JsonElement data)
+    {
+        var m = data.JsonObj("mission");
+        var lines = new List<string>
+        {
+            $"{(m.JsonObj("teamView").ValueKind == JsonValueKind.Object ? "Team Mission" : "Mission")} “{m.Json("title")}” — {m.Json("state")?.ToUpperInvariant()}",
+            $"Objective: {m.Json("objective")}",
+            $"Created {When(m.JsonLong("createdAt"))} · started {When(m.JsonLong("startedAt"))} · finished {When(m.JsonLong("finishedAt"))}{Span(m.JsonLong("startedAt"), m.JsonLong("finishedAt"))}",
+        };
+        var planning = m.JsonObj("planning");
+        if (planning.ValueKind == JsonValueKind.Object) lines.Add($"Planner: {planning.Json("planner")} · {planning.Json("complexity")} · planned {When(planning.JsonLong("plannedAt"))} · replans {planning.JsonLong("replans")}");
+        var result = m.JsonObj("result");
+        if (result.ValueKind == JsonValueKind.Object) lines.Add($"Result: {result.Json("summary")} · {result.JsonLong("verifiedSteps")} verified, {result.JsonLong("unverifiedSteps")} unverified step(s)");
+        var failure = m.JsonObj("failure");
+        if (failure.ValueKind == JsonValueKind.Object) lines.Add($"Failure: {failure.Json("category")} — {failure.Json("detail")}");
+        var recovery = m.JsonObj("recovery");
+        if (recovery.ValueKind == JsonValueKind.Object) lines.Add($"Recovery {When(recovery.JsonLong("at"))}: {recovery.Json("detail")}");
+        if (m.JsonObj("teamView") is { ValueKind: JsonValueKind.Object } tv && tv.Json("coordinatorAgentId") is { } coordinator)
+            lines.Add(TeamSummary(m, coordinator));
+
+        var steps = m.JsonArr("steps").ToList();
+        string Label(string? id) { var s = steps.FirstOrDefault(x => x.Json("id") == id); return s.ValueKind != JsonValueKind.Object ? "?" : s.JsonObj("team").Json("key") ?? $"{s.JsonLong("index") + 1}"; }
+        lines.Add("Steps:");
+        foreach (var s in steps)
+        {
+            var team = s.JsonObj("team");
+            var verifiedFlag = s.JsonObj("result").ValueKind == JsonValueKind.Object && s.JsonObj("result").TryGetProperty("verified", out var v) ? v.ValueKind : JsonValueKind.Undefined;
+            var deps = s.JsonArr("dependsOn").Select(d => Label(d.GetString())).ToList();
+            lines.Add($"  {Label(s.Json("id"))}. [{(team.ValueKind == JsonValueKind.Object ? $"{team.Json("role")} · {team.Json("kind")}" : s.Json("role"))}] {s.Json("state")?.ToUpperInvariant()}" +
+                (deps.Count > 0 ? $" · after {string.Join(", ", deps)}" : "") +
+                (verifiedFlag == JsonValueKind.True ? " · Host-verified" : verifiedFlag == JsonValueKind.False ? " · verification FAILED" : "") +
+                $" — {s.Json("objective")}");
+            foreach (var a in s.JsonArr("attempts"))
+            {
+                var task = a.Json("taskId") is { } tid ? FindTask(tid) : null;
+                var served = task is JsonElement t && t.Json("model") is { } model ? $"{t.Json("provider")} · {model}" : a.Json("provider") ?? "no model (Host step)";
+                lines.Add($"     attempt {a.JsonLong("attempt")}: {served} · {When(a.JsonLong("startedAt"))}{Span(a.JsonLong("startedAt"), a.JsonLong("finishedAt"))} · {a.Json("outcome")}" +
+                    (a.Json("category") is { } cat ? $" · {cat}: {a.Json("detail")}" : ""));
+            }
+        }
+        var requests = m.JsonArr("requests").ToList();
+        lines.Add(requests.Count > 0 ? "Permission decisions:" : "Permission decisions: none requested");
+        foreach (var r in requests)
+            lines.Add($"  {When(r.JsonLong("createdAt"))} {r.Json("action")} ({r.Json("risk")}) · " +
+                (r.JsonLong("resolvedAt") > 0 ? $"{r.Json("resolution")} by {r.Json("resolvedBy")} at {When(r.JsonLong("resolvedAt"))}" : "PENDING"));
+        var events = data.JsonArr("events").ToList();
+        var agentRoles = lastRoot.JsonObj("agents").JsonArr("agents").Where(a => a.Json("id") != null)
+            .ToDictionary(a => a.Json("id")!, a => a.JsonObj("team").Json("role") ?? a.Json("name") ?? "agent");
+        // Decisions the Host logged: a team plan approval is an agent.started event marked approved "team-plan".
+        var approvals = events.Where(e => e.Json("type") is { } t && (t.Contains("approv") || (t == "agent.started" && (e.Json("detail") ?? "").Contains("\"approved\"")))).ToList();
+        lines.Add(approvals.Count > 0 ? "Approvals logged by the Host:" : "Approvals logged by the Host: none in the retained events");
+        lines.AddRange(approvals.Select(e => $"  {When(e.JsonLong("at"))} {EventLine(e, agentRoles)}"));
+        lines.Add($"Host events (latest {Math.Min(60, events.Count)} of {events.Count} retained):");
+        lines.AddRange(events.TakeLast(60).Select(e => $"  {When(e.JsonLong("at"))} {EventLine(e, agentRoles)}"));
+        return string.Join("\n", lines);
+    }
+
+    /// <summary>One Host event, readable: agent ids become their team role; internal run/step ids are dropped.</summary>
+    private static string EventLine(JsonElement e, IReadOnlyDictionary<string, string> roles)
+    {
+        var type = e.Json("type") ?? "event";
+        var detail = e.Json("detail") ?? "";
+        if (!detail.StartsWith('{')) return detail.Length > 0 ? $"{type} — {ClipText(detail, 160)}" : type;
+        try
+        {
+            using var doc = JsonDocument.Parse(detail);
+            var d = doc.RootElement;
+            var who = d.Json("agentId") is { } id ? roles.GetValueOrDefault(id, "agent") + " " : "";
+            var change = d.Json("from") is { } from ? $" {from} → {d.Json("to")}" : "";
+            var rest = string.Join(", ", d.EnumerateObject()
+                .Where(p => p.Name is not ("kind" or "agentId" or "runId" or "stepId" or "from" or "to" or "missionId") && p.Value.ValueKind is JsonValueKind.String or JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False)
+                .Select(p => $"{p.Name}={ClipText(p.Value.ToString(), 60)}"));
+            return $"{who}{type}{change}{(rest.Length > 0 ? $" ({rest})" : "")}";
+        }
+        catch (JsonException) { return $"{type} — {ClipText(detail, 160)}"; }
+    }
+
+    private static string PtaskDetail(JsonElement t, JsonElement receiptsData)
+    {
+        var lines = new List<string>
+        {
+            $"Persistent task “{t.Json("title")}” — {t.Json("state")} ({t.Json("display")})",
+            $"Created {When(t.JsonLong("createdAt"))} · last change {When(t.JsonLong("updatedAt"))} · version {t.JsonLong("version")}",
+            $"Steps done: {t.JsonObj("progress").JsonLong("done")} of {t.JsonObj("progress").JsonLong("total")} · models: {string.Join(", ", t.JsonArr("models").Select(m => m.GetString()))}",
+            $"Approval: {(t.JsonObj("approval").JsonBool("required") ? $"required · approved until {When(t.JsonObj("approval").JsonLong("approvedUntil"))}" : "not required (read-only, foreground)")}",
+        };
+        if (t.JsonObj("failure") is { ValueKind: JsonValueKind.Object } f) lines.Add($"Failure: {f.Json("code")} — {f.Json("detail")}");
+        if (t.JsonObj("blocked") is { ValueKind: JsonValueKind.Object } b) lines.Add($"Blocked: {b.Json("code")} — {b.Json("detail")}");
+        if (t.Json("uncertainOperation") is { } u) lines.Add($"Uncertain operation: {u} — reconcile it below; Bunny never re-runs it on its own.");
+        var evidence = t.JsonArr("evidence").ToList();
+        lines.Add(evidence.Count > 0 ? "Completed steps (output digests):" : "Completed steps: none");
+        lines.AddRange(evidence.Select(e => $"  {e.Json("stepId")} · sha256 {e.Json("outputSha256")}"));
+        var receipts = receiptsData.JsonArr("receipts").ToList();
+        var chain = receiptsData.JsonObj("chain");
+        lines.Add($"Receipts ({receipts.Count}) · ledger chain {(chain.ValueKind != JsonValueKind.Object ? "not available" : chain.JsonBool("ok") ? $"verified ({chain.JsonLong("entries")} entries)" : $"BROKEN at {chain.JsonLong("brokenAt")}")}:");
+        lines.AddRange(receipts.Select(r => $"  {When(r.JsonLong("at"))} {r.Json("stepId")} · {r.Json("kind")} · {r.Json("event")}{(r.Json("detail") is { Length: > 0 } d ? $" — {ClipText(d, 120)}" : "")}"));
+        return string.Join("\n", lines);
+    }
+
+    private string DirectTaskDetail(string id)
+    {
+        if (FindTask(id) is not JsonElement t) return "This task is no longer in the Host's recent task list.";
+        return string.Join("\n",
+            $"Task “{t.Json("title")}” — {t.Json("state")?.ToUpperInvariant()}",
+            $"Served by: {t.Json("provider")} · {t.Json("model")}",
+            $"Created {When(t.JsonLong("createdAt"))} · last change {When(t.JsonLong("updatedAt"))}",
+            t.Json("error") is { Length: > 0 } err ? $"Error: {err}" : "");
+    }
 
     private void UpdateHistoryButtons()
     {

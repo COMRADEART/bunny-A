@@ -14,6 +14,10 @@ public sealed record AppConfiguration
     public double? NotchLeft { get; init; }
     public double? NotchTop { get; init; }
     public bool ReducedMotion { get; init; } = false;
+    // MA5-S2 notch appearance: "System" follows Windows (light/dark, transparency effects, high contrast);
+    // "Light", "Dark" and "HighContrast" force one; ReducedTransparency makes every notch surface opaque.
+    public string NotchTheme { get; init; } = "System";
+    public bool ReducedTransparency { get; init; } = false;
     public string PinnedModel { get; init; } = "auto";
     public bool StartupLaunch { get; init; } = false;
 }
