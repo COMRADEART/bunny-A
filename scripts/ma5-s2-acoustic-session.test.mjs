@@ -104,7 +104,7 @@ function fakeHost(state = {}) {
   const s = { open: true, capturing: false, playing: false, state: "IDLE", turnId: "t0", devices: endpoints(), ...state };
   const log = [];
   const hang = new Set();
-  const send = (action, data) => {
+  const send = (action) => {
     log.push(action);
     if (hang.has(action)) return new Promise(() => {}); // a model call or Host that never answers
     if (action === "voice.interrupt") Object.assign(s, { playing: false, state: s.capturing ? "LISTENING" : "INTERRUPTED" });

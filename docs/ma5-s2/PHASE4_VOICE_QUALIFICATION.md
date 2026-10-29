@@ -151,7 +151,8 @@ Each category has at least 12 trials so rates mean something. Each metric is lab
 reported as worker-monotonic speech onset → **render-meter silence** (`onsetToSilenceMs`, the Host's existing
 `VoiceBargeInReceipt`) against the 200 ms target. A software cancel acknowledgment is never reported as speaker silence.
 
-**Privacy gate (enforced in code, `scripts/ma5-s2-acoustic-session.test.mjs`, 4 tests).**
+**Privacy gate (enforced in code, `scripts/ma5-s2-acoustic-session.test.mjs`, 4 tests).** *Phase 4R1 replaced the volume
+field, the deadline, the shutdown and the evidence format described here; see §10. The steps below are current.*
 - No authorization file: refused before any Host code loads.
 - The authorization must name the microphone, speakers, maximum minutes (1–120), script `p4-v1` and playback volume. It must
   also set `transientInMemoryProcessing`, `noRawAudioSavedOrUploaded`, `ownerUnmutesMicrophoneManually` and
@@ -171,10 +172,12 @@ microphone (`AecSource` is used only when no fixture flag is set).
 
 ### Owner-attended session: exact steps
 
-1. Choose the room, headset or speakers, and a volume. Close BunnyA.exe and any voice worker.
+1. Choose the room, headset or speakers. Set the Windows output volume yourself, at or below the limit you will authorize.
+   Close BunnyA.exe and any voice worker.
 2. Print the template: `node scripts/ma5-s2/acoustic-session.mjs --print-template > %TEMP%\bunny-acoustic-auth.json`.
-   Fill in the exact Windows device names (Sound settings → Input / Output), `maxMinutes`, the volume and `authorizedAt`
-   (now, ISO). Confirm the four `true` statements.
+   Fill in the exact Windows device names (Sound settings → Input / Output), `maxMinutes`, `maxPlaybackVolumePercent` (an
+   integer 1–100) and `authorizedAt` (now, ISO). Confirm the four `true` statements. The session refuses to start, and stops,
+   if the real output volume is above the limit or the output device changes. Bunny never changes the volume.
 3. Validate without opening anything: `node scripts/ma5-s2/acoustic-session.mjs --authorization %TEMP%\bunny-acoustic-auth.json --check`.
 4. Unmute the microphone yourself in Windows. Bunny will not.
 5. Run: `node --experimental-strip-types scripts/ma5-s2/acoustic-session.mjs --authorization %TEMP%\bunny-acoustic-auth.json`.
@@ -285,10 +288,201 @@ Local, Windows 11, on the final Phase 4 source:
 
 Hosted CI: see the PR (results recorded in the PR description once the run finishes).
 
-## 9. Remaining release blockers
+## 9. Remaining release blockers (updated by Phase 4R1, §10.8)
 
 1. Owner-attended acoustic session (A16–A20, Narrator walk), §4.
 2. Owner approval of the reproducible whisper shim pin `45f64172…`, §2. Without it the recognizer is SAPI.
 3. Under-load answer latency: 6.5 s P50 vs 3 s. It needs a product decision on agent context size, voice pre-emption or
    hardware (§3).
 4. Live evidence of Recognizing / Interrupting / Device unavailable on the notch (needs the attended session).
+
+## 10. Phase 4R1 correction: acoustic safety hardening and whisper release readiness
+
+Continues PR #65 from `10b137c`. Software only: **no microphone or speaker was opened, no Windows microphone or volume
+setting was changed, the whisper pin was not adopted.** The local inference queue, voice priority, fairness and
+full-duplex code are unchanged. Final head: see the PR (recorded there with the CI result).
+
+### 10.1 Hard session deadline (Task 1, commit `8002944`)
+
+The Phase 4 harness checked its deadline only before a Host command, so a session waiting at the keyboard, on the Host
+or on the model could outlive its authorization. Now (`scripts/ma5-s2/acoustic-session.mjs`):
+
+- **Independent watchdog.** `createSessionGuard` arms a timer for the session budget and aborts one `AbortSignal`. Every
+  wait races it: keyboard prompts (`readline` question with the signal), Host commands (`fetch` with the signal), polls,
+  sleeps, Host start-up and the background-agent lanes. A stop of any kind (expiry, owner `q`, unauthorized endpoint, error)
+  starts the shutdown at once, from the abort itself, not when the main flow unwinds.
+- **Monotonic time.** Elapsed time is `performance.now()`. `check()` also catches a timer that fired late because the event
+  loop was blocked. The budget is `min(maxMinutes, authorizedAt + 12 h − now)`, so it can never run past the
+  authorization's own validity. The wall clock is read once, at start.
+- **Fail-safe, bounded, idempotent shutdown** (`createShutdown`). Every caller gets the same receipt. The steps:
+  1. `voice.interrupt` silences playback, then `voice.session.close` ends capture and shuts the worker down.
+  2. The Host closes; a Host that was still starting is awaited and closed too.
+  3. Any `bunny-voice-worker.exe` still present is force-terminated by pid. A session starts only with zero workers, so
+     every one is its own.
+
+  Each step has 5 s; a hanging or failing step does not block the next. A forced or timed-out shutdown is never reported
+  `clean`. It exits 3, and the worker's job object (kill-on-close) ends with the process. A session that did not complete
+  exits 2.
+
+| Deterministic test (no device; fake Host, real `readline` on an idle stream) | Result |
+|---|---|
+| Expiry while waiting for keyboard input: prompt cancelled at the deadline, voice closed | pass |
+| Expiry during active capture: capture ended by the session close | pass |
+| Expiry during playback: `voice.interrupt` before `voice.session.close`, playback stopped | pass |
+| Expiry during model inference: the pending call is abandoned; no further Host command is sent | pass |
+| Hanging shutdown: each step bounded, leftover worker force-terminated, idempotent (one close, one kill) | pass |
+| A failing step does not stop the rest | pass |
+| Monotonic: a late timer cannot extend the session; the budget is cut by authorization validity | pass |
+
+Mutation check: removing the prompt's race fails the input-expiry test; unbounding a shutdown step makes the shutdown test
+time out.
+
+**Real Host and worker self-checks** (`--fixture`: synthesized input, null sink, nothing opened; labelled `simulated`):
+
+| Run | Stop | Shutdown | Workers after |
+|---|---|---|---|
+| `--sections 7,10`, `evidence/voice/acoustic-p4r1-selfcheck-complete.json` | `COMPLETED` (58 s); 52 endpoint reads, max 34 % | clean: 94 ms + 7 ms | 0 |
+| `--sections 1 --fixture-budget-ms 15000`, `…-selfcheck-expiry.json` | **`SESSION_EXPIRED` at 15 006 ms**, mid-section | clean: 331 ms + 7 ms | 0 |
+
+The first self-check run found a harness defect, which is now fixed and covered by a test. Section 10 closes the voice
+session on purpose, and the Host clears its endpoint report on close. The new monitor read that as an unauthorized output
+and stopped the session. The monitor now enforces only while a session is open: with no worker, nothing can play.
+
+### 10.2 Real playback volume (Task 2)
+
+- The authorization schema is now `bunny-acoustic-authorization/2`. `maxPlaybackVolumePercent` must be an integer 1–100.
+  The free-form `playbackVolume` is refused by name, and a `/1` file is refused.
+- Before anything can play, the worker's read-only Core Audio query (`IAudioEndpointVolume::GetMasterVolumeLevelScalar`;
+  the worker calls no volume or mute setter) must report all of the following:
+  - the authorized output, present;
+  - the authorized input;
+  - a readable volume at or below the limit.
+
+  An unreadable or out-of-range volume fails closed (`OUTPUT_VOLUME_UNVERIFIED`). Rounding is `ceil` with a float32
+  tolerance: 0.30 reads as 30 %, and 0.305 as 31 %, which is refused at a 30 % limit.
+- **Monitored.** While a session is open, the endpoints are re-read every second (`voice.devices`, then the snapshot). The
+  worker's own change event ignores volume, so it cannot be relied on for this. A switched output, a raised volume or an
+  unreadable volume stops the session (`ENDPOINT_NOT_AUTHORIZED`), which runs the shutdown above. During the attended
+  device-recovery step only, an input change is tolerated, because unplugging the microphone is the point of that step;
+  the output rules still apply.
+- Tests use fixture measurements only: limits and rounding, unknown volumes, wrong or absent output, wrong input, an output
+  switch, a raised volume and an unreadable volume mid-session, and recovery tolerance. The monitor never sends a volume
+  command.
+
+### 10.3 Evidence privacy (Task 3)
+
+- Recognitions are stored as `{ phraseId, refWords, wordErrors, outcome }`. **Recognized text is no longer stored at all**;
+  Phase 4 stored on-script text.
+- Device names are no longer stored. Evidence records `inputAuthorized` / `outputAuthorized`, the volume percent and the
+  mute and privacy states. The authorization echo is reduced to the two limits.
+- Failures are recorded as `{ code, detail }`. The detail is redacted of paths (Windows, UNC, POSIX home and temp, `file://`),
+  e-mail addresses, bearer tokens, long identifiers containing a digit and the authorized device names, and capped at
+  200 characters. Stop codes survive. Console errors use the same redaction.
+- Before writing, `assertPrivateEvidence` refuses any recognized-text field, device name, path, address, credential or
+  free text longer than 200 characters. On refusal, only a stub (codes, stop, shutdown) is written. `writeEvidence` still
+  refuses credentials and the Host token.
+- Labels: section `class` is `acoustic`, `software receipt with real capture` or `acoustic capture + software receipts`. In
+  a `--fixture` run every class is `simulated`, and the top-level `evidenceClass` says so.
+- The prohibition on raw audio is unchanged. The worker processes audio in memory, and nothing writes audio.
+
+### 10.4 Whisper fingerprint (Task 4, commit `1de15ae`): verified, PENDING owner approval
+
+`scripts/ma5-s2/verify-whisper-fingerprint.mjs` builds only: no worker, no device. Evidence:
+`evidence/voice/whisper-fingerprint-verification.json`. Every check passes:
+
+| Check | Result |
+|---|---|
+| Source `whisper-shim.c` | `eaefdfef…` = recorded `sourceSha256`; unchanged vs `origin/main` |
+| Source tarball v1.9.4 (927cfce) | `57e280ce…` = pin |
+| Header closure (`gcc -MM`: the 5 project headers gcc actually reads) | each byte-identical to the pinned tarball; no other project header |
+| Linked `whisper.dll`, `ggml.dll`, `ggml-base.dll` | = `whisper-pin.json` |
+| Compiler | gcc 16.1.0 (MSYS2 Rev5) `f96a3bdb…` = recorded |
+| Flags | equal to an independently written list; include `--no-insert-timestamp`, `--disable-auto-image-base` |
+| Build A: the build script's own function, short temp root | `45f64172a5b41144f6057399f5a92776cf394c4991dce2d5b50346d3be8867e3` |
+| Build B: literal gcc command, long nested root, separate cwd and `TEMP` | `45f64172a5b41144f6057399f5a92776cf394c4991dce2d5b50346d3be8867e3` |
+| PE header, both builds | TimeDateStamp 0; ImageBase `0x180000000`; DllCharacteristics `0x160` (ASLR kept); no build path embedded |
+| `native/voice/bunny-voice-worker.json` | **unchanged** (still pins `35c03239…`) |
+
+Both builds ran on this machine with the same compiler binary. "Independent" here means different code paths, folders,
+working directories and temp directories, not a second machine or toolchain.
+
+**Provenance note.** The first build B wrote `out.dll`, and its hash differed, because a PE export directory records the
+DLL's own file name. With the same output name the hashes are identical. The fingerprint therefore depends on the output
+file name `bunny-whisper-shim.dll`, which the build script fixes.
+
+**Prepared for review, not adopted.** No owner approval of `45f64172…` is recorded. Proposed change:
+`whisperShim.binarySha256 35c03239… → 45f64172…`; every other `whisperShim` field is unchanged. Once the owner approves:
+
+1. Run `node scripts/build-voice-worker.mjs --repin-whisper-shim`. It must print `build:whisper-shim built`.
+2. Check that the record holds `45f64172…`.
+3. Commit `native/voice/bunny-voice-worker.json` alone, as a separate commit.
+4. Rerun `scripts/voice-worker.test.mjs` (whisper selection and integrity) and
+   `node --experimental-strip-types scripts/ma5-s2/verify-whisper.mjs`.
+
+Until then the build refuses the shim, the record keeps the old pin, and the Host selects SAPI and says why (pretest output
+in this run: `build:whisper-shim refused: built shim 45f64172… differs from the recorded pin 35c03239…`).
+
+### 10.5 Latency (Task 5)
+
+No inference, queue or voice-priority code changed in 4R1, so the §3 measurements stand and were **not re-measured**:
+
+- first audible (status acknowledgment) **1.6 s P50**;
+- answer's own first audio **6.5 s P50: an unresolved MISS** against 3 s;
+- background throughput −2.5 %, 0 starvation overrides.
+
+The harness's section 9 now reports the status acknowledgment (`statusAckAudibleMs`), first model token, first audible
+**answer** and completed response separately, plus background completed per minute. The acknowledgment is never counted as
+the answer.
+
+### 10.6 Regression (Task 6), local Windows 11, on the 4R1 source
+
+| Check | Result |
+|---|---|
+| `scripts/ma5-s2-acoustic-session.test.mjs` (authorization, deadline, volume, monitor, privacy) | **17 / 17** (was 4) |
+| `npm run pretest` | exit 0; whisper shim refused against the recorded pin, as designed (§10.4) |
+| `npm run typecheck` | exit 0 |
+| `npm test` stage 1 (scripts, CI form: without `voice-worker.test.mjs`) | **418 / 418** |
+| `npm test` stage 2 (MA3 Host and Mission suites, all voice and F04 containment) | **1 693 pass, 1 skip, 0 fail** |
+| `npm test` stage 3 (agent runtime and teams) | **62 / 62** (T11-I07 did not hang) |
+| `npm test` stage 4 (`test:ma4`) | **317 pass, 1 skip, 0 fail** |
+| `scripts/voice-worker.test.mjs` (local hardware-voice gate; fixture input, null sink) | **76 / 77**. The one failure is `whisper: the staged runtime and model match … the build record`: expected while the pin is pending (§10.4) |
+| `npm run test:ui` | 421 / 421 |
+| Routing policy tests | pass |
+| Local inference scheduling and fairness (`local-inference.test.ts`, P4-V01/V02, in stage 2) | pass |
+| `npm run build` | exit 0 |
+| `native/windows/build.ps1` (Debug + `BunnyA.Tests`) | 0 warnings, 0 errors; **134 / 134** |
+| `scripts/ma5-s2/verify-voice-windows.mjs` (compiled app, UI Automation, fixture voice) | **12 / 12**, 0 workers after; `evidence/voice/windows-voice-p4r1.json` (Phase 4's file kept) |
+| `scripts/ma5-s2/verify-whisper-fingerprint.mjs` | all 11 checks pass |
+| Static security (CI checks run locally) | `npm audit --omit=dev --audit-level=high`: 0 vulnerabilities; no committed secrets or env files; external inference disabled |
+| `eslint` on changed files | 0 errors, 0 warnings |
+| `npm run check:auth` | **not run**: it reads a running dev server's `VITE_AUTH_ENABLED`, and none was running (exit 2, "could not read"). Not a CI check; no auth code changed |
+| `%TEMP%\bunny-f04-*` after the suite; voice workers; BunnyA.exe | 0; 0; 0 |
+| Packaging | not re-run: no native, installer or package input changed since Phase 4 |
+
+Hosted CI: recorded in the PR.
+
+### 10.7 Updated acceptance matrix
+
+Rows not listed are unchanged from §7.
+
+| # | Requirement | Phase 4 | Phase 4R1 | Evidence |
+|---|---|---|---|---|
+| R1-1 | Hard acoustic-session deadline: watchdog, cancellation, fail-safe stop, bounded and forced shutdown, monotonic, idempotent | — | **PASS** (software) | §10.1; 17 tests; live expiry self-check |
+| R1-2 | Real playback volume verified against a numeric limit, fail closed, monitored, never changed | — | **PASS** (software, fixture measurements) | §10.2 |
+| R1-3 | Evidence privacy: no recognized text, device names, paths, addresses or tokens; classes labelled | PASS (on-script text stored) | **PASS**, stricter | §10.3 |
+| P4-1d / R1-4 | Whisper fingerprint independently verified | BLOCKED | **Verified; adoption PENDING owner approval** | §10.4 |
+| P4-2d | Spoken answer ≤ 3 s under load | MISS (6.5 s P50) | **MISS, unchanged, not re-measured** | §3, §10.5 |
+| P4-4 | No real audio without authorization | PASS | **PASS**; nothing was opened in 4R1 either | §10 |
+| A16–A20, P4-5c | Physical acoustic gates, Narrator walk | BLOCKED | **BLOCKED** (owner-attended session) | §4 |
+| P4-7 | Regression, native build, security | §8 | **PASS** locally, with the expected whisper-pin failure; hosted CI in the PR | §10.6 |
+
+**Overall: still PARTIAL.** Every software safety gate now passes, and the harness is safe to hand to the owner. Phase 4
+is not accepted until the decisions below are made.
+
+### 10.8 Decisions that remain the owner's
+
+1. **Whisper pin.** Approve `45f64172a5b41144f6057399f5a92776cf394c4991dce2d5b50346d3be8867e3` and run the re-pin as a
+   separate commit (§10.4), or keep SAPI.
+2. **Attended acoustic session** (A16–A20, Narrator). Sign a `/2` authorization with a numeric volume limit (§4 steps), then run it.
+3. **Under-load answer latency** (6.5 s P50 vs 3 s). Choose between capping agent context, pre-empting agents for voice
+   (currently ruled out) and more VRAM; or accept the miss with the 1.6 s status acknowledgment (§3).

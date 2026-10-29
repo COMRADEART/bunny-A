@@ -1,0 +1,327 @@
+{
+  "schema": "ma5-s2.windows-voice.v1",
+  "at": "2026-10-29T20:54:21.427Z",
+  "host": "disposable, Ollama adapter only",
+  "worker": {
+    "flags": [
+      "--input-silence",
+      "--output",
+      "null"
+    ],
+    "note": "fixture input and null sink; no microphone or speaker was opened"
+  },
+  "stages": {
+    "v1-start-is-private": {
+      "ok": true,
+      "pill": {
+        "status": "OFF",
+        "help": "Voice: Voice off",
+        "text": "🎙️ Voice off",
+        "level": null,
+        "glyph": null
+      },
+      "hostOpen": false,
+      "voiceWorkers": 0
+    },
+    "v2-open-push-to-talk": {
+      "ok": true,
+      "pill": {
+        "status": "ON",
+        "help": "Voice: Voice on",
+        "text": "🎙️ Voice on",
+        "level": null,
+        "glyph": null
+      },
+      "mode": "push_to_talk",
+      "capturing": false,
+      "voiceWorkers": 1,
+      "stt": "Windows SAPI 5.4 System.Speech"
+    },
+    "v3-host-facts-turn": {
+      "ok": true,
+      "seen": [
+        "SPEAKING",
+        "ON"
+      ],
+      "answerSource": "host_facts",
+      "turnKind": "agent_team",
+      "answer": "No mission is recorded.",
+      "timing": {
+        "turnId": "t1-typed-a7e36548",
+        "activatedAt": 1793307271978,
+        "captureStartedAt": null,
+        "firstAudioAt": null,
+        "firstPartialAt": null,
+        "speechEndAt": null,
+        "finalAt": 1793307271978,
+        "admittedAt": null,
+        "firstTokenAt": null,
+        "firstTtsReadyAt": 1793307272065,
+        "firstPlaybackAt": 1793307272066,
+        "inferenceCompletedAt": 1793307271998,
+        "completedAt": 1793307274233,
+        "source": "typed",
+        "endpointing": null
+      }
+    },
+    "v4-model-turn-and-barge-in": {
+      "ok": true,
+      "seen": [
+        "THINKING",
+        "SPEAKING",
+        "ON"
+      ],
+      "speakingPill": {
+        "status": "SPEAKING",
+        "help": "Voice: Speaking",
+        "text": "🔊 Speaking · 1 working",
+        "level": null,
+        "glyph": null
+      },
+      "route": {
+        "taskId": "55098187-6437-4c0b-9ed4-108e4d84d4ee",
+        "provider": "ollama",
+        "model": "huihui_ai/qwen2.5-abliterate:7b"
+      },
+      "interrupt": {
+        "turnId": "t2-typed-369f07da",
+        "gen": 0,
+        "requestedAt": 1793307298865,
+        "source": "button",
+        "workerResetMs": 7.9919,
+        "workerCancelWaitMs": 7.9919,
+        "workerResetPending": false,
+        "meterSilentMs": null,
+        "droppedChunks": 3,
+        "inferenceStopped": null,
+        "inferenceCancellation": "not_requested",
+        "lateEventsDropped": 0,
+        "wasPlaying": true
+      },
+      "timing": {
+        "turnId": "t2-typed-369f07da",
+        "activatedAt": 1793307288926,
+        "captureStartedAt": null,
+        "firstAudioAt": null,
+        "firstPartialAt": null,
+        "speechEndAt": null,
+        "finalAt": 1793307288926,
+        "admittedAt": 1793307289047,
+        "firstTokenAt": 1793307296038,
+        "firstTtsReadyAt": 1793307296560,
+        "firstPlaybackAt": 1793307296560,
+        "inferenceCompletedAt": 1793307298219,
+        "completedAt": null,
+        "source": "typed",
+        "endpointing": null
+      }
+    },
+    "v11-thinking-while-queued": {
+      "ok": true,
+      "seen": [
+        "THINKING",
+        "SPEAKING",
+        "THINKING"
+      ],
+      "delayAckSentMs": 1598,
+      "answerAudioMs": 9930,
+      "agentGeneration": "completed"
+    },
+    "v12-keyboard": {
+      "ok": true,
+      "controls": [
+        {
+          "id": "VoiceSessionButton",
+          "focused": true,
+          "focusable": true,
+          "name": "🎙️ Close Voice Session",
+          "enabled": true
+        },
+        {
+          "id": "HandsFreeButton",
+          "focused": true,
+          "focusable": true,
+          "name": "Start hands-free conversation",
+          "enabled": true
+        },
+        {
+          "id": "ListenStartButton",
+          "focused": true,
+          "focusable": true,
+          "name": "Start Listening",
+          "enabled": true
+        },
+        {
+          "id": "ListenEndButton",
+          "focused": false,
+          "focusable": false,
+          "name": "Stop Listening",
+          "enabled": false
+        },
+        {
+          "id": "VoiceBargeInButton",
+          "focused": false,
+          "focusable": false,
+          "name": "⚡ Barge-In (Interrupt)",
+          "enabled": false
+        },
+        {
+          "id": "VoiceMuteButton",
+          "focused": true,
+          "focusable": true,
+          "name": "Mute Mic",
+          "enabled": true
+        },
+        {
+          "id": "VoiceTextBox",
+          "focused": true,
+          "focusable": true,
+          "name": "Type a question for the voice session",
+          "enabled": true
+        },
+        {
+          "id": "VoiceTextSend",
+          "focused": true,
+          "focusable": true,
+          "name": "Ask Bunny by text in this voice session",
+          "enabled": true
+        }
+      ],
+      "keyboardTurn": {
+        "transcript": "What failed?",
+        "answerSource": "host_facts"
+      }
+    },
+    "v5-hands-free": {
+      "ok": true,
+      "pill": {
+        "status": "LISTENING",
+        "help": "Voice: Listening",
+        "text": "🔴 Listening",
+        "level": {
+          "id": "VoiceLevelTrack",
+          "name": "Microphone level",
+          "status": "",
+          "help": "",
+          "offscreen": false,
+          "enabled": true,
+          "focusable": false,
+          "focused": false,
+          "x": 1777,
+          "y": 55,
+          "width": 39,
+          "height": 7
+        },
+        "glyph": null
+      },
+      "button": "Stop hands-free conversation and release the microphone",
+      "stateText": "Voice: LISTENING · microphone open · 🔴 hands-free microphone on",
+      "duplex": {
+        "available": true,
+        "active": true,
+        "aec": "fixture:no-aec",
+        "reference": "fixture",
+        "fixture": true,
+        "releasing": false,
+        "starting": false,
+        "grantExpiresAt": 1793309140260,
+        "stopped": null
+      },
+      "seenDuringTypedTurn": [
+        "SPEAKING"
+      ]
+    },
+    "v6-mute-releases-capture": {
+      "ok": true,
+      "pill": {
+        "status": "MUTED",
+        "help": "Voice: Muted",
+        "text": "🔇 Muted",
+        "level": null,
+        "glyph": null
+      },
+      "capturing": false,
+      "duplexActive": false,
+      "stopped": {
+        "reason": "mute",
+        "at": 1793307357462
+      }
+    },
+    "v7-stop-hands-free": {
+      "ok": true,
+      "pill": {
+        "status": "ON",
+        "help": "Voice: Voice on",
+        "text": "🎙️ Voice on",
+        "level": null,
+        "glyph": null
+      },
+      "mode": "push_to_talk",
+      "capturing": false,
+      "grantExpiresAt": null
+    },
+    "v8-close-releases-worker": {
+      "ok": true,
+      "pill": {
+        "status": "OFF",
+        "help": "Voice: Voice off",
+        "text": "🎙️ Voice off",
+        "level": null,
+        "glyph": null
+      },
+      "voiceWorkers": 0,
+      "lastClose": {
+        "source": "button",
+        "at": 1793307371910
+      }
+    },
+    "v9-vertical-edge": {
+      "ok": true,
+      "off": {
+        "status": "OFF",
+        "glyph": "🎙️",
+        "help": "Voice: Voice off"
+      },
+      "on": {
+        "status": "ON",
+        "glyph": "🎙️",
+        "help": "Voice: Voice on"
+      }
+    },
+    "v10-host-disconnect": {
+      "ok": true,
+      "disconnected": {
+        "status": "DISCONNECTED",
+        "help": "Voice: Voice disconnected",
+        "text": "⚠️ Voice disconnected",
+        "level": null,
+        "glyph": null
+      },
+      "afterRestart": {
+        "status": "OFF",
+        "help": "Voice: Voice off",
+        "text": "🎙️ Voice off",
+        "level": null,
+        "glyph": null
+      },
+      "voiceWorkers": 0,
+      "hostVoiceOpenAfterRestart": false
+    }
+  },
+  "model": "qwen2.5:1.5b",
+  "thinkingObserved": true,
+  "verdicts": {
+    "v1-start-is-private": "PASS",
+    "v2-open-push-to-talk": "PASS",
+    "v3-host-facts-turn": "PASS",
+    "v4-model-turn-and-barge-in": "PASS",
+    "v11-thinking-while-queued": "PASS",
+    "v12-keyboard": "PASS",
+    "v5-hands-free": "PASS",
+    "v6-mute-releases-capture": "PASS",
+    "v7-stop-hands-free": "PASS",
+    "v8-close-releases-worker": "PASS",
+    "v9-vertical-edge": "PASS",
+    "v10-host-disconnect": "PASS"
+  }
+}
