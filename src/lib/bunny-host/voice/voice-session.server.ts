@@ -1210,9 +1210,11 @@ export class VoiceSessionManager {
   /** A notice waits for a quiet moment: never over the user's speech, Bunny's own reply, a held reply or a pending recognition. */
   private quietForNotice(): boolean {
     if (this.inference || this.outstanding > 0 || this.hold || this.snap.playing || this.fragment || this.finalizing.size > 0) return false;
+    // The duplex lane can hold an open utterance while the session itself is IDLE.
+    if (this.input?.speechOpen) return false;
     const state = this.fsm.state;
     if (state === "IDLE" || state === "MUTED" || state === "INTERRUPTED") return true;
-    return (state === "LISTENING" || state === "ARMING") && this.duplexLane() && !this.input?.speechOpen;
+    return (state === "LISTENING" || state === "ARMING") && this.duplexLane();
   }
 
   private pollWatches() {
