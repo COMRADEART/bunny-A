@@ -40,7 +40,8 @@ process.stdin.on("end", () => {
 });
 `);
   const launch: Launchable = { command: process.execPath, args: [provider], path: provider, kind: "node-script", source: "F04 disposable fixture" };
-  return { directory, fixture, provider, launch, cleanup: () => { try { rmSync(directory, { recursive: true, force: true }); } catch { /* still unlinking */ } } };
+  // MA5-S2 P4-6: a fixture exe that is still exiting cannot be deleted on Windows (EBUSY/EPERM); one try leaked the folder.
+  return { directory, fixture, provider, launch, cleanup: () => { try { rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); } catch { /* still unlinking */ } } };
 }
 type Workspace = ReturnType<typeof workspace>;
 
