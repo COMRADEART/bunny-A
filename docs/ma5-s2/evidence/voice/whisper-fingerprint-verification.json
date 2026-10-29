@@ -1,0 +1,157 @@
+{
+  "schema": "ma5-s2-p4r1-whisper-fingerprint/1",
+  "evidenceClass": "software only: builds and hashes, no worker, no device",
+  "expected": "45f64172a5b41144f6057399f5a92776cf394c4991dce2d5b50346d3be8867e3",
+  "checks": {
+    "source": {
+      "pass": true,
+      "sha256": "eaefdfef6344ab4354cf3a4f2ededa665f675b81afbe5381af053c43379db8d0",
+      "matchesRecord": true,
+      "unchangedVsOriginMain": true,
+      "lastCommit": "a23fd8e642fe527fdb856394f646aab9480c2e4f"
+    },
+    "sourceTarball": {
+      "pass": true,
+      "sha256": "57e280cee375ab02425b806ad5146b99f6eb9357e3c2b31357c8a6af2e2e44ae",
+      "pinned": "57e280cee375ab02425b806ad5146b99f6eb9357e3c2b31357c8a6af2e2e44ae",
+      "release": "v1.9.4",
+      "commit": "927cfce34f31707e17f2bff35c349632fb9e2c3a"
+    },
+    "headerClosure": {
+      "pass": true,
+      "headers": [
+        {
+          "header": "whisper.cpp-1.9.4/include/whisper.h",
+          "matchesTarball": true
+        },
+        {
+          "header": "whisper.cpp-1.9.4/ggml/include/ggml.h",
+          "matchesTarball": true
+        },
+        {
+          "header": "whisper.cpp-1.9.4/ggml/include/ggml-cpu.h",
+          "matchesTarball": true
+        },
+        {
+          "header": "whisper.cpp-1.9.4/ggml/include/ggml-backend.h",
+          "matchesTarball": true
+        },
+        {
+          "header": "whisper.cpp-1.9.4/ggml/include/ggml-alloc.h",
+          "matchesTarball": true
+        }
+      ],
+      "nonPinnedProjectHeaders": 0,
+      "note": "gcc -MM lists project headers only; system headers come from the pinned compiler"
+    },
+    "linkedDlls": {
+      "pass": true,
+      "linked": {
+        "whisper.dll": "b7bb4ba92bd36b8afe0c00059ca6a0f69c6767193bfb5f0761e9ed27b1087803",
+        "ggml.dll": "c6e88687d6aa0238f2e834a87958f38d2dc96075a6a7bf6fb8b9cd728a0faed2",
+        "ggml-base.dll": "a5241b52206f61c9dfd6f0f53a8ef19076f9528ead2db1e039a66d7e03817bfc"
+      }
+    },
+    "compiler": {
+      "pass": true,
+      "sha256": "f96a3bdb1d3a3967b309d75c7413399391e857b5be4cb17162572ed66f6772a0",
+      "recorded": "f96a3bdb1d3a3967b309d75c7413399391e857b5be4cb17162572ed66f6772a0",
+      "version": "gcc.exe (Rev5, Built by MSYS2 project) 16.1.0"
+    },
+    "flags": {
+      "pass": true,
+      "flags": [
+        "-std=c11",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-shared",
+        "-static-libgcc",
+        "-Wl,--no-insert-timestamp",
+        "-Wl,--disable-auto-image-base"
+      ],
+      "deterministicLink": true
+    },
+    "reproducible": {
+      "pass": true,
+      "hashes": [
+        "45f64172a5b41144f6057399f5a92776cf394c4991dce2d5b50346d3be8867e3",
+        "45f64172a5b41144f6057399f5a92776cf394c4991dce2d5b50346d3be8867e3"
+      ]
+    },
+    "matchesExpectedCandidate": {
+      "pass": true,
+      "expected": "45f64172a5b41144f6057399f5a92776cf394c4991dce2d5b50346d3be8867e3"
+    },
+    "peDeterminism": {
+      "pass": true,
+      "note": "TimeDateStamp 0, identical image base, no build folder embedded, DYNAMIC_BASE (ASLR) kept"
+    },
+    "buildRecordSchema": {
+      "pass": true
+    },
+    "approvedRecordUntouched": {
+      "pass": true,
+      "sha256": "a795e29de66165381605448d962fb4396ec40f3f9cdc4cbcaec86d608102ab86"
+    }
+  },
+  "builds": [
+    {
+      "path": "build-script function, short temp root",
+      "sha256": "45f64172a5b41144f6057399f5a92776cf394c4991dce2d5b50346d3be8867e3",
+      "pe": {
+        "timeDateStamp": 0,
+        "magic": "0x20b",
+        "imageBase": "0x180000000",
+        "dllCharacteristics": "0x160",
+        "embedsBuildPath": false
+      }
+    },
+    {
+      "path": "literal gcc, long nested root, separate cwd and TEMP",
+      "sha256": "45f64172a5b41144f6057399f5a92776cf394c4991dce2d5b50346d3be8867e3",
+      "pe": {
+        "timeDateStamp": 0,
+        "magic": "0x20b",
+        "imageBase": "0x180000000",
+        "dllCharacteristics": "0x160",
+        "embedsBuildPath": false
+      }
+    }
+  ],
+  "proposedWhisperShim": {
+    "source": "native/voice/whisper-shim.c",
+    "sourceSha256": "eaefdfef6344ab4354cf3a4f2ededa665f675b81afbe5381af053c43379db8d0",
+    "binarySha256": "45f64172a5b41144f6057399f5a92776cf394c4991dce2d5b50346d3be8867e3",
+    "linkedAgainst": {
+      "whisper.dll": "b7bb4ba92bd36b8afe0c00059ca6a0f69c6767193bfb5f0761e9ed27b1087803",
+      "ggml.dll": "c6e88687d6aa0238f2e834a87958f38d2dc96075a6a7bf6fb8b9cd728a0faed2",
+      "ggml-base.dll": "a5241b52206f61c9dfd6f0f53a8ef19076f9528ead2db1e039a66d7e03817bfc"
+    },
+    "flags": [
+      "-std=c11",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-shared",
+      "-static-libgcc",
+      "-Wl,--no-insert-timestamp",
+      "-Wl,--disable-auto-image-base"
+    ],
+    "compiler": {
+      "path": "C:\\msys64\\ucrt64\\bin\\gcc.exe",
+      "sha256": "f96a3bdb1d3a3967b309d75c7413399391e857b5be4cb17162572ed66f6772a0",
+      "version": "gcc.exe (Rev5, Built by MSYS2 project) 16.1.0"
+    },
+    "whisperVersion": "whisper.cpp v1.9.4 (927cfce)"
+  },
+  "allPass": true,
+  "currentPin": "45f64172a5b41144f6057399f5a92776cf394c4991dce2d5b50346d3be8867e3",
+  "proposal": {
+    "status": "ADOPTED",
+    "change": "none: the record already holds the verified shim",
+    "adoptWith": "node scripts/build-voice-worker.mjs --repin-whisper-shim  (must print build:whisper-shim built; then check the record holds the proposed hash, commit native/voice/bunny-voice-worker.json alone, and rerun the whisper selection and integrity tests)"
+  }
+}

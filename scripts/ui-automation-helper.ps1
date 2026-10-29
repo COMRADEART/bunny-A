@@ -346,8 +346,9 @@ switch ($Action) {
     foreach ($e in $notch.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)) {
       $c = $e.Current
       if ([string]::IsNullOrEmpty($c.AutomationId)) { continue }
-      $b = $c.BoundingRectangle
-      $items += [PSCustomObject]@{ id = $c.AutomationId; name = $c.Name; status = $c.ItemStatus; help = $c.HelpText; offscreen = $c.IsOffscreen; enabled = $c.IsEnabled
+      # A collapsed element reports Rect.Empty (X = Infinity), which ConvertTo-Json writes as invalid JSON; report no bounds.
+      $b = if ($c.BoundingRectangle.IsEmpty) { $null } else { $c.BoundingRectangle }
+      $items +=[PSCustomObject]@{ id = $c.AutomationId; name = $c.Name; status = $c.ItemStatus; help = $c.HelpText; offscreen = $c.IsOffscreen; enabled = $c.IsEnabled
         focusable = $c.IsKeyboardFocusable; focused = $c.HasKeyboardFocus; x = $b.X; y = $b.Y; width = $b.Width; height = $b.Height }
     }
     $r = $notch.Current.BoundingRectangle

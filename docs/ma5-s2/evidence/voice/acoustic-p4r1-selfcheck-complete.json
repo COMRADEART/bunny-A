@@ -1,0 +1,81 @@
+{
+  "evidenceClass": "simulated: synthesized input and null sink; nothing here is acoustic evidence",
+  "schema": "ma5-s2-p4r1.acoustic/1",
+  "script": "p4-v1",
+  "at": "2026-10-29T20:26:16.346Z",
+  "authorization": {
+    "maxMinutes": 30,
+    "maxPlaybackVolumePercent": 100
+  },
+  "privacy": "no audio saved or uploaded; recognitions stored as phrase id + word-error count; no device names",
+  "sections": {
+    "latency": {
+      "class": "simulated",
+      "boundary": "Host speechEndAt (VAD speech_end after 900 ms endpoint silence) to the worker's playback.started of the answer; speaker output latency not included",
+      "speechEndToFirstAnswerAudioMs": {
+        "n": 3,
+        "p50": 24,
+        "p95": 26,
+        "max": 26
+      }
+    },
+    "controls": {
+      "class": "simulated",
+      "mute": {
+        "capturing": false,
+        "duplexActive": false,
+        "state": "MUTED"
+      },
+      "close": {
+        "open": false,
+        "workers": 0
+      },
+      "recovery": {
+        "duringLoss": {
+          "state": "IDLE",
+          "inputPresent": true
+        },
+        "after": {
+          "state": "IDLE",
+          "inputPresent": true,
+          "inputAuthorized": true
+        }
+      }
+    }
+  },
+  "devices": {
+    "inputAuthorized": true,
+    "outputAuthorized": true,
+    "outputVolumePercent": 34,
+    "outputMuted": false,
+    "inputMuted": false,
+    "micPrivacy": "allow",
+    "stt": "Windows SAPI 5.4 System.Speech"
+  },
+  "stop": {
+    "code": "COMPLETED",
+    "elapsedMs": 58085
+  },
+  "shutdown": {
+    "steps": [
+      {
+        "step": "silence-and-close-voice",
+        "outcome": "ok",
+        "ms": 94
+      },
+      {
+        "step": "close-host",
+        "outcome": "ok",
+        "ms": 7
+      }
+    ],
+    "forcedWorkers": 0,
+    "workersAfterShutdown": 0,
+    "clean": true
+  },
+  "endpointMonitor": {
+    "reads": 52,
+    "maxVolumePercent": 34,
+    "intervalMs": 1000
+  }
+}
