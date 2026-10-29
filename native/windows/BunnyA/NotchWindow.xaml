@@ -106,16 +106,25 @@
     <Grid.RenderTransform>
       <ScaleTransform x:Name="NotchScale" ScaleX="1" ScaleY="1"/>
     </Grid.RenderTransform>
-    <Border x:Name="NotchBorder"
+    <!-- The glass plate carries the surface and its shadow. It is a sibling of the content, not its parent, so animating
+         chips do not re-render the whole notch through the blur effect every frame. -->
+    <Border x:Name="NotchPlate"
             Background="{DynamicResource NotchSurface}"
             BorderBrush="{DynamicResource NotchChipEdge}"
             BorderThickness="1"
             CornerRadius="24"
+            Margin="12"
+            IsHitTestVisible="False">
+      <Border.Effect>
+        <DropShadowEffect BlurRadius="22" ShadowDepth="3" Direction="270" Color="#000000" Opacity="0.45"/>
+      </Border.Effect>
+    </Border>
+    <Border x:Name="NotchBorder"
+            Background="Transparent"
+            BorderThickness="1"
+            CornerRadius="24"
             Padding="12,7"
             Margin="12">
-      <Border.Effect>
-        <DropShadowEffect x:Name="NotchShadow" BlurRadius="22" ShadowDepth="3" Direction="270" Color="#000000" Opacity="0.45"/>
-      </Border.Effect>
 
       <Grid>
         <!-- Specular top highlight: the glass edge catching light. Hidden in high contrast and reduced transparency. -->

@@ -127,7 +127,7 @@ public partial class NotchWindow : Window
         var horizontal = edge is "Top" or "Bottom";
         HorizontalLayout.Visibility = horizontal ? Visibility.Visible : Visibility.Collapsed;
         VerticalLayout.Visibility = horizontal ? Visibility.Collapsed : Visibility.Visible;
-        NotchBorder.CornerRadius = new CornerRadius(horizontal ? 24 : 20);
+        NotchBorder.CornerRadius = NotchPlate.CornerRadius = new CornerRadius(horizontal ? 24 : 20);
         chipSignature = "";
         RenderChips(chips);
         UpdateLayout(); // ActualWidth/Height must describe the new layout, not the previous orientation.
@@ -224,9 +224,9 @@ public partial class NotchWindow : Window
         RenderChips(chips);
         FitContent();
         if (animate && !ReducedMotion)
-            NotchBorder.BeginAnimation(OpacityProperty, new DoubleAnimation(0.55, 1, TimeSpan.FromMilliseconds(180)) { EasingFunction = new QuadraticEase() });
+            NotchRoot.BeginAnimation(OpacityProperty, new DoubleAnimation(0.55, 1, TimeSpan.FromMilliseconds(180)) { EasingFunction = new QuadraticEase() });
         else
-            NotchBorder.BeginAnimation(OpacityProperty, null);
+            NotchRoot.BeginAnimation(OpacityProperty, null);
     }
 
     // ==========================================
@@ -316,12 +316,23 @@ public partial class NotchWindow : Window
                 "MUTED" => ("🔇 Muted", "sleeping", Color.FromRgb(32, 38, 54)),
                 "INTERRUPTED" => ("⏸ Interrupted", "interrupted", Color.FromRgb(28, 36, 56)),
                 "ERROR" or "DEVICE_UNAVAILABLE" => ("⚠️ Voice unavailable", "idle", Color.FromRgb(70, 34, 40)),
-                _ => (voice.JsonBool("muted") ? "🔇 Muted" : "🎙️ Voice", activeTitle != null || working > 0 ? "processing" : "idle", Color.FromRgb(28, 36, 56)),
+                _ => (voice.JsonBool("muted") ? "🔇 Muted" : "🎙️ Voice", activeTitle != null || working > 0 ? "processing" : "idle", (Color?)null),
             };
             // Voice and agents are independent: an open session that keeps talking while agents work says so.
             if (voiceState is not ("CLOSED" or "IDLE") && working > 0) label += $" · {working} working";
             VoiceStatusText.Text = label;
-            VoicePill.Background = HighContrast ? SystemColors.WindowBrush : new SolidColorBrush(color);
+            // Idle uses the themed chip; a live voice state gets its colour with white text. A new brush on every snapshot
+            // would redraw the whole layered window each poll, so brushes change only when the state does.
+            if (HighContrast || color is not { } fill)
+            {
+                VoicePill.SetResourceReference(BackgroundProperty, HighContrast ? (object)SystemColors.WindowBrushKey : "NotchChip");
+                VoiceStatusText.SetResourceReference(TextBlock.ForegroundProperty, HighContrast ? (object)SystemColors.WindowTextBrushKey : "NotchText");
+            }
+            else if (VoicePill.Background is not SolidColorBrush { Color: var current } || current != fill)
+            {
+                VoicePill.Background = new SolidColorBrush(fill);
+                VoiceStatusText.Foreground = Brushes.White;
+            }
             System.Windows.Automation.AutomationProperties.SetItemStatus(VoicePill, voiceState);
             if (avatar != lastAvatar)
             {
@@ -449,8 +460,13 @@ public partial class NotchWindow : Window
         var scale = (ScaleTransform)group.Children[0];
         var rotate = (RotateTransform)group.Children[1];
         var move = (TranslateTransform)group.Children[2];
-        DoubleAnimation Loop(double from, double to, double seconds, IEasingFunction? ease = null, bool reverse = true) =>
-            new(from, to, TimeSpan.FromSeconds(seconds)) { AutoReverse = reverse, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = ease };
+        // Ambient loops on an 18 px glyph look the same at 30 fps and cost half the frames in a layered window.
+        DoubleAnimation Loop(double from, double to, double seconds, IEasingFunction? ease = null, bool reverse = true)
+        {
+            var loop = new DoubleAnimation(from, to, TimeSpan.FromSeconds(seconds)) { AutoReverse = reverse, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = ease };
+            Timeline.SetDesiredFrameRate(loop, 30);
+            return loop;
+        }
         if (NotchModel.IsActive(a.State))
         {
             var horizontal = currentEdge is "Top" or "Bottom";
@@ -554,8 +570,8 @@ public partial class NotchWindow : Window
             Set("NotchSurface", opaque ? Surface("#FF1C2236", "#FF121726") : Surface("#E61C2236", "#D9121726"));
         }
         NotchSheen.Visibility = opaque ? Visibility.Collapsed : Visibility.Visible;
-        NotchBorder.Effect = HighContrast ? null : new DropShadowEffect { BlurRadius = 22, ShadowDepth = 3, Direction = 270, Color = Colors.Black, Opacity = light ? 0.22 : 0.45 };
-        NotchBorder.BorderThickness = new Thickness(HighContrast ? 2 : 1);
+        NotchPlate.Effect = HighContrast ? null : new DropShadowEffect { BlurRadius = 22, ShadowDepth = 3, Direction = 270, Color = Colors.Black, Opacity = light ? 0.22 : 0.45 };
+        NotchBorder.BorderThickness = NotchPlate.BorderThickness = new Thickness(HighContrast ? 2 : 1);
         // Readable by UI Automation, so acceptance can check which fallback is active.
         System.Windows.Automation.AutomationProperties.SetItemStatus(this, $"theme={(HighContrast ? "high-contrast" : light ? "light" : "dark")};opaque={opaque.ToString().ToLowerInvariant()};reducedMotion={ReducedMotion.ToString().ToLowerInvariant()}");
         chipSignature = ""; // brushes captured by running animations are rebuilt with the new palette

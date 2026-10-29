@@ -77,7 +77,7 @@ async function stage(name, fn) {
   if (ONLY && !ONLY.has(name)) return;
   log(`── ${name}`);
   try { const r = await fn(); results.stages[name] = { ok: r?.blocked ? "BLOCKED" : true, ...scrub(r) }; verdicts[name] = r?.blocked ? "BLOCKED" : "PASS"; }
-  catch (e) { results.stages[name] = { ok: false, error: String(e?.message ?? e).slice(0, 2000) }; verdicts[name] = "FAIL"; log(`FAILED ${name}: ${e.message}`); }
+  catch (e) { results.stages[name] = { ok: false, error: String(e?.message ?? e).slice(0, 2000), ...(e?.detail ? scrub(e.detail) : {}) }; verdicts[name] = "FAIL"; log(`FAILED ${name}: ${e.message}`); }
 }
 
 try {
@@ -283,8 +283,11 @@ try {
     // Active: a live team with the frame meter on.
     rmSync(frameLog, { force: true });
     await relaunch({ BUNNY_NOTCH_FRAME_LOG: frameLog });
+    // Let startup (JIT, first layout) finish so it is not counted as notch work.
+    const warmup = await cpu(15);
     const created = await cmd("agent.create", { objective: "Build a small offline inventory page from data/inventory.csv.", projectId, team: { requirements: [{ id: "R1", text: "No internet resources", check: { kind: "no_external_resources" } }] } });
-    const coordinatorId = created.agents.agents.find((a) => a.team?.role === "coordinator").id;
+    // The Host lists every Agent: the new team's Coordinator is the one not started yet (n4's team is finished).
+    const coordinatorId = created.agents.agents.find((a) => a.team?.role === "coordinator" && a.state === "CREATED").id;
     await cmd("agent.start", { id: coordinatorId });
     const active = await cpu(15);
     const review = await until("perf team review", async () => host.missions.snapshot().missions.find((m) => m.teamView?.coordinatorAgentId === coordinatorId && m.teamView.phase === "review"), 600_000, 1_000);
@@ -293,11 +296,49 @@ try {
     await sleep(6_000);
     const frames = existsSync(frameLog) ? readFileSync(frameLog, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : [];
     const idleAfter = await cpu(30);
-    return { idle, activeDuringPlanning: active, idleAfterWork: idleAfter, frameWindows: frames, memoryGrowthMb: Math.round((idleAfter.workingSetEndMb - idle.workingSetStartMb) * 10) / 10 };
+    // The frame meter itself makes WPF render every frame, so CPU is also measured without it: once with motion, once
+    // with motion off, to attribute the cost of the animations.
+    const planningCpu = async (config, hideNotch = false) => {
+      writeConfig(config);
+      await relaunch({});
+      if (hideNotch) await ui("navigate", { ProcessId: app.pid, TargetId: "ToggleNotchButton" });
+      await cpu(15);
+      const created = await cmd("agent.create", { objective: "Build a small offline inventory page from data/inventory.csv.", projectId, team: { requirements: [{ id: "R1", text: "No internet resources", check: { kind: "no_external_resources" } }] } });
+      const coordinator = created.agents.agents.find((a) => a.team?.role === "coordinator" && a.state === "CREATED").id;
+      await cmd("agent.start", { id: coordinator });
+      const r = await cpu(15);
+      await cmd("agent.stop", { id: coordinator });
+      return r;
+    };
+    const activeNoMeter = await planningCpu({});
+    const activeReducedMotion = await planningCpu({ ReducedMotion: true });
+    const activeNotchHidden = await planningCpu({ ReducedMotion: true }, true);
+    writeConfig({});
+    const animated = frames.filter((f) => f.animatedElements > 0);
+    const memoryGrowthMb = Math.round((idleAfter.workingSetEndMb - idle.workingSetStartMb) * 10) / 10;
+    // Budgets, derived from the 30 fps cap on ambient loops: p95 gap within two target frames, no stall a person
+    // notices (100 ms), at least 25 fps; idle near-free; no runaway memory.
+    const budgets = { idleCpuPercentOfOneCoreMax: 3, animatedP95MsMax: 67, animatedMaxGapMsMax: 100, animatedFpsMin: 25, memoryGrowthMbMax: 100 };
+    const fail = [];
+    if (idle.cpuPercentOfOneCore > budgets.idleCpuPercentOfOneCoreMax || idleAfter.cpuPercentOfOneCore > budgets.idleCpuPercentOfOneCoreMax) fail.push("idle CPU");
+    if (!animated.length) fail.push("no animated frame window recorded");
+    if (animated.some((f) => f.p95Ms > budgets.animatedP95MsMax || f.maxMs > budgets.animatedMaxGapMsMax || f.fps < budgets.animatedFpsMin)) fail.push("frame pacing");
+    if (memoryGrowthMb > budgets.memoryGrowthMbMax) fail.push("memory growth");
+    const result = { budgets, idle, startupWarmup: warmup, activeDuringPlanningWithFrameMeter: active, activeDuringPlanningNoMeter: activeNoMeter, activeDuringPlanningReducedMotionNoMeter: activeReducedMotion, activeDuringPlanningNotchHidden: activeNotchHidden, idleAfterWork: idleAfter, frameWindows: frames, memoryGrowthMb };
+    if (fail.length) throw Object.assign(new Error(`performance budget exceeded: ${fail.join(", ")}`), { detail: result });
+    return result;
   });
 } finally {
   results.verdicts = verdicts;
-  try { writeEvidence(join(EVIDENCE, "windows-notch.json"), scrub(results), [host.token]); } catch (e) { log(`evidence not written: ${e.message}`); }
+  // A partial run (NOTCH_STAGES) updates its stages in the existing evidence instead of replacing the others.
+  const evidenceFile = join(EVIDENCE, "windows-notch.json");
+  if (ONLY && existsSync(evidenceFile)) {
+    const prior = JSON.parse(readFileSync(evidenceFile, "utf8"));
+    results.stages = { ...prior.stages, ...results.stages };
+    results.verdicts = { ...prior.verdicts, ...verdicts };
+    results.partialRerun = [...new Set([...(prior.partialRerun ?? []), ...ONLY])];
+  }
+  try { writeEvidence(evidenceFile, scrub(results), [host.token]); } catch (e) { log(`evidence not written: ${e.message}`); }
   try { app?.kill(); } catch { /* gone */ }
   await sleep(1_000);
   await host.close().catch(() => {});
