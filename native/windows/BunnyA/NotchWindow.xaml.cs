@@ -310,6 +310,7 @@ public partial class NotchWindow : Window
             var view = NotchVoice.From(root.JsonObj("voice"), DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
             // Voice off or idle never hides the agents: the avatar follows agent work then.
             var avatar = view.State is "OFF" or "ON" && (activeTitle != null || working > 0) ? "processing" : view.Avatar;
+            lastWorking = working;
             ApplyVoice(view, working);
             if (avatar != lastAvatar)
             {
@@ -326,6 +327,14 @@ public partial class NotchWindow : Window
     }
 
     private string? lastVoiceState;
+    private int lastWorking;
+
+    /// <summary>Phase 3: a voice-only update (the measured level while capture is confirmed); agent chips are untouched.</summary>
+    public void UpdateVoice(JsonElement voice)
+    {
+        if (!IsVisible || offline || voice.ValueKind != JsonValueKind.Object) return;
+        ApplyVoice(NotchVoice.From(voice, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()), lastWorking);
+    }
 
     /// <summary>
     /// MA5-S2 Phase 3: the voice pill (both orientations) from Host voice facts. Brushes and the Narrator announcement change
@@ -358,13 +367,14 @@ public partial class NotchWindow : Window
                 System.Windows.Automation.AutomationProperties.SetItemStatus(pill, view.State);
                 System.Windows.Automation.AutomationProperties.SetHelpText(pill, NotchVoice.Announcement(view));
             }
-            VoiceLevelBar.SetResourceReference(BackgroundProperty, HighContrast ? (object)SystemColors.WindowTextBrushKey : "NotchText");
+            VoiceLevelTrack.SetResourceReference(ForegroundProperty, HighContrast ? (object)SystemColors.WindowTextBrushKey : "NotchText");
             if (announce && System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(VoiceStatusText) is { } peer)
                 peer.RaiseAutomationEvent(System.Windows.Automation.Peers.AutomationEvents.LiveRegionChanged);
         }
         VoiceLevelTrack.Visibility = view.Level is null ? Visibility.Collapsed : Visibility.Visible;
-        var width = Math.Round((view.Level ?? 0) * VoiceLevelTrack.Width);
-        if (VoiceLevelBar.Width != width) VoiceLevelBar.Width = width;
+        // Quantized to 5 % so a steady room does not redraw the layered window on every reading.
+        var value = Math.Round((view.Level ?? 0) * 20) / 20;
+        if (VoiceLevelTrack.Value != value) VoiceLevelTrack.Value = value;
     }
 
     /// <summary>

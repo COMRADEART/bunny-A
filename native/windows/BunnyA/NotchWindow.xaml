@@ -151,10 +151,10 @@
               <Button x:Name="VoicePill" Style="{StaticResource ChipButton}" Margin="0,0,8,0" Click="VoicePill_Click" AutomationProperties.Name="Open Voice Studio">
                 <StackPanel Orientation="Horizontal">
                   <TextBlock x:Name="VoiceStatusText" Text="🎙️ Voice off" FontWeight="Medium" Foreground="{DynamicResource NotchMuted}" AutomationProperties.LiveSetting="Polite"/>
-                  <!-- Phase 3: the worker's measured input level, shown only while the Host confirms capture; never animated on its own. -->
-                  <Border x:Name="VoiceLevelTrack" Width="26" Height="5" CornerRadius="2.5" Margin="6,0,0,0" VerticalAlignment="Center" Background="#33FFFFFF" Visibility="Collapsed" AutomationProperties.Name="Microphone level">
-                    <Border x:Name="VoiceLevelBar" HorizontalAlignment="Left" Width="0" CornerRadius="2.5" Background="White"/>
-                  </Border>
+                  <!-- Phase 3: the worker's measured input level, shown only while the Host confirms capture; never animated on its own.
+                       A ProgressBar (not a Border) so UI Automation and Narrator can read the value. -->
+                  <ProgressBar x:Name="VoiceLevelTrack" Width="26" Height="5" Minimum="0" Maximum="1" Value="0" Margin="6,0,0,0" VerticalAlignment="Center"
+                               Background="#33FFFFFF" BorderThickness="0" Foreground="{DynamicResource NotchText}" Visibility="Collapsed" AutomationProperties.Name="Microphone level"/>
                 </StackPanel>
               </Button>
               <Button x:Name="QuickStopButton" Content="■ Stop" Style="{StaticResource DangerButtonStyle}" MinHeight="28" Padding="8,2" Margin="0,0,6,0" FontSize="11" Click="QuickStop_Click" Visibility="Collapsed" AutomationProperties.Name="Stop the running task"/>

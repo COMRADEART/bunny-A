@@ -24,6 +24,9 @@ public partial class MainWindow : Window
     private readonly HostClient hostClient = new();
     private readonly DispatcherTimer refreshTimer = new() { Interval = TimeSpan.FromSeconds(3) };
     private readonly DispatcherTimer activityDebounce = new() { Interval = TimeSpan.FromMilliseconds(300) };
+    /// <summary>Phase 3: level changes raise no Host event, so the voice section alone is read this often, only while capture is confirmed.</summary>
+    private readonly DispatcherTimer voiceLevelTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    private bool voiceLevelInFlight;
     private readonly CancellationTokenSource lifetime = new();
     private NotchWindow? notchWindow;
 
@@ -58,6 +61,19 @@ public partial class MainWindow : Window
         hostClient.HostChanged += OnHostChanged;
         activityDebounce.Tick += (_, _) => { activityDebounce.Stop(); _ = RefreshAllStateAsync(); };
         refreshTimer.Tick += (_, _) => _ = RefreshAllStateAsync();
+        voiceLevelTimer.Tick += async (_, _) =>
+        {
+            if (voiceLevelInFlight) return;
+            voiceLevelInFlight = true;
+            try
+            {
+                var voice = (await hostClient.SendCommandAsync("voice.state", new { }, lifetime.Token)).JsonObj("voice");
+                notchWindow?.UpdateVoice(voice);
+                if (!voice.JsonBool("capturing")) voiceLevelTimer.Stop();
+            }
+            catch (Exception) { voiceLevelTimer.Stop(); }
+            finally { voiceLevelInFlight = false; }
+        };
         PreviewKeyDown += Window_PreviewKeyDown;
 
         Loaded += async (_, _) =>
@@ -93,6 +109,7 @@ public partial class MainWindow : Window
             isClosed = true;
             refreshTimer.Stop();
             activityDebounce.Stop();
+            voiceLevelTimer.Stop();
             lifetime.Cancel();
             hostClient.Dispose();
             lifetime.Dispose();
@@ -595,6 +612,8 @@ public partial class MainWindow : Window
         HandsFreeButton.IsEnabled = voice.ValueKind == JsonValueKind.Object && !muted;
         VoiceTextBox.IsEnabled = VoiceTextSend.IsEnabled = open && !muted;
         if (open && voice.JsonBool("capturing")) VoiceStateText.Text += handsFree ? " · 🔴 hands-free microphone on" : " · 🔴 microphone on";
+        if (open && voice.JsonBool("capturing")) { if (!voiceLevelTimer.IsEnabled && !isClosed) voiceLevelTimer.Start(); }
+        else voiceLevelTimer.Stop();
 
         var devices = voice.JsonObj("devices");
         static string Endpoint(JsonElement d) => d.ValueKind != JsonValueKind.Object ? "Not reported"
