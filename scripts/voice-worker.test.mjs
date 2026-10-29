@@ -988,6 +988,21 @@ test("whisper: the staged runtime and model match native/voice/whisper-pin.json 
   assert.equal(record.whisperShim.linkedAgainst["whisper.dll"], pin.runtimeFiles["whisper.dll"]);
 });
 
+test("P4-1 whisper shim builds byte-identically and a build that differs from the pin is refused, not installed", { skip }, async () => {
+  requireWhisperRuntime();
+  const { buildWhisperShim } = await import("./build-voice-worker.mjs");
+  const installed = sha(shimPath);
+  // A pin no build can match forces a fresh compile (each in its own random temp folder) down the refusal path.
+  const prior = { sourceSha256: "stale", binarySha256: "0".repeat(64) };
+  const first = buildWhisperShim(root, prior);
+  if (first.status === "skipped") assert.fail(`shim build skipped: ${first.reason}`);
+  const second = buildWhisperShim(root, prior);
+  assert.equal(first.status, "refused");
+  assert.match(first.reason, /--repin-whisper-shim/);
+  assert.equal(second.built, first.built, "two builds from different temp folders differ: the shim build is not reproducible");
+  assert.equal(sha(shimPath), installed, "a refused build must not replace the installed shim");
+});
+
 test("whisper: ready reports whisper.cpp v1.9.4 running locally on ggml-base.en with no fallback error", { skip }, async () => {
   requireWhisperRuntime();
   const w = session([...whisperArgs, "--input-silence", "--output", "null"]);

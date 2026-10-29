@@ -446,6 +446,18 @@ switch ($Action) {
     [PSCustomObject]@{ toggled = $TargetId } | ConvertTo-Json -Compress
   }
 
+  "focus_main" {
+    # MA5-S2 P4-5: moves keyboard focus to a main-window element and reports whether it took it. With -PromptText the text
+    # is then typed and Enter pressed (the keyboard path, no UIA Invoke).
+    $win = Get-MainWindow $ProcessId
+    $e = Find-Descendant $win $TargetId
+    if ($null -eq $e) { throw "$TargetId not found" }
+    $e.SetFocus(); Start-Sleep -Milliseconds 200
+    $focused = $e.Current.HasKeyboardFocus
+    if ($focused -and $PromptText) { [System.Windows.Forms.SendKeys]::SendWait($PromptText + "{ENTER}"); Start-Sleep -Milliseconds 300 }
+    [PSCustomObject]@{ id = $TargetId; focused = $focused; focusable = $e.Current.IsKeyboardFocusable; name = $e.Current.Name; enabled = $e.Current.IsEnabled } | ConvertTo-Json -Compress
+  }
+
   "set_text" {
     $win = Get-MainWindow $ProcessId
     $e = Find-Descendant $win $TargetId

@@ -471,6 +471,8 @@ export type ExecRequest = {
   taskId: string;
   /** M-A-3 T10: the task requires local execution; a tag the fresh probe reports as hosted is refused at launch. */
   localOnly?: boolean;
+  /** MA5-S2 P4-2: local admission class; only the Host's voice path sets "interactive". Absent means background. */
+  priority?: import("./local-inference.ts").InferenceClass;
   provider: ProviderId;
   model: string;
   prompt: string;

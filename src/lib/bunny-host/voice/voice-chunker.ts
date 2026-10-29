@@ -64,6 +64,8 @@ export type VoiceChunkerOptions = {
 export class VoiceChunker {
   private raw = "";
   private seq = 0;
+  /** Seqs taken by Host lines before the model's first chunk (reserve); the first-chunk rules apply after them. */
+  private reserved = 0;
   private spoken = 0;
   private done = false;
   /** True when the spoken-character cap cut the answer short. */
@@ -98,7 +100,7 @@ export class VoiceChunker {
       this.pendingSince = this.raw && this.now ? this.now() : null;
     }
     // H1: first chunk only, no boundary yet, enough text and idle long enough: release at the last word boundary.
-    if (this.seq === 0 && this.now && this.pendingSince !== null && this.raw.length >= FIRST_WORD_MIN_CHARS && !hasOpenFence(this.raw)) {
+    if (this.seq === this.reserved && this.now && this.pendingSince !== null && this.raw.length >= FIRST_WORD_MIN_CHARS && !hasOpenFence(this.raw)) {
       if (this.now() - this.pendingSince >= FIRST_WORD_IDLE_MS) {
         const space = this.raw.lastIndexOf(" ");
         if (space >= FIRST_WORD_MIN_CHARS / 2) {
@@ -118,6 +120,13 @@ export class VoiceChunker {
     return out;
   }
 
+  /** MA5-S2 P4-2: the seq for one Host line spoken before any model chunk, or null once model text has been chunked. */
+  reserve(): number | null {
+    if (this.seq !== this.reserved || this.raw !== "" || this.done) return null;
+    this.reserved += 1;
+    return this.seq++;
+  }
+
   /** End of answer: flushes whatever remains. Safe to call once; later calls return nothing. */
   end(): SpokenChunk[] {
     if (this.done) return [];
@@ -134,7 +143,7 @@ export class VoiceChunker {
    * boundary (, : - dash) once >= FIRST_MIN_CHUNK chars are speakable, so speech starts earlier.
    */
   private findCut(raw: string): number {
-    const first = this.seq === 0;
+    const first = this.seq === this.reserved;
     const re = first ? /[.!?;\n,:\-–—](?=\s)/g : /[.!?;\n](?=\s)/g;
     let match: RegExpExecArray | null;
     while ((match = re.exec(raw))) {

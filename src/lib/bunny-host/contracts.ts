@@ -88,6 +88,8 @@ export type SubmitTask = { prompt: string; routingPrompt?: string; mode: Mode; p
 export type AdapterResult = { ok: boolean; output: string; error?: string; stopped?: boolean; exitCode?: number | null; dispatched?: false };
 export type AdapterHooks = {
   beforeDispatch?: () => Promise<void>;
+  /** MA5-S2 P4-2: local inference admission class (a spoken turn is "interactive"); set by the manager, never from HTTP. */
+  inferenceClass?: import("../orch/local-inference.ts").InferenceClass;
   childEnvironment?: () => Record<string, string>;
   billingSource?: (source: string) => void;
   event: (type: string, detail: string) => void;

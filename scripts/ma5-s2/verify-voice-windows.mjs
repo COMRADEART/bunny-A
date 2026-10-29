@@ -134,6 +134,46 @@ try {
     return { seen, speakingPill: speaking, route: snap.route, interrupt: snap.lastInterrupt, timing: snap.timing };
   });
 
+  // MA5-S2 P4-2/P4-5: an agent generation holds the local model, so the question waits in Bunny's local queue. The notch
+  // shows THINKING for seconds (long enough for UIA sampling), then the Host's delay acknowledgment, then the answer; the
+  // agent generation is never cancelled.
+  await stage("v11-thinking-while-queued", async () => {
+    let bgState = null;
+    let bgStreaming = false;
+    const bgTask = host.manager.submit({ prompt: "Write a 250-word explanation of how tides work.", mode: "fast", override: "auto", constraints: { localOnly: true, offlineOnly: true, outputTokens: 400 } });
+    host.manager.onTaskOutput(bgTask.id, (e) => { if ("text" in e) bgStreaming = true; else bgState = e.state; });
+    if (bgTask.state === "waiting_for_approval") host.manager.approve(bgTask.id);
+    await until("agent generation streaming", async () => bgStreaming || bgState, 120_000, 100);
+    assert.ok(bgStreaming, `the agent generation started (${bgState})`);
+    const before = (await voice()).turnId;
+    await ask("In one short sentence, what does a rabbit eat?");
+    const seen = await timeline(async () => { const s = await voice(); return s.turnId !== before && s.timing?.firstPlaybackAt; }, 180_000);
+    const snap = await voice();
+    assert.ok(seen.includes("THINKING"), `THINKING shown while the question waited: ${seen.join(" > ")}`);
+    assert.ok(snap.timing?.delayAckAt, "the Host spoke the delay acknowledgment");
+    await until("answer finished", async () => { const s = await voice(); return s.timing?.completedAt && !s.playing; }, 120_000);
+    await until("agent generation finished", async () => bgState, 300_000, 500);
+    assert.equal(bgState, "completed", "the agent generation was not cancelled by the voice turn");
+    return { seen, delayAckSentMs: snap.timing.delayAckAt - snap.timing.activatedAt, answerAudioMs: snap.timing.firstPlaybackAt - snap.timing.activatedAt, agentGeneration: bgState };
+  });
+
+  // MA5-S2 P4-5: every Voice Studio control that is enabled takes keyboard focus and has an accessible name, and a question
+  // can be asked with the keyboard alone (focus the box, type, Enter).
+  await stage("v12-keyboard", async () => {
+    const ids = ["VoiceSessionButton", "HandsFreeButton", "ListenStartButton", "ListenEndButton", "VoiceBargeInButton", "VoiceMuteButton", "VoiceTextBox", "VoiceTextSend"];
+    const controls = [];
+    for (const id of ids) controls.push(await ui("focus_main", { ProcessId: app.pid, TargetId: id }));
+    const enabled = controls.filter((c) => c.enabled);
+    assert.ok(enabled.length >= 5, `voice controls enabled with a session open: ${enabled.map((c) => c.id).join(", ")}`);
+    for (const c of enabled) { assert.ok(c.focused, `${c.id} takes keyboard focus`); assert.ok(c.name, `${c.id} has an accessible name`); }
+    const before = (await voice()).turnId;
+    await ui("focus_main", { ProcessId: app.pid, TargetId: "VoiceTextBox", PromptText: "What failed?" });
+    const snap = await until("keyboard-only turn answered", async () => { const s = await voice(); return s.turnId !== before && s.answer ? s : null; });
+    assert.equal(snap.answerSource, "host_facts");
+    await pillIs("ON");
+    return { controls, keyboardTurn: { transcript: snap.finalTranscript, answerSource: snap.answerSource } };
+  });
+
   await stage("v5-hands-free", async () => {
     await press("HandsFreeButton");
     await pillIs("LISTENING");

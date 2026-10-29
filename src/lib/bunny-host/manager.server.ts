@@ -171,6 +171,8 @@ export class TaskManager {
   bus = new EventEmitter();
   /** M-A-3 T9R (DEV-01): direct tasks a paired device approved; their reroutes stay on local tool-free inference. */
   private readonly deviceApproved = new Set<string>();
+  /** MA5-S2 P4-2: spoken turns admitted by approveVoiceTurn; read once (and dropped) when the task's hooks are built. */
+  private readonly voiceTurns = new Set<string>();
   /** M-A-3 T10: voice listens to a task's real token deltas and terminal state. Listeners carry no authority. */
   private readonly taskOutputListeners = new Map<string, Set<(event: TaskOutputEvent) => void>>();
   instanceId: string = crypto.randomUUID();
@@ -1683,6 +1685,7 @@ export class TaskManager {
     )
       throw new Error("Voice may admit only a local tool-free generation with a concrete model.");
     this.deviceApproved.add(id);
+    this.voiceTurns.add(id);
     return this.launch(
       id,
       { kind: "user", at: Date.now() },
@@ -2081,6 +2084,7 @@ export class TaskManager {
     // M-A-3 T3 §22: one hooks object shared by the initial launch and every relaunch; each
     // handler re-reads the live task record, so provider/model reroutes flow through unrebound.
     const adapterHooks: AdapterHooks = {
+      inferenceClass: this.voiceTurns.delete(id) ? "interactive" : "background",
       beforeDispatch:async()=>{
         await this.registry.refresh({force:true});
         this.live();

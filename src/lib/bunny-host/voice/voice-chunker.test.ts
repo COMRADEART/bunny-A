@@ -139,3 +139,14 @@ test("T10 H1 the total spoken cap and ordering still hold with early release", (
   assert.ok(chunks.reduce((sum, chunk) => sum + chunk.text.length, 0) <= VOICE_LIMITS.maxAnswerChars);
   assert.deepEqual(chunks.map((chunk) => chunk.seq), chunks.map((_, index) => index));
 });
+
+test("P4-2 a reserved Host line takes seq 0; the model's first chunk still gets the first-chunk clause cut, on seq 1", () => {
+  const chunker = new VoiceChunker();
+  assert.equal(chunker.reserve(), 0);
+  const chunks = chunker.push("Rabbits mostly eat hay and fresh grass, with some leafy greens ");
+  assert.deepEqual(chunks, [{ seq: 1, text: "Rabbits mostly eat hay and fresh grass," }]);
+  assert.equal(chunker.reserve(), null, "no Host line once model text was chunked");
+  const pending = new VoiceChunker();
+  pending.push("Rabbits");
+  assert.equal(pending.reserve(), null, "nor while model text is buffered");
+});

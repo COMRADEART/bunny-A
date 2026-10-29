@@ -1,4 +1,5 @@
 import type { ExecRequest, ExecResult, OllamaReceipt } from "./types";
+import { localInference } from "./local-inference.ts";
 
 const inflight = new Map<string, AbortController>();
 
@@ -112,7 +113,10 @@ export async function execute(request: ExecRequest, options: { stream?: (text: s
   const timeoutMs = options.timeoutMs ?? 120_000;
   const timeout = setTimeout(() => controller.abort("timeout"), timeoutMs);
   const requestedAt = Date.now();
+  let release: (() => void) | undefined;
   try {
+    // MA5-S2 P4-2: admission by class (voice first, never pre-empting). Queue time counts toward the timeout, as it did inside Ollama.
+    release = await localInference.acquire(request.taskId, request.priority ?? "background", controller.signal);
     const response = await fetch("http://127.0.0.1:11434/api/generate", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -148,6 +152,7 @@ export async function execute(request: ExecRequest, options: { stream?: (text: s
     const message = error instanceof Error ? error.message : "Ollama request failed.";
     return { ok: false, error: message, log: message };
   } finally {
+    release?.();
     clearTimeout(timeout);
     options.signal?.removeEventListener("abort",externalAbort);
     inflight.delete(request.taskId);

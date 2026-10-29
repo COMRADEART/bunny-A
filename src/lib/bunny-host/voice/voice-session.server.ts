@@ -108,6 +108,8 @@ export interface VoiceChatPort {
   output?(taskId: string): string | null;
   /** T12 RES-04: the task's canonical state, so a refused spoken question leaves the waiting count when it is reviewed. Optional. */
   taskState?(taskId: string): string | null;
+  /** MA5-S2 P4-2: true while the task waits for the local model (not yet sent to it). Optional; without it no acknowledgment. */
+  queued?(taskId: string): boolean;
 }
 export interface VoiceAgentPort {
   rows(): VoiceAgentRow[];
@@ -180,6 +182,8 @@ export type DuplexEnd = "user" | "mute" | "idle" | "lifetime" | "error" | "worke
 /** RC-05: how a held reply ends with the duplex lane. Absent means cancelled (interrupted), never resumed by default. */
 type StopOptions = { holdOutcome?: "resumed" | "interrupted" };
 const SPOKEN_LOG_MAX = 64;
+/** MA5-S2 P4-2: true whatever holds the local model (an agent step, or a stopped turn still finishing). */
+export const QUEUED_ACK_TEXT = "One moment. The local model is finishing other work first.";
 /** Input turns whose capture ended and whose recognition is still pending: bounded, oldest evicted first. */
 const FINALIZING_MAX = 4;
 /** After a recognition deadline drops an input turn, the worker has this long to acknowledge the abort before the session closes. */
@@ -237,6 +241,8 @@ export class VoiceSessionManager {
   private cancelIdle: (() => void) | null = null;
   private cancelRearm: (() => void) | null = null;
   private cancelInferenceTimer: (() => void) | null = null;
+  /** MA5-S2 P4-2: the last delay acknowledgment chunk, so its playback is not counted as the answer's first audio. */
+  private delayAck: { turn: string; gen: number; seq: number } | null = null;
   private cancelTaskOutput: (() => void) | null = null;
   private inference: Inference | null = null;
   private outstanding = 0;
@@ -1724,6 +1730,18 @@ export class VoiceSessionManager {
       }
       this.finishInference(current, event.state);
     });
+    // MA5-S2 P4-2: a question still waiting for the local model gets one short, true line instead of silence. It is only
+    // a status: the answer itself still comes from the model, and nothing is said once any model text has arrived.
+    this.schedule(() => {
+      if (this.inference !== current || current.turn !== this.snap.turnId || current.gen !== this.snap.generation || current.received || current.done) return;
+      if (!this.deps.chat.queued?.(taskId)) return;
+      const seq = current.chunker.reserve();
+      if (seq === null) return;
+      this.delayAck = { turn: current.turn, gen: current.gen, seq };
+      if (this.snap.timing) this.snap.timing = { ...this.snap.timing, delayAckAt: this.now() };
+      this.deps.journal("voice.turn", "The spoken question is waiting for the local model; a short acknowledgment was spoken.");
+      this.sendChunk(current, { seq, text: QUEUED_ACK_TEXT });
+    }, VOICE_LIMITS.queuedAckMs);
     this.cancelInferenceTimer = this.schedule(() => {
       this.cancelInferenceTimer = null;
       if (this.inference === current) {
@@ -2839,7 +2857,9 @@ export class VoiceSessionManager {
         if (this.snap.timing && this.snap.timing.firstTtsReadyAt === null) this.snap.timing = { ...this.snap.timing, firstTtsReadyAt: this.now() };
         break;
       case "playback.started":
-        if (this.snap.timing && this.snap.timing.firstPlaybackAt === null) this.snap.timing = { ...this.snap.timing, firstPlaybackAt: this.now() };
+        if (this.delayAck && this.delayAck.turn === event.turn && this.delayAck.gen === event.gen && this.delayAck.seq === event.seq) {
+          if (this.snap.timing) this.snap.timing = { ...this.snap.timing, delayAckPlaybackAt: this.snap.timing.delayAckPlaybackAt ?? this.now() };
+        } else if (this.snap.timing && this.snap.timing.firstPlaybackAt === null) this.snap.timing = { ...this.snap.timing, firstPlaybackAt: this.now() };
         this.markSpokenPlayed(event.turn, event.gen, event.seq);
         this.noteDuplexActivity();
         // RC-01: the state tracks output in flight, so a chunk that starts during a hold still leaves PROCESSING. Only the

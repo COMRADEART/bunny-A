@@ -63,7 +63,10 @@ Without `--stt whisper` the worker uses SAPI exactly as before.
   `whisper-pin.json`. `scripts/stage-whisper.mjs` verifies the release zip, the source tarball, the vendored headers and
   the model against the pin, then stages `native/voice/vendor/runtime/` (gitignored). It never downloads: a missing
   file is reported with its pinned URL. `scripts/build-voice-worker.mjs` builds `bunny-whisper-shim.dll` from
-  `whisper-shim.c` with gcc and records its hashes under `whisperShim` in the build record.
+  `whisper-shim.c` with gcc and records its hashes under `whisperShim` in the build record. The shim build is
+  byte-reproducible (no link timestamp, fixed preferred base; ASLR kept). Once a shim hash is recorded, a build that
+  differs is refused and not installed; replacing the pin needs owner approval and
+  `node scripts/build-voice-worker.mjs --repin-whisper-shim` (MA5-S2 P4-1).
 - **Model**: ggml-base.en (MIT), loaded once at startup (about 150 ms on the test machine). The `ready` event reports
   `stt: {engine: "whisper.cpp v1.9.4", recognizer: "ggml-base.en", culture: "en", local: true}`.
 - **Fallback, never silent**: if the runtime or model is missing or fails to load, `ready` reports SAPI and an `error`

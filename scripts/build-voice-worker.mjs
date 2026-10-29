@@ -19,9 +19,16 @@ function resolveSpeech() {
   return dll;
 }
 
+// MA5-S2 P4-1: ld otherwise stamps the link time and derives the image base from the full output path (a random temp
+// folder), so no two builds matched. With these flags the shim is byte-identical for the same compiler and inputs.
+// ASLR is kept (DYNAMIC_BASE and HIGH_ENTROPY_VA stay set); only the preferred base is fixed.
+export const SHIM_FLAGS = ["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-shared", "-static-libgcc", "-Wl,--no-insert-timestamp", "-Wl,--disable-auto-image-base"];
+
 // The whisper shim is built only when the pinned runtime is staged (scripts/stage-whisper.mjs). It is linked against
 // the staged whisper.dll, ggml.dll and ggml-base.dll, so the build record pins those hashes too.
-export function buildWhisperShim(root, prior) {
+// A recorded shim pin is never replaced silently: a build that differs from it is not installed and the record keeps the
+// old pin (the Host then refuses whisper and says why) unless the caller passes { repin: true } after owner approval.
+export function buildWhisperShim(root, prior, { repin = false } = {}) {
   const runtime = join(root, "native/voice/vendor/runtime");
   const whisperDll = join(runtime, "whisper.dll");
   const ggmlDll = join(runtime, "ggml.dll");
@@ -49,10 +56,12 @@ export function buildWhisperShim(root, prior) {
   const temporary = mkdtempSync(join(runtime, ".shim-build-"));
   try {
     const compiled = join(temporary, "bunny-whisper-shim.dll");
-    const flags = ["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-shared", "-static-libgcc"];
     const includeFlags = includes.flatMap(d => ["-I", d]);
-    execFileSync(compiler, [...flags, ...includeFlags, "-o", compiled, source, whisperDll, ggmlDll, ggmlBaseDll], { windowsHide: true, stdio: "pipe" });
+    execFileSync(compiler, [...SHIM_FLAGS, ...includeFlags, "-o", compiled, source, whisperDll, ggmlDll, ggmlBaseDll], { windowsHide: true, stdio: "pipe" });
     const binarySha256 = sha(compiled);
+    if (prior?.binarySha256 && prior.binarySha256 !== binarySha256 && !repin) {
+      return { status: "refused", built: binarySha256, reason: `built shim ${binarySha256} differs from the recorded pin ${prior.binarySha256}; not installed. After owner approval: node scripts/build-voice-worker.mjs --repin-whisper-shim` };
+    }
     if (!existsSync(output) || sha(output) !== binarySha256) copyFileSync(compiled, output);
     const version = execFileSync(compiler, ["--version"], { encoding: "utf8", windowsHide: true }).split(/\r?\n/)[0].trim();
     return {
@@ -62,6 +71,7 @@ export function buildWhisperShim(root, prior) {
         sourceSha256,
         binarySha256,
         linkedAgainst,
+        flags: SHIM_FLAGS,
         compiler: { path: compiler, sha256: sha(compiler), version },
         whisperVersion: "whisper.cpp v1.9.4 (927cfce)",
       },
@@ -71,7 +81,7 @@ export function buildWhisperShim(root, prior) {
   }
 }
 
-export function buildVoiceWorker(root = resolve(dirname(fileURLToPath(import.meta.url)), ".."), output = resolve(root, "native/voice/bunny-voice-worker.exe")) {
+export function buildVoiceWorker(root = resolve(dirname(fileURLToPath(import.meta.url)), ".."), output = resolve(root, "native/voice/bunny-voice-worker.exe"), { repinWhisperShim = false } = {}) {
   if (process.platform !== "win32") {
     console.log("build:voice skipped: the voice worker is Windows-only (non-win32 platform).");
     return { applicable: false };
@@ -127,9 +137,9 @@ export function buildVoiceWorker(root = resolve(dirname(fileURLToPath(import.met
   }
 
   // Whisper shim: built when the runtime is staged, otherwise the record carries no whisperShim and the reason is printed.
-  const shim = buildWhisperShim(resolve(root), prior && prior.whisperShim);
-  if (shim.status === "skipped") {
-    console.log(`build:whisper-shim skipped: ${shim.reason}`);
+  const shim = buildWhisperShim(resolve(root), prior && prior.whisperShim, { repin: repinWhisperShim });
+  if (shim.status === "skipped" || shim.status === "refused") {
+    console.log(`build:whisper-shim ${shim.status}: ${shim.reason}`);
     if (prior?.whisperShim) record.whisperShim = prior.whisperShim;
   } else if (shim.status === "up-to-date") {
     console.log("build:whisper-shim up to date");
@@ -145,5 +155,7 @@ export function buildVoiceWorker(root = resolve(dirname(fileURLToPath(import.met
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  console.log(JSON.stringify(buildVoiceWorker(process.argv[2], process.argv[3])));
+  const args = process.argv.slice(2);
+  const positional = args.filter(a => a !== "--repin-whisper-shim");
+  console.log(JSON.stringify(buildVoiceWorker(positional[0], positional[1], { repinWhisperShim: args.includes("--repin-whisper-shim") })));
 }

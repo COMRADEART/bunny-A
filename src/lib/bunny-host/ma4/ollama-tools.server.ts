@@ -7,6 +7,7 @@
 import { z } from "zod";
 import type { ActionManifest, PermissionDecision } from "../../bunny-missions/types.ts";
 import { redactOutput } from "./transport.server.ts";
+import { localInference } from "../../orch/local-inference.ts";
 
 export type ToolDefinition<A = unknown> = {
   manifest: ActionManifest;
@@ -30,12 +31,19 @@ export type ToolCapability = { modelSupports: boolean | null; modelDemonstrated:
 const NAME = /^[a-z][a-z0-9_.]{0,63}$/;
 const CallSchema = z.object({ function: z.object({ name: z.string(), arguments: z.unknown() }) }).passthrough();
 
+let chatCalls = 0;
 export const ollamaChat = (endpoint = "http://127.0.0.1:11434"): Chat => async (body, signal) => {
-  const r = await fetch(`${endpoint}/api/chat`, { method: "POST", signal, redirect: "error", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, stream: false }) });
-  if (!r.ok) throw new Error(`Ollama chat HTTP ${r.status}`);
-  const text = await r.text();
-  if (text.length > 2_000_000) throw new Error("Ollama chat response too large.");
-  return JSON.parse(text) as ChatResponse;
+  // MA5-S2 P4-2: agent tool turns are background local inference, admitted through the Host-wide queue.
+  const release = await localInference.acquire(`ma4-chat-${++chatCalls}`, "background", signal);
+  try {
+    const r = await fetch(`${endpoint}/api/chat`, { method: "POST", signal, redirect: "error", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, stream: false }) });
+    if (!r.ok) throw new Error(`Ollama chat HTTP ${r.status}`);
+    const text = await r.text();
+    if (text.length > 2_000_000) throw new Error("Ollama chat response too large.");
+    return JSON.parse(text) as ChatResponse;
+  } finally {
+    release();
+  }
 };
 
 /** Tool output is data. Control characters, secrets and size are bounded before it re-enters a prompt. */
