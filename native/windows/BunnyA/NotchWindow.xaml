@@ -12,11 +12,37 @@
         SizeToContent="WidthAndHeight"
         MouseLeftButtonDown="Window_MouseLeftButtonDown">
   <Window.Resources>
+    <!-- MA5-S2 notch palette. ApplyTheme() replaces these per Windows theme, transparency setting and high contrast. -->
+    <SolidColorBrush x:Key="NotchText" Color="#EEF1FA"/>
+    <SolidColorBrush x:Key="NotchMuted" Color="#9AA3B8"/>
+    <SolidColorBrush x:Key="NotchChip" Color="#1C2438"/>
+    <SolidColorBrush x:Key="NotchChipEdge" Color="#2C3652"/>
+    <SolidColorBrush x:Key="NotchFocus" Color="#B9C6FF"/>
+    <SolidColorBrush x:Key="NotchAccent" Color="#5B6CFF"/>
+    <SolidColorBrush x:Key="NotchAttention" Color="#E5A000"/>
+    <SolidColorBrush x:Key="NotchPositive" Color="#22A06B"/>
+    <SolidColorBrush x:Key="NotchNegative" Color="#E5484D"/>
+    <LinearGradientBrush x:Key="NotchSurface" StartPoint="0,0" EndPoint="0,1">
+      <GradientStop Color="#E61C2236" Offset="0"/>
+      <GradientStop Color="#D9121726" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="NotchHighlight" StartPoint="0,0" EndPoint="0,1">
+      <GradientStop Color="#40FFFFFF" Offset="0"/>
+      <GradientStop Color="#00FFFFFF" Offset="0.45"/>
+    </LinearGradientBrush>
+
+    <!-- Original Bunny A weapon identities, drawn as strokes on a 24×24 grid so they stay legible at 18 px. -->
+    <Geometry x:Key="GlyphGada">M12,22.5 L12,12.5 M9.5,22.5 L14.5,22.5 M12,2.2 A5.3,5.3 0 1 1 11.99,2.2 Z M12,1.2 L12,2.2 M17.3,7.5 L18.4,7.5 M5.6,7.5 L6.7,7.5 M8.3,3.8 L7.5,3 M15.7,3.8 L16.5,3</Geometry>
+    <Geometry x:Key="GlyphSpear">M3,21 L15.5,8.5 M15.5,8.5 L13.4,6.4 L20.8,3.2 L17.6,10.6 Z M5.2,16.6 L7.4,18.8</Geometry>
+    <Geometry x:Key="GlyphChakra">M12,4.2 A7.8,7.8 0 1 1 11.99,4.2 Z M12,8.6 A3.4,3.4 0 1 1 11.99,8.6 Z M12,1.2 L12,4.2 M12,19.8 L12,22.8 M1.2,12 L4.2,12 M19.8,12 L22.8,12 M4.4,4.4 L6.5,6.5 M17.5,17.5 L19.6,19.6 M19.6,4.4 L17.5,6.5 M6.5,17.5 L4.4,19.6</Geometry>
+    <Geometry x:Key="GlyphSword">M12,1.5 L14,4.5 L14,15.5 L10,15.5 L10,4.5 Z M6.5,15.5 L17.5,15.5 M12,15.5 L12,20.5 M10.2,22.5 L13.8,22.5 M12,4.5 L12,14</Geometry>
+    <Geometry x:Key="GlyphTask">M5,3.5 L19,3.5 L19,20.5 L5,20.5 Z M8,8.5 L9.5,10 L12,7.5 M13.5,9 L16.5,9 M8,14.5 L9.5,16 L12,13.5 M13.5,15 L16.5,15</Geometry>
+
     <!-- Flat glass chip buttons used for every notch control, so each one is focusable and keyboard-operable. -->
     <Style x:Key="ChipButton" TargetType="Button">
-      <Setter Property="Background" Value="#1C2438"/>
-      <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-      <Setter Property="BorderBrush" Value="#2C3652"/>
+      <Setter Property="Background" Value="{DynamicResource NotchChip}"/>
+      <Setter Property="Foreground" Value="{DynamicResource NotchText}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource NotchChipEdge}"/>
       <Setter Property="BorderThickness" Value="1"/>
       <Setter Property="Padding" Value="8,3"/>
       <Setter Property="MinHeight" Value="28"/>
@@ -32,10 +58,10 @@
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True">
-                <Setter TargetName="Chip" Property="BorderBrush" Value="#5B6CFF"/>
+                <Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource NotchAccent}"/>
               </Trigger>
               <Trigger Property="IsKeyboardFocused" Value="True">
-                <Setter TargetName="Chip" Property="BorderBrush" Value="#B9C6FF"/>
+                <Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource NotchFocus}"/>
                 <Setter TargetName="Chip" Property="BorderThickness" Value="2"/>
               </Trigger>
             </ControlTemplate.Triggers>
@@ -43,94 +69,106 @@
         </Setter.Value>
       </Setter>
     </Style>
-    <Style x:Key="AgentBadge" TargetType="Border">
-      <Setter Property="Background" Value="#20FFFFFF"/>
+
+    <!-- An agent chip: round glass button; its content (identity glyph + state badge) is built in code from Host state. -->
+    <Style x:Key="AgentChip" TargetType="Button">
+      <Setter Property="Background" Value="{DynamicResource NotchChip}"/>
+      <Setter Property="Foreground" Value="{DynamicResource NotchText}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource NotchChipEdge}"/>
       <Setter Property="BorderThickness" Value="1.5"/>
-      <Setter Property="BorderBrush" Value="#2C3652"/>
-      <Setter Property="Opacity" Value="0.45"/>
+      <Setter Property="Width" Value="34"/>
+      <Setter Property="Height" Value="34"/>
+      <Setter Property="Margin" Value="2"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Chip" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="17">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource NotchAccent}"/>
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource NotchFocus}"/>
+                <Setter TargetName="Chip" Property="BorderThickness" Value="2.5"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
   </Window.Resources>
-  <Border x:Name="NotchBorder"
-          Background="#D8141824"
-          BorderBrush="{StaticResource GlassEdgeBrush}"
-          BorderThickness="1.5"
-          CornerRadius="24"
-          Padding="14,8"
-          Margin="12">
-    <Border.Effect>
-      <DropShadowEffect BlurRadius="24" ShadowDepth="4" Direction="270" Color="#000000" Opacity="0.55"/>
-    </Border.Effect>
 
-    <Grid x:Name="NotchLayoutGrid">
-      <!-- Horizontal Notch Layout (Top / Bottom): agent icons sit to the LEFT -->
-      <StackPanel x:Name="HorizontalLayout" Orientation="Horizontal" VerticalAlignment="Center">
-        <StackPanel x:Name="HorizontalAgentsPanel" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0">
-          <Border x:Name="GadaBadge" Style="{StaticResource AgentBadge}" CornerRadius="16" Width="32" Height="32" Margin="2,0" ToolTip="Gada">
-            <Image Source="pack://application:,,,/Assets/characters/gada.compact.png" Stretch="Uniform" Margin="3" AutomationProperties.AutomationId="AgentGada" AutomationProperties.Name="Gada"/>
-          </Border>
-          <Border x:Name="SpearBadge" Style="{StaticResource AgentBadge}" CornerRadius="16" Width="32" Height="32" Margin="2,0" ToolTip="Spear">
-            <Image Source="pack://application:,,,/Assets/characters/spear.compact.png" Stretch="Uniform" Margin="3" AutomationProperties.AutomationId="AgentSpear" AutomationProperties.Name="Spear"/>
-          </Border>
-          <Border x:Name="ChakraBadge" Style="{StaticResource AgentBadge}" CornerRadius="16" Width="32" Height="32" Margin="2,0" ToolTip="Vishnu Chakra">
-            <Image Source="pack://application:,,,/Assets/characters/chakra.compact.png" Stretch="Uniform" Margin="3" AutomationProperties.AutomationId="AgentChakra" AutomationProperties.Name="Chakra"/>
-          </Border>
-          <Border x:Name="SwordBadge" Style="{StaticResource AgentBadge}" CornerRadius="16" Width="32" Height="32" Margin="2,0" ToolTip="Sword">
-            <Image Source="pack://application:,,,/Assets/characters/sword.compact.png" Stretch="Uniform" Margin="3" AutomationProperties.AutomationId="AgentSword" AutomationProperties.Name="Sword"/>
-          </Border>
-        </StackPanel>
+  <Grid x:Name="NotchRoot" RenderTransformOrigin="0.5,0.5">
+    <Grid.RenderTransform>
+      <ScaleTransform x:Name="NotchScale" ScaleX="1" ScaleY="1"/>
+    </Grid.RenderTransform>
+    <Border x:Name="NotchBorder"
+            Background="{DynamicResource NotchSurface}"
+            BorderBrush="{DynamicResource NotchChipEdge}"
+            BorderThickness="1"
+            CornerRadius="24"
+            Padding="12,7"
+            Margin="12">
+      <Border.Effect>
+        <DropShadowEffect x:Name="NotchShadow" BlurRadius="22" ShadowDepth="3" Direction="270" Color="#000000" Opacity="0.45"/>
+      </Border.Effect>
 
-        <Button x:Name="CollapseButton" Style="{StaticResource ChipButton}" Padding="0" Width="38" Height="38" Margin="0,0,10,0" Background="#26304D" BorderBrush="#5B6CFF"
-                Click="Collapse_Click" AutomationProperties.Name="Collapse or expand the notch" ToolTip="Collapse / expand">
-          <Image x:Name="BunnyAvatar" Source="pack://application:,,,/Assets/characters/bunny.idle.png" Stretch="Uniform" Margin="3"/>
-        </Button>
+      <Grid>
+        <!-- Specular top highlight: the glass edge catching light. Hidden in high contrast and reduced transparency. -->
+        <Border x:Name="NotchSheen" Background="{DynamicResource NotchHighlight}" CornerRadius="20" Margin="-10,-5,-10,0" IsHitTestVisible="False"/>
 
-        <StackPanel x:Name="HorizontalDetails" Orientation="Horizontal" VerticalAlignment="Center">
-          <StackPanel VerticalAlignment="Center" Margin="0,0,12,0" MaxWidth="280">
-            <TextBlock x:Name="NotchTitle" Text="Bunny A Â· Connecting" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextBrush}"/>
-            <TextBlock x:Name="NotchSubtitle" Text="Waiting for the Host" FontSize="11" Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis"/>
+        <Grid x:Name="NotchLayoutGrid">
+          <!-- Horizontal Notch Layout (Top / Bottom): agent chips sit to the LEFT -->
+          <StackPanel x:Name="HorizontalLayout" Orientation="Horizontal" VerticalAlignment="Center">
+            <StackPanel x:Name="HorizontalAgentsPanel" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0"
+                        AutomationProperties.Name="Agents" KeyboardNavigation.TabNavigation="Continue"/>
+
+            <Button x:Name="CollapseButton" Style="{StaticResource ChipButton}" Padding="0" Width="38" Height="38" Margin="0,0,10,0" BorderBrush="{DynamicResource NotchAccent}"
+                    Click="Collapse_Click" AutomationProperties.Name="Collapse or expand the notch" ToolTip="Collapse / expand">
+              <Image x:Name="BunnyAvatar" Source="pack://application:,,,/Assets/characters/bunny.idle.png" Stretch="Uniform" Margin="3"/>
+            </Button>
+
+            <StackPanel x:Name="HorizontalDetails" Orientation="Horizontal" VerticalAlignment="Center">
+              <StackPanel VerticalAlignment="Center" Margin="0,0,12,0" MaxWidth="300">
+                <TextBlock x:Name="NotchTitle" Text="Bunny A · Connecting" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource NotchText}"/>
+                <TextBlock x:Name="NotchSubtitle" Text="Waiting for the Host" FontSize="11" Foreground="{DynamicResource NotchMuted}" TextTrimming="CharacterEllipsis"/>
+              </StackPanel>
+              <Button x:Name="ApprovalBadge" Style="{StaticResource ChipButton}" Visibility="Collapsed" Background="{DynamicResource NotchAttention}" Foreground="#121726" FontWeight="Bold" Margin="0,0,8,0"
+                      Content="! Approval needed" Click="ApprovalBadge_Click" AutomationProperties.Name="Open the Approval Center"/>
+              <Button x:Name="VoicePill" Style="{StaticResource ChipButton}" Margin="0,0,8,0" Click="VoicePill_Click" AutomationProperties.Name="Open Voice Studio">
+                <TextBlock x:Name="VoiceStatusText" Text="🎙️ Voice" FontWeight="Medium" Foreground="{DynamicResource NotchMuted}"/>
+              </Button>
+              <Button x:Name="QuickStopButton" Content="■ Stop" Style="{StaticResource DangerButtonStyle}" MinHeight="28" Padding="8,2" Margin="0,0,6,0" FontSize="11" Click="QuickStop_Click" Visibility="Collapsed" AutomationProperties.Name="Stop the running task"/>
+              <Button x:Name="OpenWindowButton" Content="⤢ Open" Style="{StaticResource ChipButton}" Click="OpenWindow_Click" AutomationProperties.Name="Open Bunny A"/>
+              <Button x:Name="DockEdgeButton" Content="⚓ Edge" Style="{StaticResource ChipButton}" ToolTip="Move to the next screen edge (Top, Right, Bottom, Left)" Margin="4,0,0,0" Click="DockEdge_Click" AutomationProperties.Name="Move the notch to the next edge"/>
+            </StackPanel>
           </StackPanel>
-          <Button x:Name="ApprovalBadge" Style="{StaticResource ChipButton}" Visibility="Collapsed" Background="{StaticResource WarningBrush}" Foreground="#121726" FontWeight="Bold" Margin="0,0,8,0"
-                  Content="âš ï¸ Approval Needed" Click="ApprovalBadge_Click" AutomationProperties.Name="Open the Approval Center"/>
-          <Button x:Name="VoicePill" Style="{StaticResource ChipButton}" Margin="0,0,8,0" Click="VoicePill_Click" AutomationProperties.Name="Open Voice Studio">
-            <TextBlock x:Name="VoiceStatusText" Text="ðŸŽ™ï¸ Voice" FontWeight="Medium" Foreground="{StaticResource MutedBrush}"/>
-          </Button>
-          <Button x:Name="QuickStopButton" Content="â¹ Stop" Style="{StaticResource DangerButtonStyle}" MinHeight="28" Padding="8,2" Margin="0,0,6,0" FontSize="11" Click="QuickStop_Click" Visibility="Collapsed" AutomationProperties.Name="Stop the running task"/>
-          <Button x:Name="OpenWindowButton" Content="â¤¢ Open" Style="{StaticResource ChipButton}" Click="OpenWindow_Click" AutomationProperties.Name="Open Bunny A"/>
-          <Button x:Name="DockEdgeButton" Content="âš“ Edge" Style="{StaticResource ChipButton}" ToolTip="Move to the next screen edge (Top, Right, Bottom, Left)" Margin="4,0,0,0" Click="DockEdge_Click" AutomationProperties.Name="Move the notch to the next edge"/>
-        </StackPanel>
-      </StackPanel>
 
-      <!-- Vertical Notch Layout (Left / Right): agent icons sit ABOVE -->
-      <StackPanel x:Name="VerticalLayout" Orientation="Vertical" HorizontalAlignment="Center" Visibility="Collapsed">
-        <StackPanel x:Name="VerticalAgentsPanel" Orientation="Vertical" HorizontalAlignment="Center" Margin="0,0,0,10">
-          <Border x:Name="VGadaBadge" Style="{StaticResource AgentBadge}" CornerRadius="14" Width="28" Height="28" Margin="0,2" ToolTip="Gada">
-            <Image Source="pack://application:,,,/Assets/characters/gada.compact.png" Stretch="Uniform" Margin="2" AutomationProperties.AutomationId="VAgentGada" AutomationProperties.Name="Gada"/>
-          </Border>
-          <Border x:Name="VSpearBadge" Style="{StaticResource AgentBadge}" CornerRadius="14" Width="28" Height="28" Margin="0,2" ToolTip="Spear">
-            <Image Source="pack://application:,,,/Assets/characters/spear.compact.png" Stretch="Uniform" Margin="2" AutomationProperties.AutomationId="VAgentSpear" AutomationProperties.Name="Spear"/>
-          </Border>
-          <Border x:Name="VChakraBadge" Style="{StaticResource AgentBadge}" CornerRadius="14" Width="28" Height="28" Margin="0,2" ToolTip="Vishnu Chakra">
-            <Image Source="pack://application:,,,/Assets/characters/chakra.compact.png" Stretch="Uniform" Margin="2" AutomationProperties.AutomationId="VAgentChakra" AutomationProperties.Name="Chakra"/>
-          </Border>
-          <Border x:Name="VSwordBadge" Style="{StaticResource AgentBadge}" CornerRadius="14" Width="28" Height="28" Margin="0,2" ToolTip="Sword">
-            <Image Source="pack://application:,,,/Assets/characters/sword.compact.png" Stretch="Uniform" Margin="2" AutomationProperties.AutomationId="VAgentSword" AutomationProperties.Name="Sword"/>
-          </Border>
-        </StackPanel>
+          <!-- Vertical Notch Layout (Left / Right): agent chips sit ABOVE -->
+          <StackPanel x:Name="VerticalLayout" Orientation="Vertical" HorizontalAlignment="Center" Visibility="Collapsed">
+            <StackPanel x:Name="VerticalAgentsPanel" Orientation="Vertical" HorizontalAlignment="Center" Margin="0,0,0,8"
+                        AutomationProperties.Name="Agents" KeyboardNavigation.TabNavigation="Continue"/>
 
-        <Button x:Name="VCollapseButton" Style="{StaticResource ChipButton}" Padding="0" Width="34" Height="34" Margin="0,0,0,8" Background="#26304D" BorderBrush="#5B6CFF"
-                Click="Collapse_Click" AutomationProperties.Name="Collapse or expand the notch" ToolTip="Collapse / expand">
-          <Image x:Name="VBunnyAvatar" Source="pack://application:,,,/Assets/characters/bunny.idle.png" Stretch="Uniform" Margin="2"/>
-        </Button>
+            <Button x:Name="VCollapseButton" Style="{StaticResource ChipButton}" Padding="0" Width="34" Height="34" Margin="0,0,0,8" BorderBrush="{DynamicResource NotchAccent}"
+                    Click="Collapse_Click" AutomationProperties.Name="Collapse or expand the notch" ToolTip="Collapse / expand">
+              <Image x:Name="VBunnyAvatar" Source="pack://application:,,,/Assets/characters/bunny.idle.png" Stretch="Uniform" Margin="2"/>
+            </Button>
 
-        <StackPanel x:Name="VerticalDetails" HorizontalAlignment="Center">
-          <Button x:Name="VApprovalBadge" Style="{StaticResource ChipButton}" Visibility="Collapsed" Background="{StaticResource WarningBrush}" Foreground="#121726" Content="âš ï¸" Margin="0,2"
-                  Click="ApprovalBadge_Click" ToolTip="Approval needed" AutomationProperties.Name="Open the Approval Center"/>
-          <Button x:Name="VQuickStopButton" Style="{StaticResource DangerButtonStyle}" Content="â¹" MinHeight="26" Width="28" Padding="0" Margin="0,2" Click="QuickStop_Click" Visibility="Collapsed"
-                  ToolTip="Stop the running task" AutomationProperties.Name="Stop the running task"/>
-          <Button x:Name="VOpenWindowButton" Style="{StaticResource ChipButton}" Content="â¤¢" ToolTip="Open Bunny A" Margin="0,2" Click="OpenWindow_Click" AutomationProperties.Name="Open Bunny A"/>
-          <Button x:Name="VDockEdgeButton" Style="{StaticResource ChipButton}" Content="âš“" ToolTip="Move to the next screen edge" Margin="0,2" Click="DockEdge_Click" AutomationProperties.Name="Move the notch to the next edge"/>
-        </StackPanel>
-      </StackPanel>
-    </Grid>
-  </Border>
+            <StackPanel x:Name="VerticalDetails" HorizontalAlignment="Center">
+              <Button x:Name="VApprovalBadge" Style="{StaticResource ChipButton}" Visibility="Collapsed" Background="{DynamicResource NotchAttention}" Foreground="#121726" FontWeight="Bold" Content="!" Margin="0,2"
+                      Click="ApprovalBadge_Click" ToolTip="Approval needed" AutomationProperties.Name="Open the Approval Center"/>
+              <Button x:Name="VQuickStopButton" Style="{StaticResource DangerButtonStyle}" Content="■" MinHeight="26" Width="28" Padding="0" Margin="0,2" Click="QuickStop_Click" Visibility="Collapsed"
+                      ToolTip="Stop the running task" AutomationProperties.Name="Stop the running task"/>
+              <Button x:Name="VOpenWindowButton" Style="{StaticResource ChipButton}" Content="⤢" ToolTip="Open Bunny A" Margin="0,2" Click="OpenWindow_Click" AutomationProperties.Name="Open Bunny A"/>
+              <Button x:Name="VDockEdgeButton" Style="{StaticResource ChipButton}" Content="⚓" ToolTip="Move to the next screen edge" Margin="0,2" Click="DockEdge_Click" AutomationProperties.Name="Move the notch to the next edge"/>
+            </StackPanel>
+          </StackPanel>
+        </Grid>
+      </Grid>
+    </Border>
+  </Grid>
 </Window>

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -8,6 +9,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using BunnyA.Services;
 
@@ -15,9 +17,6 @@ namespace BunnyA;
 
 public partial class NotchWindow : Window
 {
-    private static readonly string[] WorkingStates = { "PLANNING", "RESEARCHING", "CODING", "TESTING", "FILE_WORK", "ACTIVE", "VERIFYING" };
-    private static readonly string[] SlotNames = { "Gada", "Spear", "Vishnu Chakra", "Sword" };
-
     private readonly MainWindow mainWindow;
     private string currentEdge;
     private double offsetRatio;
@@ -45,15 +44,23 @@ public partial class NotchWindow : Window
         if (config.NotchLeft is double left && config.NotchTop is double top) restoreAt = new POINT { X = (int)left + 1, Y = (int)top + 1 };
         ApplyExpanded(animate: false);
 
-        Loaded += (_, _) => ApplyEdgePlacement(currentEdge, offsetRatio);
+        Loaded += (_, _) => { ApplyTheme(); ApplyEdgePlacement(currentEdge, offsetRatio); };
+        // Shown again: apply what the Host reported while hidden. Hidden: drop the chips, which stops every animation.
+        IsVisibleChanged += (_, _) =>
+        {
+            if (IsVisible && pendingRoot is JsonElement root) { pendingRoot = null; UpdateSnapshot(root); }
+            else if (!IsVisible) { HorizontalAgentsPanel.Children.Clear(); VerticalAgentsPanel.Children.Clear(); chipSignature = ""; }
+        };
         SizeChanged += (_, _) => Place();
         DpiChanged += (_, _) => Place();
         // Display, resolution, DPI and taskbar changes all move the work area; the notch follows it.
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplayChanged;
+        Microsoft.Win32.SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
         SystemParameters.StaticPropertyChanged += OnSystemParameterChanged;
         Closed += (_, _) =>
         {
             Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplayChanged;
+            Microsoft.Win32.SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
             SystemParameters.StaticPropertyChanged -= OnSystemParameterChanged;
         };
         // WM_ACTIVATE names the window that lost activation to the notch, however it was activated (mouse, keyboard, UIA).
@@ -69,7 +76,10 @@ public partial class NotchWindow : Window
     private void OnSystemParameterChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(SystemParameters.WorkArea)) Dispatcher.BeginInvoke(Place);
+        if (e.PropertyName is nameof(SystemParameters.HighContrast) or nameof(SystemParameters.ClientAreaAnimation)) Dispatcher.BeginInvoke(ApplyTheme);
     }
+    // Light/dark and transparency-effects changes arrive as a General preference change.
+    private void OnUserPreferenceChanged(object? sender, Microsoft.Win32.UserPreferenceChangedEventArgs e) => Dispatcher.BeginInvoke(ApplyTheme);
 
     // ==========================================
     // PLACEMENT
@@ -118,10 +128,23 @@ public partial class NotchWindow : Window
         HorizontalLayout.Visibility = horizontal ? Visibility.Visible : Visibility.Collapsed;
         VerticalLayout.Visibility = horizontal ? Visibility.Collapsed : Visibility.Visible;
         NotchBorder.CornerRadius = new CornerRadius(horizontal ? 24 : 20);
+        chipSignature = "";
+        RenderChips(chips);
         UpdateLayout(); // ActualWidth/Height must describe the new layout, not the previous orientation.
         Place();
         Save();
-        if (changed) EdgeChanged?.Invoke(edge);
+        RequestSnapshot();
+        if (changed)
+        {
+            EdgeChanged?.Invoke(edge);
+            // A small spring settles the new orientation; skipped under reduced motion.
+            if (!ReducedMotion)
+            {
+                var spring = new DoubleAnimation(0.9, 1, TimeSpan.FromMilliseconds(420)) { EasingFunction = new ElasticEase { Oscillations = 1, Springiness = 6 } };
+                NotchScale.BeginAnimation(ScaleTransform.ScaleXProperty, spring);
+                NotchScale.BeginAnimation(ScaleTransform.ScaleYProperty, spring);
+            }
+        }
     }
 
     /// <summary>Puts the notch on its edge at its saved offset, inside the current monitor's work area.</summary>
@@ -198,34 +221,45 @@ public partial class NotchWindow : Window
     {
         var visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
         HorizontalDetails.Visibility = VerticalDetails.Visibility = visibility;
+        RenderChips(chips);
         FitContent();
-        var reducedMotion = !SystemParameters.ClientAreaAnimation || ConfigService.Load().ReducedMotion;
-        if (animate && !reducedMotion)
+        if (animate && !ReducedMotion)
             NotchBorder.BeginAnimation(OpacityProperty, new DoubleAnimation(0.55, 1, TimeSpan.FromMilliseconds(180)) { EasingFunction = new QuadraticEase() });
         else
             NotchBorder.BeginAnimation(OpacityProperty, null);
     }
 
     // ==========================================
-    // HOST STATUS
+    // HOST STATUS — MA5-S2: agent chips from Host state (NotchModel), never from local guesses
     // ==========================================
+
+    private const int MaxChips = 8;
+    private List<NotchAgent> chips = new();
+    private Dictionary<string, NotchState> previousStates = new();
+    private string chipSignature = "";
+    private JsonElement? pendingRoot;
+    private bool offline;
+
+    private bool ReducedMotion => !SystemParameters.ClientAreaAnimation || ConfigService.Load().ReducedMotion;
 
     public void ShowOffline(string reason)
     {
+        offline = true;
         NotchTitle.Text = "Bunny A · Offline";
         NotchSubtitle.Text = reason;
         QuickStopButton.Visibility = VQuickStopButton.Visibility = Visibility.Collapsed;
         ApprovalBadge.Visibility = VApprovalBadge.Visibility = Visibility.Collapsed;
-        foreach (var badge in Badges()) badge.Opacity = 0.45;
+        // Nothing the Host last reported can be claimed now: every chip shows Disconnected, still and dimmed.
+        RenderChips(chips.Select(c => c with { State = NotchState.Disconnected }).ToList());
     }
-
-    private Border[][] Badges2() => new[] { new[] { GadaBadge, VGadaBadge }, new[] { SpearBadge, VSpearBadge }, new[] { ChakraBadge, VChakraBadge }, new[] { SwordBadge, VSwordBadge } };
-    private Border[] Badges() => Badges2().SelectMany(b => b).ToArray();
 
     public void UpdateSnapshot(JsonElement root)
     {
+        // Hidden: no layout or animation work; the latest snapshot is applied when the notch is shown again.
+        if (!IsVisible) { pendingRoot = root.Clone(); return; }
         try
         {
+            offline = false;
             string? activeTitle = null, activeState = null, activeId = null, activeKind = null;
             var hasApproval = false;
 
@@ -247,29 +281,15 @@ public partial class NotchWindow : Window
             foreach (var t in root.JsonObj("persistentTasks").JsonArr("tasks"))
             {
                 var state = t.Json("state") ?? "";
-                if (t.JsonObj("pendingAction").ValueKind == JsonValueKind.Object) hasApproval = true;
+                if (t.JsonObj("pendingAction").ValueKind == JsonValueKind.Object || state == "AWAITING_APPROVAL") hasApproval = true;
                 if (activeTitle == null && state is "RUNNING" or "RESUMING")
                     (activeTitle, activeState, activeId, activeKind) = (t.Json("title") ?? "Task running", state, t.Json("id"), "ptask");
             }
 
-            // Agent icons reflect each slot's Host presentation state; idle slots stay dimmed.
-            var working = 0;
-            var badges = Badges2();
-            foreach (var s in root.JsonObj("personalAgents").JsonArr("slots"))
-            {
-                var slot = (int)s.JsonLong("slot");
-                if (slot is < 1 or > 4) continue;
-                var state = s.JsonObj("presentation").Json("state") ?? "UNKNOWN";
-                var isWorking = WorkingStates.Contains(state);
-                if (isWorking) working++;
-                foreach (var badge in badges[slot - 1])
-                {
-                    badge.Opacity = isWorking ? 1 : 0.45;
-                    badge.BorderBrush = new SolidColorBrush(isWorking ? Color.FromRgb(53, 80, 214) : Color.FromRgb(44, 54, 82));
-                    badge.ToolTip = $"{SlotNames[slot - 1]} · {state.Replace('_', ' ').ToLowerInvariant()}";
-                    System.Windows.Automation.AutomationProperties.SetItemStatus(badge, state);
-                }
-            }
+            var next = NotchModel.Agents(root, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            RenderChips(next);
+            var working = next.Count(c => NotchModel.IsActive(c.State));
+            var waiting = next.Count(c => NotchModel.NeedsAttention(c.State));
 
             var stopTag = activeId == null ? null : $"{activeKind}:{activeId}";
             if (activeTitle != null)
@@ -279,8 +299,8 @@ public partial class NotchWindow : Window
             }
             else
             {
-                NotchTitle.Text = "Bunny A · Idle";
-                NotchSubtitle.Text = working > 0 ? $"{working} of 4 agents working" : "No agent is working";
+                NotchTitle.Text = working > 0 ? "Bunny A · Working" : waiting > 0 ? "Bunny A · Needs you" : "Bunny A · Idle";
+                NotchSubtitle.Text = working > 0 ? $"{working} agent{(working == 1 ? "" : "s")} working" : waiting > 0 ? $"{waiting} waiting for you" : "No agent is working";
             }
             QuickStopButton.Tag = VQuickStopButton.Tag = stopTag;
             QuickStopButton.Visibility = VQuickStopButton.Visibility = stopTag != null ? Visibility.Visible : Visibility.Collapsed;
@@ -296,21 +316,251 @@ public partial class NotchWindow : Window
                 "MUTED" => ("🔇 Muted", "sleeping", Color.FromRgb(32, 38, 54)),
                 "INTERRUPTED" => ("⏸ Interrupted", "interrupted", Color.FromRgb(28, 36, 56)),
                 "ERROR" or "DEVICE_UNAVAILABLE" => ("⚠️ Voice unavailable", "idle", Color.FromRgb(70, 34, 40)),
-                _ => (voice.JsonBool("muted") ? "🔇 Muted" : "🎙️ Voice", activeTitle != null ? "processing" : "idle", Color.FromRgb(28, 36, 56)),
+                _ => (voice.JsonBool("muted") ? "🔇 Muted" : "🎙️ Voice", activeTitle != null || working > 0 ? "processing" : "idle", Color.FromRgb(28, 36, 56)),
             };
+            // Voice and agents are independent: an open session that keeps talking while agents work says so.
+            if (voiceState is not ("CLOSED" or "IDLE") && working > 0) label += $" · {working} working";
             VoiceStatusText.Text = label;
-            VoicePill.Background = new SolidColorBrush(color);
+            VoicePill.Background = HighContrast ? SystemColors.WindowBrush : new SolidColorBrush(color);
+            System.Windows.Automation.AutomationProperties.SetItemStatus(VoicePill, voiceState);
             if (avatar != lastAvatar)
             {
                 lastAvatar = avatar;
                 var source = new BitmapImage(new Uri($"pack://application:,,,/Assets/characters/bunny.{avatar}.png"));
                 BunnyAvatar.Source = VBunnyAvatar.Source = source;
             }
+            RequestSnapshot();
         }
         catch (Exception)
         {
             // A malformed snapshot leaves the last good notch state; the main window reports the unreadable section.
         }
+    }
+
+    /// <summary>
+    /// Rebuilds the chip strip only when what it shows changed. Collapsed shows only chips that are working or need the
+    /// owner, so an idle notch is just the Bunny button; expanded shows every chip up to <see cref="MaxChips"/>.
+    /// </summary>
+    private void RenderChips(List<NotchAgent> next)
+    {
+        var shown = (expanded ? next : next.Where(c => NotchModel.IsActive(c.State) || NotchModel.NeedsAttention(c.State) || c.State is NotchState.Failed)).ToList();
+        var signature = $"{expanded}|{currentEdge}|{ReducedMotion}|" + string.Join(";", shown.Select(c => $"{c.Key}={c.State}|{c.AccessibleName}"));
+        chips = next;
+        if (signature == chipSignature) return;
+        chipSignature = signature;
+        var horizontal = currentEdge is "Top" or "Bottom";
+        var panel = horizontal ? HorizontalAgentsPanel : VerticalAgentsPanel;
+        HorizontalAgentsPanel.Children.Clear();
+        VerticalAgentsPanel.Children.Clear();
+        foreach (var chip in NotchModel.Visible(shown, MaxChips))
+        {
+            var before = previousStates.GetValueOrDefault(chip.Key, chip.State);
+            panel.Children.Add(BuildChip(chip, horizontal ? "" : "V", before));
+        }
+        if (shown.Count > MaxChips)
+        {
+            var more = new Button { Style = (Style)FindResource("AgentChip"), Content = new TextBlock { Text = $"+{shown.Count - MaxChips}", FontSize = 11, FontWeight = FontWeights.SemiBold } };
+            more.SetResourceReference(ForegroundProperty, "NotchText");
+            System.Windows.Automation.AutomationProperties.SetAutomationId(more, (horizontal ? "" : "V") + "AgentOverflow");
+            System.Windows.Automation.AutomationProperties.SetName(more, $"{shown.Count - MaxChips} more agents; open Bunny A");
+            System.Windows.Automation.AutomationProperties.SetItemStatus(more, $"{shown.Count - MaxChips} more");
+            more.Click += (_, _) => { mainWindow.OpenItem(null, null, false); };
+            panel.Children.Add(more);
+        }
+        panel.Margin = panel.Children.Count == 0 ? new Thickness(0) : horizontal ? new Thickness(0, 0, 10, 0) : new Thickness(0, 0, 0, 8);
+        previousStates = next.ToDictionary(c => c.Key, c => c.State);
+        FitContent();
+        RequestSnapshot();
+    }
+
+    /// <summary>
+    /// MA5-S2 acceptance evidence (BUNNY_NOTCH_SNAPSHOT=&lt;file.png&gt;): renders only the notch's own visual tree, with a
+    /// transparent background, so no desktop content behind the glass is ever captured. Inert without the variable.
+    /// </summary>
+    private static readonly string? SnapshotPath = Environment.GetEnvironmentVariable("BUNNY_NOTCH_SNAPSHOT");
+    private void RequestSnapshot()
+    {
+        if (SnapshotPath == null) return;
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle, () =>
+        {
+            if (!IsVisible || NotchRoot.ActualWidth <= 0) return;
+            var dpi = VisualTreeHelper.GetDpi(this);
+            var bitmap = new RenderTargetBitmap((int)Math.Ceiling(NotchRoot.ActualWidth * dpi.DpiScaleX), (int)Math.Ceiling(NotchRoot.ActualHeight * dpi.DpiScaleY),
+                dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+            bitmap.Render(NotchRoot);
+            var png = new PngBitmapEncoder();
+            png.Frames.Add(BitmapFrame.Create(bitmap));
+            try { using var file = System.IO.File.Create(SnapshotPath); png.Save(file); } catch { /* evidence never breaks the notch */ }
+        });
+    }
+
+    private Button BuildChip(NotchAgent a, string prefix, NotchState before)
+    {
+        var glyph = new System.Windows.Shapes.Path
+        {
+            Data = (Geometry)FindResource(a.Identity switch { "gada" => "GlyphGada", "spear" => "GlyphSpear", "chakra" => "GlyphChakra", "sword" => "GlyphSword", _ => "GlyphTask" }),
+            StrokeThickness = 1.7, StrokeLineJoin = PenLineJoin.Round, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
+            Stretch = Stretch.Uniform, Width = 18, Height = 18, RenderTransformOrigin = new Point(0.5, 0.5),
+            RenderTransform = new TransformGroup { Children = { new ScaleTransform(), new RotateTransform(), new TranslateTransform() } },
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+        };
+        glyph.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, "NotchText");
+        var stateKey = a.State switch
+        {
+            _ when NotchModel.NeedsAttention(a.State) => "NotchAttention",
+            _ when NotchModel.IsActive(a.State) => "NotchAccent",
+            NotchState.Completed => "NotchPositive",
+            NotchState.Failed => "NotchNegative",
+            _ => "NotchChipEdge",
+        };
+        var mark = NotchModel.Glyph(a.State);
+        var badge = new Border
+        {
+            CornerRadius = new CornerRadius(6), MinWidth = 12, Height = 12, Padding = new Thickness(2, 0, 2, 0),
+            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, -3, -3),
+            Visibility = mark.Length == 0 ? Visibility.Collapsed : Visibility.Visible,
+            Child = new TextBlock { Text = mark, FontSize = 8, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+        };
+        badge.SetResourceReference(Border.BackgroundProperty, stateKey);
+        ((TextBlock)badge.Child).SetResourceReference(TextBlock.ForegroundProperty, HighContrast ? "NotchChip" : "NotchText");
+        var grid = new Grid { Width = 28, Height = 28 };
+        grid.Children.Add(glyph);
+        grid.Children.Add(badge);
+        var chip = new Button { Style = (Style)FindResource("AgentChip"), Content = grid, Tag = a, ToolTip = a.AccessibleName.Replace(" · ", "\n") };
+        chip.SetResourceReference(BorderBrushProperty, stateKey);
+        chip.Opacity = a.State is NotchState.Idle or NotchState.Unknown or NotchState.Disconnected ? 0.55 : 1;
+        System.Windows.Automation.AutomationProperties.SetAutomationId(chip, prefix + a.AutomationId);
+        System.Windows.Automation.AutomationProperties.SetName(chip, a.AccessibleName);
+        System.Windows.Automation.AutomationProperties.SetItemStatus(chip, NotchModel.Label(a.State));
+        System.Windows.Automation.AutomationProperties.SetHelpText(chip, a.Kind != null ? "Opens this item in Bunny A" : "Opens the Agent Dashboard");
+        chip.Click += Chip_Click;
+        if (!ReducedMotion && !offline) Animate(a, before, glyph, badge, chip);
+        return chip;
+    }
+
+    /// <summary>
+    /// One motion per identity, only while the Host reports work in progress: Gada a weighted impact pulse, Spear a
+    /// forward thrust, Vishnu Chakra a turning ring, Sword a light sweep along the blade. Attention pulses its badge;
+    /// a fresh Completed or Failed plays once. Nothing moves while idle, waiting, hidden or under reduced motion.
+    /// </summary>
+    private void Animate(NotchAgent a, NotchState before, System.Windows.Shapes.Path glyph, Border badge, Button chip)
+    {
+        var group = (TransformGroup)glyph.RenderTransform;
+        var scale = (ScaleTransform)group.Children[0];
+        var rotate = (RotateTransform)group.Children[1];
+        var move = (TranslateTransform)group.Children[2];
+        DoubleAnimation Loop(double from, double to, double seconds, IEasingFunction? ease = null, bool reverse = true) =>
+            new(from, to, TimeSpan.FromSeconds(seconds)) { AutoReverse = reverse, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = ease };
+        if (NotchModel.IsActive(a.State))
+        {
+            var horizontal = currentEdge is "Top" or "Bottom";
+            switch (a.Identity)
+            {
+                case "gada":
+                    var impact = Loop(1, 1.14, 0.55, new BackEase { Amplitude = 0.6, EasingMode = EasingMode.EaseIn });
+                    scale.BeginAnimation(ScaleTransform.ScaleXProperty, impact);
+                    scale.BeginAnimation(ScaleTransform.ScaleYProperty, impact);
+                    break;
+                case "spear":
+                    move.BeginAnimation(horizontal ? TranslateTransform.XProperty : TranslateTransform.YProperty, Loop(0, horizontal ? 2.5 : -2.5, 0.45, new SineEase()));
+                    break;
+                case "chakra":
+                    rotate.BeginAnimation(RotateTransform.AngleProperty, Loop(0, 360, 2.4, reverse: false));
+                    break;
+                case "sword":
+                    var sweep = new LinearGradientBrush { StartPoint = new Point(0, 1), EndPoint = new Point(1, 0) };
+                    var baseColor = ((SolidColorBrush)FindResource("NotchText")).Color;
+                    var glint = new GradientStop(((SolidColorBrush)FindResource("NotchFocus")).Color, 0);
+                    sweep.GradientStops.Add(new GradientStop(baseColor, 0));
+                    sweep.GradientStops.Add(glint);
+                    sweep.GradientStops.Add(new GradientStop(baseColor, 1));
+                    glyph.Stroke = sweep;
+                    glint.BeginAnimation(GradientStop.OffsetProperty, Loop(0, 1, 1.1, new SineEase(), reverse: false));
+                    break;
+                default:
+                    glyph.BeginAnimation(OpacityProperty, Loop(1, 0.55, 0.9, new SineEase()));
+                    break;
+            }
+            FrameMeter.Track(chip);
+        }
+        else if (NotchModel.NeedsAttention(a.State))
+        {
+            badge.BeginAnimation(OpacityProperty, Loop(1, 0.35, 0.7, new SineEase()));
+            FrameMeter.Track(chip);
+        }
+        else if (before != a.State && a.State == NotchState.Completed)
+        {
+            var pop = new DoubleAnimation(1.25, 1, TimeSpan.FromMilliseconds(420)) { EasingFunction = new ElasticEase { Oscillations = 1, Springiness = 5 } };
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty, pop);
+            scale.BeginAnimation(ScaleTransform.ScaleYProperty, pop);
+        }
+        else if (before != a.State && a.State == NotchState.Failed)
+        {
+            move.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(-2.5, 0, TimeSpan.FromMilliseconds(360)) { EasingFunction = new ElasticEase { Oscillations = 3, Springiness = 2 } });
+        }
+    }
+
+    private void Chip_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: NotchAgent a }) return;
+        mainWindow.OpenItem(a.Kind, a.ItemId, NotchModel.NeedsAttention(a.State));
+    }
+
+    // ==========================================
+    // GLASS THEME — follows Windows light/dark, transparency effects and high contrast (or the NotchTheme override)
+    // ==========================================
+
+    private bool HighContrast { get; set; }
+
+    private static (bool light, bool transparency) WindowsPersonalization()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+            return ((key?.GetValue("AppsUseLightTheme") as int?) == 1, (key?.GetValue("EnableTransparency") as int?) != 0);
+        }
+        catch { return (false, true); }
+    }
+
+    private void ApplyTheme()
+    {
+        var config = ConfigService.Load();
+        var (systemLight, systemTransparency) = WindowsPersonalization();
+        HighContrast = config.NotchTheme == "HighContrast" || (config.NotchTheme is not ("Light" or "Dark") && SystemParameters.HighContrast);
+        var light = config.NotchTheme == "Light" || (config.NotchTheme == "System" && systemLight);
+        var opaque = HighContrast || config.ReducedTransparency || (config.NotchTheme == "System" && !systemTransparency);
+        void Set(string key, Brush brush) => Resources[key] = brush;
+        SolidColorBrush C(string hex) => new((Color)ColorConverter.ConvertFromString(hex));
+        LinearGradientBrush Surface(string top, string bottom) => new(new GradientStopCollection { new((Color)ColorConverter.ConvertFromString(top), 0), new((Color)ColorConverter.ConvertFromString(bottom), 1) }, new Point(0, 0), new Point(0, 1));
+        if (HighContrast)
+        {
+            // System colours only: the user's contrast theme decides every colour; state is carried by glyph and name.
+            Set("NotchText", SystemColors.WindowTextBrush); Set("NotchMuted", SystemColors.WindowTextBrush);
+            Set("NotchChip", SystemColors.WindowBrush); Set("NotchChipEdge", SystemColors.WindowTextBrush);
+            Set("NotchFocus", SystemColors.HighlightBrush); Set("NotchAccent", SystemColors.HighlightBrush);
+            Set("NotchAttention", SystemColors.HighlightBrush); Set("NotchPositive", SystemColors.WindowTextBrush); Set("NotchNegative", SystemColors.WindowTextBrush);
+            Set("NotchSurface", SystemColors.WindowBrush);
+        }
+        else if (light)
+        {
+            Set("NotchText", C("#141826")); Set("NotchMuted", C("#4A5268")); Set("NotchChip", C(opaque ? "#FFFFFFFF" : "#CCFFFFFF")); Set("NotchChipEdge", C("#B8C0D6"));
+            Set("NotchFocus", C("#2F45D8")); Set("NotchAccent", C("#3A4FE0")); Set("NotchAttention", C("#B87800")); Set("NotchPositive", C("#14804F")); Set("NotchNegative", C("#C42B31"));
+            Set("NotchSurface", opaque ? Surface("#FFF4F6FB", "#FFE9ECF5") : Surface("#E6FBFCFF", "#D9EEF1F8"));
+        }
+        else
+        {
+            Set("NotchText", C("#EEF1FA")); Set("NotchMuted", C("#9AA3B8")); Set("NotchChip", C(opaque ? "#FF1C2438" : "#CC1C2438")); Set("NotchChipEdge", C("#36425F"));
+            Set("NotchFocus", C("#B9C6FF")); Set("NotchAccent", C("#6B7BFF")); Set("NotchAttention", C("#E5A000")); Set("NotchPositive", C("#22A06B")); Set("NotchNegative", C("#E5484D"));
+            Set("NotchSurface", opaque ? Surface("#FF1C2236", "#FF121726") : Surface("#E61C2236", "#D9121726"));
+        }
+        NotchSheen.Visibility = opaque ? Visibility.Collapsed : Visibility.Visible;
+        NotchBorder.Effect = HighContrast ? null : new DropShadowEffect { BlurRadius = 22, ShadowDepth = 3, Direction = 270, Color = Colors.Black, Opacity = light ? 0.22 : 0.45 };
+        NotchBorder.BorderThickness = new Thickness(HighContrast ? 2 : 1);
+        // Readable by UI Automation, so acceptance can check which fallback is active.
+        System.Windows.Automation.AutomationProperties.SetItemStatus(this, $"theme={(HighContrast ? "high-contrast" : light ? "light" : "dark")};opaque={opaque.ToString().ToLowerInvariant()};reducedMotion={ReducedMotion.ToString().ToLowerInvariant()}");
+        chipSignature = ""; // brushes captured by running animations are rebuilt with the new palette
+        RenderChips(chips);
+        RequestSnapshot();
     }
 
     // ==========================================

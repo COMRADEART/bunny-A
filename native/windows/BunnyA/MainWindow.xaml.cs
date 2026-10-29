@@ -673,6 +673,25 @@ public partial class MainWindow : Window
         MessageBox.Show(this, message, title, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes;
 
     /// <summary>Stops one item with the single command its kind accepts; nothing guesses between command families.</summary>
+    /// <summary>
+    /// MA5-S2: a notch chip opens its item in the existing UI: the Approval Center when it waits for the owner, the Agent
+    /// Dashboard while active, History once finished. The notch only navigates; every decision stays in these screens.
+    /// </summary>
+    public void OpenItem(string? kind, string? id, bool needsOwner)
+    {
+        ShowAndActivate();
+        if (needsOwner && id != null && currentApprovals.FirstOrDefault(a => a.TaskId == id) is { } approval)
+        {
+            SelectTab("Approvals");
+            PendingApprovalsList.SelectedItem = approval;
+            return;
+        }
+        var row = id == null ? null : currentTaskRows.FirstOrDefault(r => r.Id == id && (kind == null || r.Kind == kind));
+        if (row != null && ActiveTasksList.Items.Contains(row)) { SelectTab("Agents"); ActiveTasksList.SelectedItem = row; ActiveTasksList.ScrollIntoView(row); }
+        else if (row != null) { SelectTab("History"); TaskHistoryList.SelectedItem = row; TaskHistoryList.ScrollIntoView(row); }
+        else SelectTab("Agents");
+    }
+
     /// <summary>A run record can exist before anything ran; only a Host start time means the Agent actually started.</summary>
     private static bool AgentStarted(JsonElement agent) =>
         agent.ValueKind == JsonValueKind.Object && agent.JsonObj("run").ValueKind == JsonValueKind.Object && agent.JsonObj("run").JsonLong("startedAt") > 0;
