@@ -1,7 +1,7 @@
 // MA5-S2 Phase 4 (P4-1): whisper runtime verification. Read-only against this checkout: the repo's runtime, pin and
 // build record are hashed, never written. The reproducible shim candidate is built in two disposable roots, and real
 // engine selection plus real recognition run there on SAPI-synthesized fixture speech (--input-synth, --output null).
-// No microphone or speaker is opened. The candidate is NOT adopted: re-pinning is an owner decision.
+// No microphone or speaker is opened. It never re-pins (an owner decision); `adopted` reports whether the record holds the candidate.
 // Usage: node --experimental-strip-types scripts/ma5-s2/verify-whisper.mjs
 import { createHash } from "node:crypto";
 import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
@@ -32,6 +32,9 @@ const pin = JSON.parse(readFileSync(join(root, "native/voice/whisper-pin.json"),
 const record = JSON.parse(readFileSync(join(root, "native/voice/bunny-voice-worker.json"), "utf8"));
 const out = { schema: "ma5-s2-p4-whisper/1", evidenceClass: "software only: synthesized fixture speech, no microphone, no speaker", pin: { version: pin.version, commit: pin.commit } };
 
+// Evidence keeps the engine and reason only: the launcher args carry absolute local paths.
+const engineOnly = (s) => ({ engine: s.engine, reason: s.reason ?? null });
+
 // 1. The repo as it stands, read-only.
 const runtimeFiles = Object.entries(pin.runtimeFiles).map(([name, expected]) => ({ name, matchesPin: sha(join(root, RUNTIME, name)) === expected }));
 const installedShim = existsSync(join(root, RUNTIME, "bunny-whisper-shim.dll")) ? sha(join(root, RUNTIME, "bunny-whisper-shim.dll")) : null;
@@ -41,7 +44,7 @@ out.checkout = {
   modelMatchesPin: sha(join(root, RUNTIME, "models", pin.model.name)) === pin.model.sha256,
   recordedShim: record.whisperShim?.binarySha256 ?? null,
   installedShim,
-  selection: selectSpeechEngine(root),
+  selection: engineOnly(selectSpeechEngine(root)),
 };
 
 // 2. Two disposable roots, each a fresh build of the shim from the pinned inputs.
@@ -74,16 +77,16 @@ try {
     linkedAgainst: a.shim.linkedAgainst,
     linkedAgainstMatchesPin: Object.entries(a.shim.linkedAgainst).every(([n, h]) => pin.runtimeFiles[n] === h),
     compiler: { sha256: a.shim.compiler.sha256, version: a.shim.compiler.version, matchesRecordedCompiler: a.shim.compiler.sha256 === record.whisperShim?.compiler?.sha256 },
-    adopted: false,
+    adopted: a.shim.binarySha256 === record.whisperShim?.binarySha256,
   };
 
   // 3. Selection in the disposable root: refused against the committed pin, selected against the candidate record.
   const write = (r, shim) => writeFileSync(join(r, "native/voice/bunny-voice-worker.json"), JSON.stringify({ ...record, whisperShim: shim }, null, 2));
   write(a.root, record.whisperShim);
-  out.selectionWithCommittedPin = selectSpeechEngine(a.root);
+  out.selectionWithCommittedPin = engineOnly(selectSpeechEngine(a.root));
   write(a.root, a.shim);
   const selected = selectSpeechEngine(a.root);
-  out.selectionWithCandidate = { engine: selected.engine, reason: selected.reason ?? null };
+  out.selectionWithCandidate = engineOnly(selected);
   if (selected.engine !== "whisper") throw new Error(`candidate not selected: ${selected.reason}`);
 
   // 4. Real worker launched by the real launcher (it re-runs selection and the exe integrity check itself).
