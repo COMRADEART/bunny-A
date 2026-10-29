@@ -138,5 +138,37 @@ foreach (var s in Enum.GetValues<NotchState>())
 }
 Check("only work in progress animates", Enum.GetValues<NotchState>().Where(NotchModel.IsActive).SequenceEqual(new[] { NotchState.Thinking, NotchState.Planning, NotchState.Executing, NotchState.Delegating }));
 
+// ── MA5-S2 Phase 3: the voice pill claims only what the Host voice snapshot reports ──────────────
+string V(string voice) => NotchVoice.From(J(voice), Now).State;
+Eq("no voice section is off", "OFF", NotchVoice.From(default, Now).State);
+Eq("closed session is off", "OFF", V("""{"open":false,"state":"IDLE","capturing":true}"""));
+Eq("open idle", "ON", V("""{"open":true,"state":"IDLE"}"""));
+Eq("arming", "ARMING", V("""{"open":true,"state":"ARMING"}"""));
+Eq("duplex starting", "ARMING", V("""{"open":true,"state":"IDLE","duplex":{"starting":true}}"""));
+Eq("listening without confirmed capture is not listening", "ARMING", V("""{"open":true,"state":"LISTENING","capturing":false}"""));
+Eq("listening", "LISTENING", V("""{"open":true,"state":"LISTENING","capturing":true}"""));
+Eq("recognizing from a partial", "RECOGNIZING", V("""{"open":true,"state":"LISTENING","capturing":true,"partial":"what are"}"""));
+Eq("transcribing", "RECOGNIZING", V("""{"open":true,"state":"TRANSCRIBING"}"""));
+Eq("thinking", "THINKING", V("""{"open":true,"state":"PROCESSING"}"""));
+Eq("speaking needs confirmed playback", "THINKING", V("""{"open":true,"state":"SPEAKING","playing":false}"""));
+Eq("speaking", "SPEAKING", V("""{"open":true,"state":"SPEAKING","playing":true}"""));
+Eq("held reply is the user interrupting", "INTERRUPTING", V("""{"open":true,"state":"SPEAKING","playing":true,"outputHeld":true}"""));
+Eq("interrupted", "INTERRUPTED", V("""{"open":true,"state":"INTERRUPTED"}"""));
+Eq("muted state", "MUTED", V("""{"open":true,"state":"MUTED","muted":true}"""));
+Eq("muted flag while idle", "MUTED", V("""{"open":true,"state":"IDLE","muted":true}"""));
+Eq("device unavailable", "DEVICE_UNAVAILABLE", V("""{"open":true,"state":"DEVICE_UNAVAILABLE"}"""));
+Eq("error", "ERROR", V("""{"open":true,"state":"ERROR"}"""));
+Eq("disconnected is its own state", "DISCONNECTED", NotchVoice.Disconnected.State);
+Eq("full duplex speaking says it also listens", "Speaking · listening", NotchVoice.From(J("""{"open":true,"state":"SPEAKING","playing":true,"capturing":true}"""), Now).Label);
+// Level: only a fresh, measured reading while capture is confirmed. -60 dBFS..0 dBFS maps to 0..1.
+Check("fresh level is -30 dBFS at half scale", Math.Abs((NotchVoice.From(J($$$"""{"open":true,"state":"LISTENING","capturing":true,"level":{"rms":0.0316227766,"peak":0.01,"speech":false,"at":{{{Now - 100}}} }}"""), Now).Level ?? -1) - 0.5) < 1e-6);
+Eq("stale level hidden", null, NotchVoice.From(J($$$"""{"open":true,"state":"LISTENING","capturing":true,"level":{"rms":0.1,"at":{{{Now - 5_000}}} }}"""), Now).Level);
+Eq("no capture, no level", null, NotchVoice.From(J($$$"""{"open":true,"state":"PROCESSING","capturing":false,"level":{"rms":0.1,"at":{{{Now}}} }}"""), Now).Level);
+Eq("muted, no level", null, NotchVoice.From(J($$$"""{"open":true,"state":"LISTENING","capturing":true,"muted":true,"level":{"rms":0.1,"at":{{{Now}}} }}"""), Now).Level);
+Eq("silence is zero", 0.0, NotchVoice.LevelOf(J($$$"""{"rms":0,"at":{{{Now}}} }"""), Now));
+Eq("full scale clamps", 1.0, NotchVoice.LevelOf(J($$$"""{"rms":2,"at":{{{Now}}} }"""), Now));
+foreach (var s in new[] { "OFF", "ON", "ARMING", "LISTENING", "RECOGNIZING", "THINKING", "SPEAKING", "INTERRUPTING", "INTERRUPTED", "MUTED", "DEVICE_UNAVAILABLE", "ERROR" })
+    Check($"announcement {s}", NotchVoice.Announcement(new VoiceView(s, "x", "", "idle", null, null)).StartsWith("Voice: "));
+
 Console.WriteLine(failures == 0 ? "ALL PASSED" : $"{failures} FAILED");
 return failures;

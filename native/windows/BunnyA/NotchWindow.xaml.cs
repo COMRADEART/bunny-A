@@ -249,6 +249,7 @@ public partial class NotchWindow : Window
         NotchSubtitle.Text = reason;
         QuickStopButton.Visibility = VQuickStopButton.Visibility = Visibility.Collapsed;
         ApprovalBadge.Visibility = VApprovalBadge.Visibility = Visibility.Collapsed;
+        ApplyVoice(NotchVoice.Disconnected, 0);
         // Nothing the Host last reported can be claimed now: every chip shows Disconnected, still and dimmed.
         RenderChips(chips.Select(c => c with { State = NotchState.Disconnected }).ToList());
     }
@@ -306,34 +307,10 @@ public partial class NotchWindow : Window
             QuickStopButton.Visibility = VQuickStopButton.Visibility = stopTag != null ? Visibility.Visible : Visibility.Collapsed;
             ApprovalBadge.Visibility = VApprovalBadge.Visibility = hasApproval ? Visibility.Visible : Visibility.Collapsed;
 
-            var voice = root.JsonObj("voice");
-            var voiceState = voice.JsonBool("open") ? voice.Json("state") ?? "IDLE" : "CLOSED";
-            var (label, avatar, color) = voiceState switch
-            {
-                "ARMING" or "LISTENING" => ("🔴 Listening…", "listening", Color.FromRgb(53, 80, 214)),
-                "TRANSCRIBING" or "PROCESSING" => ("💭 Thinking…", "thinking", Color.FromRgb(53, 80, 214)),
-                "SPEAKING" => ("🔊 Speaking…", "speaking", Color.FromRgb(109, 79, 224)),
-                "MUTED" => ("🔇 Muted", "sleeping", Color.FromRgb(32, 38, 54)),
-                "INTERRUPTED" => ("⏸ Interrupted", "interrupted", Color.FromRgb(28, 36, 56)),
-                "ERROR" or "DEVICE_UNAVAILABLE" => ("⚠️ Voice unavailable", "idle", Color.FromRgb(70, 34, 40)),
-                _ => (voice.JsonBool("muted") ? "🔇 Muted" : "🎙️ Voice", activeTitle != null || working > 0 ? "processing" : "idle", (Color?)null),
-            };
-            // Voice and agents are independent: an open session that keeps talking while agents work says so.
-            if (voiceState is not ("CLOSED" or "IDLE") && working > 0) label += $" · {working} working";
-            VoiceStatusText.Text = label;
-            // Idle uses the themed chip; a live voice state gets its colour with white text. A new brush on every snapshot
-            // would redraw the whole layered window each poll, so brushes change only when the state does.
-            if (HighContrast || color is not { } fill)
-            {
-                VoicePill.SetResourceReference(BackgroundProperty, HighContrast ? (object)SystemColors.WindowBrushKey : "NotchChip");
-                VoiceStatusText.SetResourceReference(TextBlock.ForegroundProperty, HighContrast ? (object)SystemColors.WindowTextBrushKey : "NotchText");
-            }
-            else if (VoicePill.Background is not SolidColorBrush { Color: var current } || current != fill)
-            {
-                VoicePill.Background = new SolidColorBrush(fill);
-                VoiceStatusText.Foreground = Brushes.White;
-            }
-            System.Windows.Automation.AutomationProperties.SetItemStatus(VoicePill, voiceState);
+            var view = NotchVoice.From(root.JsonObj("voice"), DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            // Voice off or idle never hides the agents: the avatar follows agent work then.
+            var avatar = view.State is "OFF" or "ON" && (activeTitle != null || working > 0) ? "processing" : view.Avatar;
+            ApplyVoice(view, working);
             if (avatar != lastAvatar)
             {
                 lastAvatar = avatar;
@@ -346,6 +323,48 @@ public partial class NotchWindow : Window
         {
             // A malformed snapshot leaves the last good notch state; the main window reports the unreadable section.
         }
+    }
+
+    private string? lastVoiceState;
+
+    /// <summary>
+    /// MA5-S2 Phase 3: the voice pill (both orientations) from Host voice facts. Brushes and the Narrator announcement change
+    /// only when the state does; the level bar follows the worker's measured input and is hidden when there is none.
+    /// </summary>
+    private void ApplyVoice(VoiceView view, int working)
+    {
+        // Voice and agents are independent: an active voice state while agents work says so; the chips keep their own states.
+        var label = $"{view.Glyph} {view.Label}{(view.State is not ("OFF" or "ON") && working > 0 ? $" · {working} working" : "")}";
+        if (VoiceStatusText.Text != label) VoiceStatusText.Text = label;
+        VVoiceGlyph.Text = view.Glyph;
+        VVoicePill.ToolTip = label;
+        var key = $"{view.State}|{HighContrast}";
+        if (key != lastVoiceState)
+        {
+            var announce = lastVoiceState != null && !lastVoiceState.StartsWith(view.State + "|");
+            lastVoiceState = key;
+            foreach (var (pill, text) in new[] { (VoicePill, VoiceStatusText), (VVoicePill, VVoiceGlyph) })
+            {
+                if (HighContrast || view.Fill is not { } fill)
+                {
+                    pill.SetResourceReference(BackgroundProperty, HighContrast ? (object)SystemColors.WindowBrushKey : "NotchChip");
+                    text.SetResourceReference(TextBlock.ForegroundProperty, HighContrast ? (object)SystemColors.WindowTextBrushKey : "NotchText");
+                }
+                else
+                {
+                    pill.Background = new SolidColorBrush(Color.FromRgb(fill.R, fill.G, fill.B));
+                    text.Foreground = Brushes.White;
+                }
+                System.Windows.Automation.AutomationProperties.SetItemStatus(pill, view.State);
+                System.Windows.Automation.AutomationProperties.SetHelpText(pill, NotchVoice.Announcement(view));
+            }
+            VoiceLevelBar.SetResourceReference(BackgroundProperty, HighContrast ? (object)SystemColors.WindowTextBrushKey : "NotchText");
+            if (announce && System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(VoiceStatusText) is { } peer)
+                peer.RaiseAutomationEvent(System.Windows.Automation.Peers.AutomationEvents.LiveRegionChanged);
+        }
+        VoiceLevelTrack.Visibility = view.Level is null ? Visibility.Collapsed : Visibility.Visible;
+        var width = Math.Round((view.Level ?? 0) * VoiceLevelTrack.Width);
+        if (VoiceLevelBar.Width != width) VoiceLevelBar.Width = width;
     }
 
     /// <summary>
