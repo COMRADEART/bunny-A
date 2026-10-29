@@ -337,6 +337,34 @@ switch ($Action) {
     [PSCustomObject]@{ id = $TargetId; text = if ($null -ne $e) { $e.Current.Name } else { $null } } | ConvertTo-Json -Compress
   }
 
+  "notch_tree" {
+    # MA5-S2: every element of the notch with an AutomationId: name, item status, rectangle, focus facts. Plus the
+    # notch window's own ItemStatus (active theme / transparency / motion fallback) and the monitor work area.
+    $notch = Get-Notch $ProcessId
+    if ($null -eq $notch) { throw "Notch window not found" }
+    $items = @()
+    foreach ($e in $notch.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)) {
+      $c = $e.Current
+      if ([string]::IsNullOrEmpty($c.AutomationId)) { continue }
+      $b = $c.BoundingRectangle
+      $items += [PSCustomObject]@{ id = $c.AutomationId; name = $c.Name; status = $c.ItemStatus; help = $c.HelpText; offscreen = $c.IsOffscreen; enabled = $c.IsEnabled
+        focusable = $c.IsKeyboardFocusable; focused = $c.HasKeyboardFocus; x = $b.X; y = $b.Y; width = $b.Width; height = $b.Height }
+    }
+    $r = $notch.Current.BoundingRectangle
+    $wa = Get-WorkAreaAt ([int]($r.X + $r.Width / 2)) ([int]($r.Y + $r.Height / 2))
+    [PSCustomObject]@{ notch = @{ x = $r.X; y = $r.Y; width = $r.Width; height = $r.Height; status = $notch.Current.ItemStatus }; workArea = @{ x = $wa.x; y = $wa.y; width = $wa.width; height = $wa.height }; items = @($items) } | ConvertTo-Json -Compress -Depth 5
+  }
+
+  "focus_notch" {
+    # MA5-S2: moves keyboard focus to a notch element (what Tab / Narrator navigation does) and reports who has it.
+    $notch = Get-Notch $ProcessId
+    if ($null -eq $notch) { throw "Notch window not found" }
+    $e = Find-Descendant $notch $TargetId
+    if ($null -eq $e) { throw "$TargetId not found on the notch" }
+    $e.SetFocus(); Start-Sleep -Milliseconds 300
+    [PSCustomObject]@{ id = $TargetId; focused = $e.Current.HasKeyboardFocus; name = $e.Current.Name } | ConvertTo-Json -Compress
+  }
+
   "read_state" {
     # MA5-S2: any element's accessible name, enabled state and whether it is on screen (collapsed elements are absent).
     $win = Get-MainWindow $ProcessId
