@@ -291,7 +291,8 @@ Hosted CI: see the PR (results recorded in the PR description once the run finis
 ## 9. Remaining release blockers (updated by Phase 4R1, §10.8)
 
 1. Owner-attended acoustic session (A16–A20, Narrator walk), §4.
-2. Owner approval of the reproducible whisper shim pin `45f64172…`, §2. Without it the recognizer is SAPI.
+2. ~~Owner approval of the reproducible whisper shim pin `45f64172…`~~: **resolved**. The owner authorized it on
+   2026-10-29 and it was adopted in `6e4b553`. Whisper is now selected over SAPI (§10.9).
 3. Under-load answer latency: 6.5 s P50 vs 3 s. It needs a product decision on agent context size, voice pre-emption or
    hardware (§3).
 4. Live evidence of Recognizing / Interrupting / Device unavailable on the notch (needs the attended session).
@@ -481,8 +482,78 @@ is not accepted until the decisions below are made.
 
 ### 10.8 Decisions that remain the owner's
 
-1. **Whisper pin.** Approve `45f64172a5b41144f6057399f5a92776cf394c4991dce2d5b50346d3be8867e3` and run the re-pin as a
-   separate commit (§10.4), or keep SAPI.
+1. ~~**Whisper pin.**~~ **Decided:** the owner authorized `45f64172a5b41144f6057399f5a92776cf394c4991dce2d5b50346d3be8867e3`,
+   and it was adopted as a separate commit (§10.9).
 2. **Attended acoustic session** (A16–A20, Narrator). Sign a `/2` authorization with a numeric volume limit (§4 steps), then run it.
 3. **Under-load answer latency** (6.5 s P50 vs 3 s). Choose between capping agent context, pre-empting agents for voice
    (currently ruled out) and more VRAM; or accept the miss with the 1.6 s status acknowledgment (§3).
+
+### 10.9 Final integration (follow-up PR #66)
+
+PR #65 was merged at `10b137c` (main `42e8b66`) before the 4R1 commits were pushed. Those commits now go to main
+through **draft PR #66** (https://github.com/COMRADEART/bunny-A/pull/66). The branch was reconciled with a no-op merge of
+main (`b065086`): main's tree equalled the branch base, so no change was lost or rewritten. Software only, as before: no
+microphone or speaker was opened, no Windows privacy or volume setting was changed, and the voice scheduler is unchanged
+(non-preemptive).
+
+**Whisper pin adopted.** The verification was re-run on the PR branch before asking: all 11 checks passed, and both builds
+gave `45f64172…`. The owner then authorized adoption.
+
+| Step | Result |
+|---|---|
+| `build-voice-worker.mjs --repin-whisper-shim` | `6e4b553` changes only `native/voice/bunny-voice-worker.json` → `whisperShim`: `binarySha256` `35c03239…` → `45f64172…`, plus the reproducible `flags` list. The record equals the reviewed `proposedWhisperShim` byte for byte. The worker exe hash and `builtAt` are unchanged. §10.4's "every other field unchanged" was wrong about `flags`; the verifier now computes the changed fields (`1b057ea`) |
+| Installed shim | `45f64172…` = record |
+| Selection (`verify-whisper.mjs`) | checkout, committed pin and candidate all select **whisper**, not SAPI. WER 0 on synthesized fixture speech; repo runtime unchanged; 0 disposable roots left |
+| `scripts/voice-worker.test.mjs` | **77 / 77** (twice) |
+| `npm run pretest` after adoption | `build:whisper-shim up to date`; record hash unchanged before and after the whole regression |
+
+Two harness defects were found and fixed during the final regression. Neither changes product behaviour.
+
+- **Path leak (`a8e7183`).** With whisper selected, `whisper-verification.json` recorded the launcher args, which
+  contain absolute local paths (SAPI selection had no args, so this was hidden). Every selection now records only
+  `{ engine, reason }`. `adopted` is computed from the record; it is no longer hardcoded `false`.
+- **UIA JSON (`d396f65`).** `notch_tree` wrote `Infinity` for a collapsed element (`Rect.Empty`), which made
+  `v11-thinking-while-queued` fail once with a JSON parse error. Collapsed elements now report no bounds.
+
+**Safety verification.** Simulated audio and null output only.
+
+| Protection | Enforced by | Result |
+|---|---|---|
+| Hard session deadline; immediate cancellation of pending input, capture, playback and inference | `ma5-s2-acoustic-session.test.mjs` P4R1-1 (5 tests) | pass |
+| Bounded, idempotent shutdown; no orphaned workers | P4R1-1 hanging-shutdown and failing-step tests; every harness counts workers afterwards | pass; 0 workers and 0 `BunnyA.exe` after the full regression |
+| Authorized audio endpoints only; actual output volume at or below the approved ceiling; fails closed; monitored | P4R1-2 (4 tests: volume and endpoint rules, monitor switch and raise, recovery tolerance, open-session-only) | pass |
+| No raw-audio recording or upload | Worker processes audio in memory; nothing writes audio (§10.3); external inference disabled (CI static check) | pass |
+| Privacy-safe evidence | P4R1-3 (2 tests) and `assertPrivateEvidence`; whisper evidence path leak fixed above | pass; no path in the 4R1 evidence files |
+| No unauthorized Mission actions | The acoustic harness sends only `voice.*` commands. Host voice suites (stage 2): voice cannot approve; a confirm spoken over Bunny's own output never executes a proposal | pass |
+
+The acoustic suite has **17 / 17**.
+
+**Regression (local Windows 11, final source):**
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | exit 0 |
+| `npm run test:ui` | 421 / 421 |
+| `npm test` stage 1 (scripts, CI form) | 418 / 418 |
+| `npm test` stage 2 (MA3 Host, Mission, voice, F04) | **1 694 / 1 694**. The test that skipped in §10.6 now runs, because whisper is adopted |
+| `npm test` stage 3 (agent runtime and teams) | 62 / 62 |
+| `npm test` stage 4 (`test:ma4`) | 317 pass, 1 skip, 0 fail |
+| `scripts/voice-worker.test.mjs` | 77 / 77 |
+| `npm run build` | exit 0 |
+| Static security (CI checks run locally) | `npm audit --omit=dev --audit-level=high`: 0 vulnerabilities; no committed `.env` or secrets; external inference disabled |
+| `native/windows/build.ps1` (Debug + `BunnyA.Tests`) | 0 warnings, 0 errors; 134 / 134 |
+| `package-dev-candidate.ps1` (reproducible packaging) | two Release builds byte-identical (4 files) |
+| `scripts/ma5-s1r1-installer.test.mjs` | pass |
+| `verify-voice-windows.mjs` (UI Automation, fixture voice) | **12 / 12** after the helper fix; 0 workers; `evidence/voice/windows-voice-p4r1.json` |
+| `verify-notch-windows.mjs` (shares the UIA helper) | 7 pass, n3 BLOCKED (single monitor, as before). n9 frame pacing failed once (two single gaps of 236 and 274 ms; p95 and fps in budget) and passed when re-run alone. No native or UI code changed since main. Notch evidence not re-committed |
+| `verify-whisper-fingerprint.mjs` | 11 / 11; proposal `ADOPTED` |
+| `%TEMP%unny-f04-*`; voice workers; `BunnyA.exe` | 0; 0; 0 |
+
+Hosted CI: recorded in PR #66.
+
+**Latency.** Still a known limitation: answer first audio **6.5 s P50** against a 3 s target. The status acknowledgment
+plays at 1.6 s P50. Not re-measured; no inference or scheduling code changed.
+
+**Classification: PARTIAL.** Every software gate passes and the whisper pin is adopted. Phase 4 acoustic acceptance is
+**not** claimed: A16–A20 and the Narrator walk need an owner-attended session with a signed `/2` authorization (§4).
+The latency MISS also remains open (§10.8).
