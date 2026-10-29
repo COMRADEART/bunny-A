@@ -1,7 +1,7 @@
 import test from "node:test";
 import type { MissionFact } from "./voice-answers.server.ts";
 import assert from "node:assert/strict";
-import { VoiceSessionManager, REFUSAL_TEXT, REDIRECT_TEXT, TOOLS_TEXT, MISSION_PAUSE_TEXT, SPOKEN_ACTION_CLAIM_TEXT, DEVICE_ACTION_TEXT, WAITING_VOICE_TASKS_TEXT, pickCandidate, SPOKEN_CHAT_INSTRUCTION, type VoiceAgentRow, type VoiceChatTask, type VoiceTaskEvent } from "./voice-session.server.ts";
+import { VoiceSessionManager, QUEUED_ACK_TEXT, REFUSAL_TEXT, REDIRECT_TEXT, TOOLS_TEXT, MISSION_PAUSE_TEXT, SPOKEN_ACTION_CLAIM_TEXT, DEVICE_ACTION_TEXT, WAITING_VOICE_TASKS_TEXT, pickCandidate, SPOKEN_CHAT_INSTRUCTION, type VoiceAgentRow, type VoiceChatTask, type VoiceTaskEvent } from "./voice-session.server.ts";
 import { deviceTask, VOICE_TURN_DEVICE_LABEL } from "../device-authority.server.ts";
 import type { VoiceWorkerPort } from "./voice-worker.server.ts";
 import { VOICE_LIMITS, VOICE_PROTOCOL, type WorkerCommand, type WorkerEvent, type VoiceMode } from "./voice-protocol.ts";
@@ -2403,4 +2403,65 @@ test("P3-V07: 'prepare a plan for a new task' asks for the objective and drafts 
   assert.deepEqual(h.drafts, []);
   assert.equal(h.chat.submits.length, 0);
   assert.match(h.session.snapshot().answer ?? "", /^What should the plan be for\?.*Nothing was created\.$/);
+});
+
+// ── MA5-S2 Phase 4 (P4-2): a spoken question queued behind other local inference ──────────────────────────────────────
+async function askQueued(h: ReturnType<typeof setup>, queued: Set<string>) {
+  Object.assign(h.chat, { queued: (id: string) => queued.has(id) });
+  await h.session.listenStart();
+  const turn = h.session.snapshot().turnId!;
+  const gen = h.session.snapshot().generation;
+  h.worker.emit({ ev: "stt.final", turn, gen, text: "What is two plus two?", confidence: 0.9 });
+  await h.flush();
+  return { turn, gen };
+}
+
+test("P4-V01: a question still queued for the local model gets one true acknowledgment ahead of the model's answer", async () => {
+  const h = setup();
+  await h.open();
+  const queued = new Set(["task-1"]);
+  const { turn, gen } = await askQueued(h, queued);
+  h.advance(VOICE_LIMITS.queuedAckMs - 1);
+  assert.equal(h.worker.ofOp("speak").length, 0, "nothing before the threshold");
+  h.advance(1);
+  const ack = h.worker.ofOp("speak");
+  assert.deepEqual(ack.map((c) => [c.seq, c.text]), [[0, QUEUED_ACK_TEXT]]);
+  h.advance(VOICE_LIMITS.queuedAckMs * 3);
+  assert.equal(h.worker.ofOp("speak").length, 1, "said once per question");
+  h.worker.emit({ ev: "playback.started", turn, gen, seq: 0 });
+  assert.equal(h.session.snapshot().timing!.firstPlaybackAt, null, "the acknowledgment is not the answer's first audio");
+  assert.ok(h.session.snapshot().timing!.delayAckPlaybackAt);
+  queued.delete("task-1");
+  h.chat.text("task-1", "Two plus two is four. ");
+  h.chat.done("task-1");
+  await h.flush();
+  const answer = h.worker.ofOp("speak").slice(1);
+  assert.ok(answer.length > 0 && answer.every((c, i) => c.seq === i + 1), "the answer follows on seq 1, 2, ... (strictly increasing)");
+  assert.match(answer.map((c) => c.text).join(" "), /four/);
+  h.worker.emit({ ev: "playback.started", turn, gen, seq: 1 });
+  assert.ok(h.session.snapshot().timing!.firstPlaybackAt, "the answer's own first audio is stamped");
+  assert.ok(h.journal.some(([, detail]) => /waiting for the local model/.test(detail)));
+});
+
+test("P4-V02: no acknowledgment when the model already has the question, once text arrived, or after a barge-in", async () => {
+  // Sent to the model (not queued), just slow: silence, never a claim about other work.
+  const a = setup();
+  await a.open();
+  await askQueued(a, new Set());
+  a.advance(VOICE_LIMITS.queuedAckMs * 2);
+  assert.equal(a.worker.ofOp("speak").length, 0);
+  // Model text arrived before the threshold: the answer is already on its way.
+  const b = setup();
+  await b.open();
+  await askQueued(b, new Set(["task-1"]));
+  b.chat.text("task-1", "Two plus");
+  b.advance(VOICE_LIMITS.queuedAckMs);
+  assert.ok(b.worker.ofOp("speak").every((c) => c.text !== QUEUED_ACK_TEXT));
+  // The user interrupted before the threshold: the turn is over, nothing is said for it.
+  const c = setup();
+  await c.open();
+  await askQueued(c, new Set(["task-1"]));
+  await c.session.interrupt("button");
+  c.advance(VOICE_LIMITS.queuedAckMs);
+  assert.ok(c.worker.ofOp("speak").every((cmd) => cmd.text !== QUEUED_ACK_TEXT));
 });

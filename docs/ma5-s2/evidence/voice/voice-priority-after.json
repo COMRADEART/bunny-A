@@ -1,0 +1,391 @@
+{
+  "schema": "ma5-s2-p4.voice-priority/1",
+  "at": "2026-10-29T16:08:52.426Z",
+  "scheduling": "Phase 4: Bunny local queue (1 slot, voice first, no pre-emption, starvation bound 3)",
+  "workload": {
+    "voiceTurns": 12,
+    "question": "In one short sentence, what does a rabbit eat?",
+    "backgroundInFlight": 2,
+    "backgroundOutputTokens": 200,
+    "gapAfterTurnMs": 3000,
+    "path": "manager.submit -> approve -> Ollama adapter -> execute (local-only)"
+  },
+  "boundaries": "Turn clock starts at the Host's receipt of the typed question (activatedAt). firstAudible = first playback.started of any chunk (the delay acknowledgment counts); firstAnswerAudio = the answer's own first chunk. Null sink: no device latency.",
+  "idle": {
+    "label": "idle-warm",
+    "answerSource": "model",
+    "route": {
+      "provider": "ollama",
+      "model": "huihui_ai/qwen2.5-abliterate:7b"
+    },
+    "firstTokenMs": 719,
+    "firstAudibleMs": 1294,
+    "firstAnswerAudioMs": 1294,
+    "completedMs": 7444,
+    "delayAck": null,
+    "answer": "A rabbit mainly eats plants, like grass, hay, and vegetables."
+  },
+  "idleSecond": {
+    "label": "idle",
+    "answerSource": "model",
+    "route": {
+      "provider": "ollama",
+      "model": "huihui_ai/qwen2.5-abliterate:7b"
+    },
+    "firstTokenMs": 592,
+    "firstAudibleMs": 1016,
+    "firstAnswerAudioMs": 1016,
+    "completedMs": 7163,
+    "delayAck": null,
+    "answer": "A rabbit mainly eats plants, like grass, hay, and vegetables."
+  },
+  "underLoad": {
+    "turns": [
+      {
+        "label": "load-0",
+        "answerSource": "model",
+        "route": {
+          "provider": "ollama",
+          "model": "huihui_ai/qwen2.5-abliterate:7b"
+        },
+        "firstTokenMs": 7238,
+        "firstAudibleMs": 1619,
+        "firstAnswerAudioMs": 7643,
+        "completedMs": 13789,
+        "delayAck": {
+          "sentMs": 1602,
+          "audibleMs": 1619
+        },
+        "answer": "One moment. The local model is finishing other work first. A rabbit mainly eats plants, like grass, hay, and vegetables."
+      },
+      {
+        "label": "load-1",
+        "answerSource": "model",
+        "route": {
+          "provider": "ollama",
+          "model": "huihui_ai/qwen2.5-abliterate:7b"
+        },
+        "firstTokenMs": 1778,
+        "firstAudibleMs": 2224,
+        "firstAnswerAudioMs": 2224,
+        "completedMs": 8371,
+        "delayAck": null,
+        "answer": "A rabbit mainly eats plants, like grass, hay, and vegetables."
+      },
+      {
+        "label": "load-2",
+        "answerSource": "model",
+        "route": {
+          "provider": "ollama",
+          "model": "huihui_ai/qwen2.5-abliterate:7b"
+        },
+        "firstTokenMs": 4748,
+        "firstAudibleMs": 1627,
+        "firstAnswerAudioMs": 6545,
+        "completedMs": 12716,
+        "delayAck": {
+          "sentMs": 1605,
+          "audibleMs": 1627
+        },
+        "answer": "One moment. The local model is finishing other work first. A rabbit mainly eats plants, like grass, hay, and vegetables."
+      },
+      {
+        "label": "load-3",
+        "answerSource": "model",
+        "route": {
+          "provider": "ollama",
+          "model": "huihui_ai/qwen2.5-abliterate:7b"
+        },
+        "firstTokenMs": 8108,
+        "firstAudibleMs": 1612,
+        "firstAnswerAudioMs": 8573,
+        "completedMs": 14704,
+        "delayAck": {
+          "sentMs": 1592,
+          "audibleMs": 1612
+        },
+        "answer": "One moment. The local model is finishing other work first. A rabbit mainly eats plants, like grass, hay, and vegetables."
+      },
+      {
+        "label": "load-4",
+        "answerSource": "model",
+        "route": {
+          "provider": "ollama",
+          "model": "huihui_ai/qwen2.5-abliterate:7b"
+        },
+        "firstTokenMs": 5402,
+        "firstAudibleMs": 1617,
+        "firstAnswerAudioMs": 6537,
+        "completedMs": 12706,
+        "delayAck": {
+          "sentMs": 1598,
+          "audibleMs": 1617
+        },
+        "answer": "One moment. The local model is finishing other work first. A rabbit mainly eats plants, like grass, hay, and vegetables."
+      },
+      {
+        "label": "load-5",
+        "answerSource": "model",
+        "route": {
+          "provider": "ollama",
+          "model": "huihui_ai/qwen2.5-abliterate:7b"
+        },
+        "firstTokenMs": 2860,
+        "firstAudibleMs": 1633,
+        "firstAnswerAudioMs": 6552,
+        "completedMs": 12688,
+        "delayAck": {
+          "sentMs": 1613,
+          "audibleMs": 1633
+        },
+        "answer": "One moment. The local model is finishing other work first. A rabbit mainly eats plants, like grass, hay, and vegetables."
+      },
+      {
+        "label": "load-6",
+        "answerSource": "model",
+        "route": {
+          "provider": "ollama",
+          "model": "huihui_ai/qwen2.5-abliterate:7b"
+        },
+        "firstTokenMs": 7631,
+        "firstAudibleMs": 1605,
+        "firstAnswerAudioMs": 8144,
+        "completedMs": 14274,
+        "delayAck": {
+          "sentMs": 1593,
+          "audibleMs": 1605
+        },
+        "answer": "One moment. The local model is finishing other work first. A rabbit mainly eats plants, like grass, hay, and vegetables."
+      },
+      {
+        "label": "load-7",
+        "answerSource": "model",
+        "route": {
+          "provider": "ollama",
+          "model": "huihui_ai/qwen2.5-abliterate:7b"
+        },
+        "firstTokenMs": 9204,
+        "firstAudibleMs": 1615,
+        "firstAnswerAudioMs": 9603,
+        "completedMs": 15738,
+        "delayAck": {
+          "sentMs": 1593,
+          "audibleMs": 1615
+        },
+        "answer": "One moment. The local model is finishing other work first. A rabbit mainly eats plants, like grass, hay, and vegetables."
+      },
+      {
+        "label": "load-8",
+        "answerSource": "model",
+        "route": {
+          "provider": "ollama",
+          "model": "huihui_ai/qwen2.5-abliterate:7b"
+        },
+        "firstTokenMs": 709,
+        "firstAudibleMs": 1157,
+        "firstAnswerAudioMs": 1157,
+        "completedMs": 7305,
+        "delayAck": null,
+        "answer": "A rabbit mainly eats plants, like grass, hay, and vegetables."
+      },
+      {
+        "label": "load-9",
+        "answerSource": "model",
+        "route": {
+          "provider": "ollama",
+          "model": "huihui_ai/qwen2.5-abliterate:7b"
+        },
+        "firstTokenMs": 5664,
+        "firstAudibleMs": 1607,
+        "firstAnswerAudioMs": 6525,
+        "completedMs": 12649,
+        "delayAck": {
+          "sentMs": 1588,
+          "audibleMs": 1607
+        },
+        "answer": "One moment. The local model is finishing other work first. A rabbit mainly eats plants, like grass, hay, and vegetables."
+      },
+      {
+        "label": "load-10",
+        "answerSource": "model",
+        "route": {
+          "provider": "ollama",
+          "model": "huihui_ai/qwen2.5-abliterate:7b"
+        },
+        "firstTokenMs": 2406,
+        "firstAudibleMs": 1596,
+        "firstAnswerAudioMs": 6565,
+        "completedMs": 12644,
+        "delayAck": {
+          "sentMs": 1576,
+          "audibleMs": 1596
+        },
+        "answer": "One moment. The local model is finishing other work first. A rabbit mainly eats plants, like grass, hay, and vegetables."
+      },
+      {
+        "label": "load-11",
+        "answerSource": "model",
+        "route": {
+          "provider": "ollama",
+          "model": "huihui_ai/qwen2.5-abliterate:7b"
+        },
+        "firstTokenMs": 4861,
+        "firstAudibleMs": 1604,
+        "firstAnswerAudioMs": 6522,
+        "completedMs": 12656,
+        "delayAck": {
+          "sentMs": 1585,
+          "audibleMs": 1604
+        },
+        "answer": "One moment. The local model is finishing other work first. A rabbit mainly eats plants, like grass, hay, and vegetables."
+      }
+    ],
+    "modelRoutedTurns": 12,
+    "firstTokenMs": {
+      "n": 12,
+      "p50": 4861,
+      "p95": 9204,
+      "min": 709,
+      "max": 9204,
+      "mean": 5051
+    },
+    "firstAudibleMs": {
+      "n": 12,
+      "p50": 1612,
+      "p95": 2224,
+      "min": 1157,
+      "max": 2224,
+      "mean": 1626
+    },
+    "firstAnswerAudioMs": {
+      "n": 12,
+      "p50": 6545,
+      "p95": 9603,
+      "min": 1157,
+      "max": 9603,
+      "mean": 6383
+    },
+    "completedMs": {
+      "n": 12,
+      "p50": 12688,
+      "p95": 15738,
+      "min": 7305,
+      "max": 15738,
+      "mean": 12520
+    },
+    "delayAcks": 10
+  },
+  "background": {
+    "submitted": 26,
+    "completed": 26,
+    "notCompleted": [],
+    "windowMs": 186805,
+    "completedInWindow": 24,
+    "perMinute": 7.71,
+    "submitToFirstOutputMs": {
+      "n": 26,
+      "p50": 8170,
+      "p95": 11410,
+      "min": 708,
+      "max": 11572,
+      "mean": 8169
+    },
+    "submitToDoneMs": {
+      "n": 26,
+      "p50": 14841,
+      "p95": 19007,
+      "min": 7755,
+      "max": 19409,
+      "mean": 14907
+    }
+  },
+  "gpuMemoryMiB": {
+    "samples": 97,
+    "max": 4103,
+    "total": 6141
+  },
+  "queue": {
+    "stats": {
+      "slots": 1,
+      "running": 0,
+      "waiting": {
+        "interactive": 0,
+        "background": 0
+      },
+      "admitted": {
+        "interactive": 14,
+        "background": 26,
+        "starvationOverrides": 0
+      }
+    },
+    "interactiveAdmissions": [
+      {
+        "aheadAtEnqueue": 0,
+        "queuedMs": 1
+      },
+      {
+        "aheadAtEnqueue": 0,
+        "queuedMs": 0
+      },
+      {
+        "aheadAtEnqueue": 2,
+        "queuedMs": 6743
+      },
+      {
+        "aheadAtEnqueue": 2,
+        "queuedMs": 1205
+      },
+      {
+        "aheadAtEnqueue": 2,
+        "queuedMs": 4121
+      },
+      {
+        "aheadAtEnqueue": 2,
+        "queuedMs": 7441
+      },
+      {
+        "aheadAtEnqueue": 2,
+        "queuedMs": 4789
+      },
+      {
+        "aheadAtEnqueue": 2,
+        "queuedMs": 1983
+      },
+      {
+        "aheadAtEnqueue": 2,
+        "queuedMs": 6839
+      },
+      {
+        "aheadAtEnqueue": 2,
+        "queuedMs": 8471
+      },
+      {
+        "aheadAtEnqueue": 2,
+        "queuedMs": 40
+      },
+      {
+        "aheadAtEnqueue": 2,
+        "queuedMs": 5070
+      },
+      {
+        "aheadAtEnqueue": 2,
+        "queuedMs": 1827
+      },
+      {
+        "aheadAtEnqueue": 2,
+        "queuedMs": 4201
+      }
+    ],
+    "backgroundQueuedMs": {
+      "n": 26,
+      "p50": 7700,
+      "p95": 10777,
+      "min": 0,
+      "max": 11230,
+      "mean": 7674
+    },
+    "starvationOverrides": 0
+  },
+  "failure": null,
+  "workersAfterShutdown": 0
+}

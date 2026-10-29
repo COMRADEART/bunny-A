@@ -198,6 +198,9 @@ export type VoiceTiming = {
   firstTokenAt: number | null;
   firstTtsReadyAt: number | null;
   firstPlaybackAt: number | null;
+  /** MA5-S2 P4-2: the "waiting for the local model" line was sent / started playing. firstPlaybackAt stays the answer's. */
+  delayAckAt?: number | null;
+  delayAckPlaybackAt?: number | null;
   /** The routed inference (or Host-facts answer) finished producing text. */
   inferenceCompletedAt: number | null;
   /** The whole turn finished: playback drained (or the answer was delivered as text when TTS failed). */
@@ -389,6 +392,8 @@ export const VOICE_LIMITS = {
   workerStdinSoftBudget: 384 * 1024, // the F04 interactive budget is 512 KiB cumulative per group; relaunch at idle before it
   workerReadyTimeoutMs: 8_000,
   inferenceTimeoutMs: 60_000,
+  /** MA5-S2 P4-2: a question still queued for the local model this long after admission gets one short acknowledgment. */
+  queuedAckMs: 1_500,
   /** Recognizer confidence below this is "not heard": Bunny asks again and nothing is routed. */
   minFinalConfidence: 0.15,
   /** Agent controls and spoken confirmations need at least this recognizer confidence (typed turns count as 1). */

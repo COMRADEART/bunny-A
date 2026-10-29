@@ -8,6 +8,7 @@ import { HostDatabase } from "./persistence.server.ts";
 import { TaskManager, type ManagerOptions } from "./manager.server.ts";
 import { API_KEY_SHAPE } from "./jev-secrets.server.ts";
 import { sampleHost } from "../orch/telemetry.server.ts";
+import { localInference } from "../orch/local-inference.ts";
 import { validateVerifySpec, verifyTask } from "./verification.server.ts";
 import type { Mode, OrchTask, Project, ProviderId, TaskConstraints } from "../orch/types.ts";
 import { ModelApprovalRequired } from "./ma4/selection.ts";
@@ -973,6 +974,7 @@ async function openHost(
       admit: (taskId) => {
         manager.approveVoiceTurn(taskId);
       },
+      queued: (taskId) => localInference.isWaiting(taskId),
       onOutput: (taskId, listener) => manager.onTaskOutput(taskId, listener),
       // T12 RES-04: the canonical state of a refused spoken question, so a reviewed one leaves the waiting count.
       taskState: (taskId) => {
