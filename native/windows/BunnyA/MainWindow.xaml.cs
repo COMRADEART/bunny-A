@@ -24,6 +24,9 @@ public partial class MainWindow : Window
     private readonly HostClient hostClient = new();
     private readonly DispatcherTimer refreshTimer = new() { Interval = TimeSpan.FromSeconds(3) };
     private readonly DispatcherTimer activityDebounce = new() { Interval = TimeSpan.FromMilliseconds(300) };
+    /// <summary>Phase 3: level changes raise no Host event, so the voice section alone is read this often, only while capture is confirmed.</summary>
+    private readonly DispatcherTimer voiceLevelTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    private bool voiceLevelInFlight;
     private readonly CancellationTokenSource lifetime = new();
     private NotchWindow? notchWindow;
 
@@ -58,6 +61,19 @@ public partial class MainWindow : Window
         hostClient.HostChanged += OnHostChanged;
         activityDebounce.Tick += (_, _) => { activityDebounce.Stop(); _ = RefreshAllStateAsync(); };
         refreshTimer.Tick += (_, _) => _ = RefreshAllStateAsync();
+        voiceLevelTimer.Tick += async (_, _) =>
+        {
+            if (voiceLevelInFlight) return;
+            voiceLevelInFlight = true;
+            try
+            {
+                var voice = (await hostClient.SendCommandAsync("voice.state", new { }, lifetime.Token)).JsonObj("voice");
+                notchWindow?.UpdateVoice(voice);
+                if (!voice.JsonBool("capturing")) voiceLevelTimer.Stop();
+            }
+            catch (Exception) { voiceLevelTimer.Stop(); }
+            finally { voiceLevelInFlight = false; }
+        };
         PreviewKeyDown += Window_PreviewKeyDown;
 
         Loaded += async (_, _) =>
@@ -93,6 +109,7 @@ public partial class MainWindow : Window
             isClosed = true;
             refreshTimer.Stop();
             activityDebounce.Stop();
+            voiceLevelTimer.Stop();
             lifetime.Cancel();
             hostClient.Dispose();
             lifetime.Dispose();
@@ -587,6 +604,16 @@ public partial class MainWindow : Window
         VoiceBargeInButton.IsEnabled = open && state is "SPEAKING" or "PROCESSING" or "TRANSCRIBING";
         VoiceMuteButton.IsEnabled = open;
         VoiceMuteButton.Content = muted ? "Unmute Mic" : "Mute Mic";
+        // Phase 3: hands-free is on while the Host holds a live grant or the echo-cancelled lane is open or starting.
+        var duplex = voice.JsonObj("duplex");
+        var handsFree = open && voice.Json("mode") == "hands_free" && (duplex.JsonBool("active") || duplex.JsonBool("starting") || duplex.JsonLong("grantExpiresAt") > 0);
+        HandsFreeButton.Content = handsFree ? "■ Stop Hands-Free" : "🎧 Start Hands-Free";
+        System.Windows.Automation.AutomationProperties.SetName(HandsFreeButton, handsFree ? "Stop hands-free conversation and release the microphone" : "Start hands-free conversation");
+        HandsFreeButton.IsEnabled = voice.ValueKind == JsonValueKind.Object && !muted;
+        VoiceTextBox.IsEnabled = VoiceTextSend.IsEnabled = open && !muted;
+        if (open && voice.JsonBool("capturing")) VoiceStateText.Text += handsFree ? " · 🔴 hands-free microphone on" : " · 🔴 microphone on";
+        if (open && voice.JsonBool("capturing")) { if (!voiceLevelTimer.IsEnabled && !isClosed) voiceLevelTimer.Start(); }
+        else voiceLevelTimer.Stop();
 
         var devices = voice.JsonObj("devices");
         static string Endpoint(JsonElement d) => d.ValueKind != JsonValueKind.Object ? "Not reported"
@@ -1303,6 +1330,31 @@ public partial class MainWindow : Window
 
     private async void VoiceInterrupt_Click(object sender, RoutedEventArgs e) =>
         await RunCommandAsync("voice.interrupt", new { source = "button" }, "Interrupt Failed");
+
+    /// <summary>
+    /// Phase 3: an explicit press is the only thing that grants the hands-free microphone. Stop switches the open session
+    /// back to push-to-talk, which ends the echo-cancelled lane and revokes the grant without closing the session.
+    /// </summary>
+    private async void HandsFree_Click(object sender, RoutedEventArgs e)
+    {
+        var duplex = Voice.JsonObj("duplex");
+        var active = Voice.JsonBool("open") && Voice.Json("mode") == "hands_free" && (duplex.JsonBool("active") || duplex.JsonBool("starting") || duplex.JsonLong("grantExpiresAt") > 0);
+        if (active) { await RunCommandAsync("voice.session.open", new { mode = "push_to_talk" }, "Hands-Free Stop Failed"); return; }
+        if (await RunCommandAsync("voice.session.open", new { mode = "hands_free" }, "Voice Session Error") is not null)
+            await RunCommandAsync("voice.listen.start", new { source = "hands_free" }, "Hands-Free Start Failed");
+    }
+
+    private async void VoiceTextSend_Click(object sender, RoutedEventArgs e)
+    {
+        var text = VoiceTextBox.Text.Trim();
+        if (text.Length == 0) return;
+        if (await RunCommandAsync("voice.text", new { text }, "Voice Question Failed") is not null) VoiceTextBox.Clear();
+    }
+
+    private void VoiceTextBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter) VoiceTextSend_Click(sender, e);
+    }
 
     private async void VoiceMute_Click(object sender, RoutedEventArgs e) =>
         await RunCommandAsync("voice.mute", new { muted = !Voice.JsonBool("muted") }, "Mute Failed");

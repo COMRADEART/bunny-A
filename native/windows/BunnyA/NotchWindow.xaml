@@ -149,7 +149,13 @@
               <Button x:Name="ApprovalBadge" Style="{StaticResource ChipButton}" Visibility="Collapsed" Background="{DynamicResource NotchAttention}" Foreground="#121726" FontWeight="Bold" Margin="0,0,8,0"
                       Content="! Approval needed" Click="ApprovalBadge_Click" AutomationProperties.Name="Open the Approval Center"/>
               <Button x:Name="VoicePill" Style="{StaticResource ChipButton}" Margin="0,0,8,0" Click="VoicePill_Click" AutomationProperties.Name="Open Voice Studio">
-                <TextBlock x:Name="VoiceStatusText" Text="🎙️ Voice" FontWeight="Medium" Foreground="{DynamicResource NotchMuted}"/>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock x:Name="VoiceStatusText" Text="🎙️ Voice off" FontWeight="Medium" Foreground="{DynamicResource NotchMuted}" AutomationProperties.LiveSetting="Polite"/>
+                  <!-- Phase 3: the worker's measured input level, shown only while the Host confirms capture; never animated on its own.
+                       A ProgressBar (not a Border) so UI Automation and Narrator can read the value. -->
+                  <ProgressBar x:Name="VoiceLevelTrack" Width="26" Height="5" Minimum="0" Maximum="1" Value="0" Margin="6,0,0,0" VerticalAlignment="Center"
+                               Background="#33FFFFFF" BorderThickness="0" Foreground="{DynamicResource NotchText}" Visibility="Collapsed" AutomationProperties.Name="Microphone level"/>
+                </StackPanel>
               </Button>
               <Button x:Name="QuickStopButton" Content="■ Stop" Style="{StaticResource DangerButtonStyle}" MinHeight="28" Padding="8,2" Margin="0,0,6,0" FontSize="11" Click="QuickStop_Click" Visibility="Collapsed" AutomationProperties.Name="Stop the running task"/>
               <Button x:Name="OpenWindowButton" Content="⤢ Open" Style="{StaticResource ChipButton}" Click="OpenWindow_Click" AutomationProperties.Name="Open Bunny A"/>
@@ -172,6 +178,9 @@
                       Click="ApprovalBadge_Click" ToolTip="Approval needed" AutomationProperties.Name="Open the Approval Center"/>
               <Button x:Name="VQuickStopButton" Style="{StaticResource DangerButtonStyle}" Content="■" MinHeight="26" Width="28" Padding="0" Margin="0,2" Click="QuickStop_Click" Visibility="Collapsed"
                       ToolTip="Stop the running task" AutomationProperties.Name="Stop the running task"/>
+              <Button x:Name="VVoicePill" Style="{StaticResource ChipButton}" Margin="0,2" Click="VoicePill_Click" ToolTip="Voice off" AutomationProperties.Name="Open Voice Studio">
+                <TextBlock x:Name="VVoiceGlyph" Text="🎙️" Foreground="{DynamicResource NotchMuted}"/>
+              </Button>
               <Button x:Name="VOpenWindowButton" Style="{StaticResource ChipButton}" Content="⤢" ToolTip="Open Bunny A" Margin="0,2" Click="OpenWindow_Click" AutomationProperties.Name="Open Bunny A"/>
               <Button x:Name="VDockEdgeButton" Style="{StaticResource ChipButton}" Content="⚓" ToolTip="Move to the next screen edge" Margin="0,2" Click="DockEdge_Click" AutomationProperties.Name="Move the notch to the next edge"/>
             </StackPanel>

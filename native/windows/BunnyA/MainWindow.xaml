@@ -509,7 +509,13 @@
               <Button x:Name="ListenEndButton" Content="Stop Listening" Margin="0,0,10,0" Click="VoiceListenEnd_Click" IsEnabled="False"/>
               <Button x:Name="VoiceBargeInButton" Content="⚡ Barge-In (Interrupt)" Style="{StaticResource DangerButtonStyle}" Margin="0,0,10,0" Click="VoiceInterrupt_Click" IsEnabled="False"/>
               <Button x:Name="VoiceMuteButton" Content="Mute Mic" Click="VoiceMute_Click" IsEnabled="False"/>
+              <!-- Phase 3: hands-free opens the echo-cancelled microphone only on this explicit press; Stop releases it. -->
+              <Button x:Name="HandsFreeButton" Content="🎧 Start Hands-Free" Margin="10,0,0,0" Click="HandsFree_Click" AutomationProperties.Name="Start hands-free conversation"/>
             </StackPanel>
+            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,14">
+              <Button x:Name="VoiceTextSend" DockPanel.Dock="Right" Content="Ask" Margin="10,0,0,0" Click="VoiceTextSend_Click" IsEnabled="False" AutomationProperties.Name="Ask Bunny by text in this voice session"/>
+              <TextBox x:Name="VoiceTextBox" KeyDown="VoiceTextBox_KeyDown" IsEnabled="False" AutomationProperties.Name="Type a question for the voice session" ToolTip="Typed turns use the same Host answer path as speech"/>
+            </DockPanel>
 
             <TextBlock Text="Live Voice Transcription &amp; Dialogue" FontSize="15" FontWeight="SemiBold" DockPanel.Dock="Top" Margin="0,0,0,8"/>
             <TextBox x:Name="VoiceTranscriptBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" Background="#0C101A" BorderBrush="{StaticResource BorderBrush}" Padding="14" FontFamily="Consolas" FontSize="13"/>

@@ -25,9 +25,9 @@ import {
 import { canTransition, createFsm, hasSpeechInFlight, tryTransition, type VoiceFsm } from "./voice-fsm.ts";
 import { companionState } from "./voice-companion.ts";
 import { VoiceChunker, chunkAnswer, type SpokenChunk } from "./voice-chunker.ts";
-import { claimsAction, classifyTranscript, controlAction, isSpokenCorrection, type VoiceIntent } from "./voice-intent.ts";
+import { claimsAction, classifyTranscript, controlAction, GENERIC_OBJECTIVE, isSpokenCorrection, type VoiceIntent } from "./voice-intent.ts";
 import { VoiceTurnTaking, echoMatch, echoTokens, type TurnDecision } from "./voice-turn-taking.ts";
-import { answerApprovals, answerFollowUp, answerTeam, answerLastMission, answerModel, answerStatus, answerVerification, humanState, isTerminalAgent, missionLabel, MISSION_OVER, type AgentFact, type ApprovalFact, type FollowUpSubject, type MissionFact } from "./voice-answers.server.ts";
+import { answerApprovals, answerFollowUp, answerTeam, answerLastMission, answerModel, answerStatus, answerVerification, humanState, isTerminalAgent, missionLabel, missionOverNotice, MISSION_OVER, type AgentFact, type ApprovalFact, type FollowUpSubject, type MissionFact } from "./voice-answers.server.ts";
 import { RECENT_ANSWERS_MAX, type RecentAnswer, type SpeakerId } from "./voice-personalization.ts";
 
 export type ListenSource = "button" | "hotkey" | "push_to_talk" | "hands_free";
@@ -281,6 +281,9 @@ export class VoiceSessionManager {
   private fragment: { text: string; turn: string; confidence: number; meta: TurnMeta; depth: number; cancel: (() => void) | null } | null = null;
   /** T12 F4: the last Host-facts list of Agents or Missions. Cleared on close. */
   private referent: Referent | null = null;
+  /** MA5-S2 P3: Missions to announce when they end ("tell me when it finishes"). Ids only; state is re-read each poll. */
+  private watches: { missionId: string; title: string; expiresAt: number }[] = [];
+  private cancelWatchPoll: (() => void) | null = null;
   /** T12 F3: when a spoken Mission draft was last attempted (the rate limit between drafts). */
   private lastDraftAt: number | null = null;
 
@@ -567,6 +570,8 @@ export class VoiceSessionManager {
     // T12 F8: the spoken history and the Host-facts referent end with the session.
     this.history.length = 0;
     this.referent = null;
+    // MA5-S2 P3: a closed session announces nothing later; the watched Missions themselves are untouched.
+    this.clearWatches();
     this.sessionEpoch += 1;
     // races#5: no re-arm or idle timer from the closed session may fire into a later open.
     this.cancelRearmTimer();
@@ -1081,6 +1086,8 @@ export class VoiceSessionManager {
       }
       case "agent_followup":
         return this.handleFollowUp(intent, turn, transcript);
+      case "agent_watch":
+        return this.handleWatch(turn);
       case "chat":
         await this.chat(transcript, turn);
         return;
@@ -1153,6 +1160,85 @@ export class VoiceSessionManager {
         if (finished) this.setReferent("missions", [finished.id], finished.id);
         return answerLastMission(finished);
     }
+  }
+
+  /**
+   * MA5-S2 P3: "tell me when it finishes". Read-only: the Mission is resolved from the last Host-facts referent or the single
+   * unfinished Mission, never guessed among several, and nothing is sent to it. The notice is spoken only while voice is open.
+   */
+  private handleWatch(turn: string) {
+    const referent = this.liveReferent();
+    let mission = referent?.missionId ? this.missionFact(referent.missionId) : null;
+    if (!mission) {
+      const port = this.deps.agents;
+      const active = port.activeMissions?.() ?? port.facts().missions.filter((item) => !MISSION_OVER.includes(item.status));
+      if (active.length === 0) return this.answerHost("No mission is running right now, so there is nothing to watch.", turn);
+      if (active.length > 1) return this.answerHost(`${active.length} missions are running: ${active.slice(0, 3).map((item) => item.title).join(", ")}. Ask about one of them first, then say tell me when it finishes.`, turn);
+      mission = active[0];
+    }
+    this.setReferent("missions", [mission.id], mission.id);
+    if (MISSION_OVER.includes(mission.status)) return this.answerHost(missionOverNotice(mission).replace(/^Update: t/, "T"), turn);
+    if (!this.watches.some((watch) => watch.missionId === mission.id)) {
+      if (this.watches.length >= VOICE_LIMITS.maxWatches) return this.answerHost(`I am already watching ${VOICE_LIMITS.maxWatches} missions. Nothing was added.`, turn);
+      this.watches.push({ missionId: mission.id, title: mission.title, expiresAt: this.now() + VOICE_LIMITS.watchTtlMs });
+    }
+    this.deps.journal("voice.watch", `Completion notice registered for Mission ${mission.id}.`);
+    this.scheduleWatchPoll();
+    this.answerHost(`I'll tell you when the mission ${mission.title} finishes, while voice is open.`, turn);
+  }
+
+  private missionFact(missionId: string): MissionFact | null {
+    const port = this.deps.agents;
+    return port.mission?.(missionId) ?? port.facts().missions.find((item) => item.id === missionId) ?? null;
+  }
+
+  private scheduleWatchPoll() {
+    if (this.cancelWatchPoll || this.watches.length === 0) return;
+    const epoch = this.sessionEpoch;
+    this.cancelWatchPoll = this.schedule(() => {
+      this.cancelWatchPoll = null;
+      if (epoch === this.sessionEpoch) this.pollWatches();
+    }, VOICE_LIMITS.watchPollMs);
+  }
+
+  private clearWatches() {
+    this.watches = [];
+    this.cancelWatchPoll?.();
+    this.cancelWatchPoll = null;
+  }
+
+  /** A notice waits for a quiet moment: never over the user's speech, Bunny's own reply, a held reply or a pending recognition. */
+  private quietForNotice(): boolean {
+    if (this.inference || this.outstanding > 0 || this.hold || this.snap.playing || this.fragment || this.finalizing.size > 0) return false;
+    // The duplex lane can hold an open utterance while the session itself is IDLE.
+    if (this.input?.speechOpen) return false;
+    const state = this.fsm.state;
+    if (state === "IDLE" || state === "MUTED" || state === "INTERRUPTED") return true;
+    return (state === "LISTENING" || state === "ARMING") && this.duplexLane();
+  }
+
+  private pollWatches() {
+    if (!this.snap.open || this.closing) return this.clearWatches();
+    const now = this.now();
+    const before = this.watches.length;
+    this.watches = this.watches.filter((watch) => watch.expiresAt > now);
+    let changed = this.watches.length !== before;
+    const over = this.watches.map((watch) => this.missionFact(watch.missionId)).find((mission): mission is MissionFact => !!mission && MISSION_OVER.includes(mission.status));
+    if (over && this.worker && this.quietForNotice()) {
+      this.watches = this.watches.filter((watch) => watch.missionId !== over.id);
+      this.deps.journal("voice.watch", `Completion notice spoken for Mission ${over.id}.`);
+      const turn = this.newTurn();
+      this.snap.timing = { ...emptyTiming(turn, now), source: "notice", endpointing: null };
+      this.snap.partial = null;
+      this.snap.finalTranscript = null;
+      this.snap.turnKind = "agent_watch";
+      this.setReferent("missions", [over.id], over.id);
+      this.settleForTypedTurn();
+      this.speakAnswer(missionOverNotice(over), "host_facts", turn);
+      changed = false;
+    }
+    if (changed) this.touch();
+    this.scheduleWatchPoll();
   }
 
   /** T12 F6: a verification or model answer names the Mission it describes, and says when that is not the active one. */
@@ -1280,6 +1366,8 @@ export class VoiceSessionManager {
     const now = this.now();
     if (!port.draftMission) return this.answerHost(DRAFT_REFUSAL, turn);
     // Review round 7: a request cut off before its subject ("Prepare a plan for the") drafts nothing.
+    // MA5-S2 P3: "prepare a plan for a new task" names no objective; ask for it, draft nothing.
+    if (GENERIC_OBJECTIVE.test(objective)) return this.answerHost("What should the plan be for? Say, for example, prepare a plan to summarize the inventory file. Nothing was created.", turn);
     if (isCutOffObjective(objective)) return this.answerHost("I couldn't draft that Mission because the request was cut off. Nothing was created. Please say the whole request again.", turn);
     if (this.lastDraftAt !== null && now - this.lastDraftAt < VOICE_LIMITS.voiceDraftMinIntervalMs) return this.answerHost("Please wait a moment before drafting another Mission.", turn);
     // T12 RES-01: counted from canonical state. The recency window of the facts never holds every waiting draft.
@@ -3087,6 +3175,7 @@ export class VoiceSessionManager {
     this.snap.state = this.fsm.state;
     this.snap.updatedAt = this.now();
     this.snap.outputHeld = this.hold !== null;
+    this.snap.watches = this.watches.map((watch) => ({ ...watch }));
     this.trackOutputWindows();
     if (this.snap.duplex) {
       this.snap.duplex.starting = this.duplexStarting;

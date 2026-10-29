@@ -1,0 +1,395 @@
+{
+  "schema": "ma5-s2.voice-latency.v2",
+  "at": "2026-10-29T05:51:11.202Z",
+  "boundaries": {
+    "measured": "Host receipt stamps (VoiceTiming: Host epoch ms) and worker receipts (speak.cancelled wait). Playback start is the worker's playback.started for the null sink.",
+    "notMeasured": "Microphone-to-worker capture delay, speaker output latency and audible silence. The null sink has no render endpoint, so meterSilentMs is null by design. speechEndAt is the Host receipt of the VAD speech_end event, which the worker emits after its 900 ms endpoint silence."
+  },
+  "sections": {
+    "open": {
+      "coldOpenMs": 123,
+      "workerMemoryKb": 23660,
+      "workers": 1
+    },
+    "hostFacts": {
+      "turns": 30,
+      "answerSources": [
+        "host_facts"
+      ],
+      "modelRoutes": 0,
+      "receiptToFirstPlayback": {
+        "n": 30,
+        "p50": 19,
+        "p95": 37,
+        "min": 15,
+        "max": 87
+      }
+    },
+    "bargeIn": {
+      "target": "P95 <= 200 ms, software acknowledgment in controlled tests",
+      "boundary": "workerCancelWaitMs: from the Host's speak.cancel to the worker playback thread's waveOutReset acknowledgment (null sink). Not proof that sound stopped at a speaker.",
+      "samples": 30,
+      "workerCancelAckMs": {
+        "n": 30,
+        "p50": 9.3,
+        "p95": 13.2,
+        "min": 5.6,
+        "max": 14.8
+      },
+      "hostInterruptHttpRoundTripMs": {
+        "n": 30,
+        "p50": 8.5,
+        "p95": 10.4,
+        "min": 7.4,
+        "max": 18.2
+      },
+      "resetPending": 0,
+      "wasPlaying": 30,
+      "droppedChunks": {
+        "n": 30,
+        "p50": 1,
+        "p95": 1,
+        "min": 1,
+        "max": 1
+      },
+      "meterSilentMs": 0
+    },
+    "model": {
+      "question": "In one short sentence, what does a rabbit eat?",
+      "route": {
+        "provider": "ollama",
+        "model": "huihui_ai/qwen2.5-abliterate:7b"
+      },
+      "cold": {
+        "stages": {
+          "activationToFirstAudio": null,
+          "speechEndToFinal": null,
+          "finalToAdmitted": 131,
+          "admittedToFirstToken": 6535,
+          "firstTokenToFirstTts": 863,
+          "firstTtsToPlayback": 1,
+          "speechEndToFirstPlayback": null,
+          "admittedToInferenceDone": 7377
+        },
+        "receiptToFirstPlayback": 7530
+      },
+      "warm": {
+        "finalToAdmitted": {
+          "n": 10,
+          "p50": 83,
+          "p95": 112,
+          "min": 70,
+          "max": 112
+        },
+        "admittedToFirstToken": {
+          "n": 10,
+          "p50": 361,
+          "p95": 414,
+          "min": 184,
+          "max": 414
+        },
+        "firstTokenToFirstTts": {
+          "n": 10,
+          "p50": 547,
+          "p95": 682,
+          "min": 524,
+          "max": 682
+        },
+        "firstTtsToPlayback": {
+          "n": 10,
+          "p50": 0,
+          "p95": 0,
+          "min": 0,
+          "max": 0
+        },
+        "admittedToInferenceDone": {
+          "n": 9,
+          "p50": 906,
+          "p95": 1054,
+          "min": 708,
+          "max": 1054
+        },
+        "speechEndToFinal": {
+          "n": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null
+        },
+        "speechEndToFirstPlayback": {
+          "n": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null
+        },
+        "admittedToFirstPlayback": {
+          "n": 10,
+          "p50": 918,
+          "p95": 1073,
+          "min": 719,
+          "max": 1073
+        },
+        "receiptToFirstPlayback": {
+          "n": 10,
+          "p50": 1006,
+          "p95": 1150,
+          "min": 802,
+          "max": 1150
+        }
+      },
+      "target": "warm first audible model response P50 <= 3000 ms"
+    },
+    "underLoad": {
+      "turns": 6,
+      "agentsActiveAtStart": [
+        1,
+        2,
+        1,
+        2,
+        1,
+        1
+      ],
+      "turnsWithAgentsActive": 6,
+      "warm": {
+        "finalToAdmitted": {
+          "n": 6,
+          "p50": 75,
+          "p95": 186,
+          "min": 69,
+          "max": 186
+        },
+        "admittedToFirstToken": {
+          "n": 6,
+          "p50": 12666,
+          "p95": 21664,
+          "min": 6574,
+          "max": 21664
+        },
+        "firstTokenToFirstTts": {
+          "n": 6,
+          "p50": 491,
+          "p95": 639,
+          "min": 469,
+          "max": 639
+        },
+        "firstTtsToPlayback": {
+          "n": 6,
+          "p50": 0,
+          "p95": 2,
+          "min": 0,
+          "max": 2
+        },
+        "admittedToInferenceDone": {
+          "n": 2,
+          "p50": 7134,
+          "p95": 22274,
+          "min": 7134,
+          "max": 22274
+        },
+        "speechEndToFinal": {
+          "n": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null
+        },
+        "speechEndToFirstPlayback": {
+          "n": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null
+        },
+        "admittedToFirstPlayback": {
+          "n": 6,
+          "p50": 13143,
+          "p95": 22305,
+          "min": 7154,
+          "max": 22305
+        },
+        "receiptToFirstPlayback": {
+          "n": 6,
+          "p50": 13216,
+          "p95": 22380,
+          "min": 7223,
+          "max": 22380
+        }
+      },
+      "hostFactsTurn": {
+        "receiptToFirstPlayback": 66,
+        "answerSource": "host_facts",
+        "modelRoute": null
+      },
+      "voiceCloseDuringMission": {
+        "mission": "18380eae-9ba1-401a-a82d-2feeb0b339a6",
+        "before": "running",
+        "afterClose": "running",
+        "workersAfterClose": 0
+      },
+      "missions": {
+        "count": 4,
+        "finalStates": [
+          "completed",
+          "completed",
+          "completed",
+          "completed"
+        ],
+        "stoppedByVoice": 0
+      }
+    },
+    "endToEnd": {
+      "input": "SAPI-synthesized phrase via --input-synth, VAD endpointing (half duplex), worker recognizer",
+      "transcripts": [
+        "In one short sentence what does a rabbit each"
+      ],
+      "routes": [
+        "huihui_ai/qwen2.5-abliterate:7b"
+      ],
+      "warm": {
+        "finalToAdmitted": {
+          "n": 5,
+          "p50": 71,
+          "p95": 83,
+          "min": 69,
+          "max": 83
+        },
+        "admittedToFirstToken": {
+          "n": 5,
+          "p50": 370,
+          "p95": 584,
+          "min": 185,
+          "max": 584
+        },
+        "firstTokenToFirstTts": {
+          "n": 5,
+          "p50": 486,
+          "p95": 567,
+          "min": 377,
+          "max": 567
+        },
+        "firstTtsToPlayback": {
+          "n": 5,
+          "p50": 0,
+          "p95": 0,
+          "min": 0,
+          "max": 0
+        },
+        "admittedToInferenceDone": {
+          "n": 1,
+          "p50": 945,
+          "p95": 945,
+          "min": 945,
+          "max": 945
+        },
+        "speechEndToFinal": {
+          "n": 5,
+          "p50": 8,
+          "p95": 8,
+          "min": 0,
+          "max": 8
+        },
+        "speechEndToFirstPlayback": {
+          "n": 5,
+          "p50": 937,
+          "p95": 1137,
+          "min": 637,
+          "max": 1137
+        },
+        "admittedToFirstPlayback": {
+          "n": 5,
+          "p50": 858,
+          "p95": 1046,
+          "min": 562,
+          "max": 1046
+        },
+        "receiptToFirstPlayback": {
+          "n": 5,
+          "p50": 5525,
+          "p95": 5733,
+          "min": 5219,
+          "max": 5733
+        }
+      },
+      "endpointSilenceMs": 900,
+      "note": "speechEndToFirstPlayback starts at the VAD speech_end receipt, which follows 900 ms of endpoint silence after the last word."
+    },
+    "stt": {
+      "fixture": "SAPI-synthesized phrase via --input-synth; not human speech",
+      "selection": {
+        "engine": "sapi",
+        "reason": "bunny-whisper-shim.dll differs from the pin"
+      },
+      "engines": {
+        "Windows SAPI 5.4 System.Speech (MS-1033-80-DESK)": {
+          "runs": [
+            {
+              "readyMs": 162,
+              "speechEndToResultMs": 15,
+              "result": "stt.final",
+              "confidence": 0.4946562647819519,
+              "text": "What are my agents working on"
+            },
+            {
+              "readyMs": 127,
+              "speechEndToResultMs": 14,
+              "result": "stt.final",
+              "confidence": 0.4946562647819519,
+              "text": "What are my agents working on"
+            },
+            {
+              "readyMs": 137,
+              "speechEndToResultMs": 15,
+              "result": "stt.final",
+              "confidence": 0.4946562647819519,
+              "text": "What are my agents working on"
+            },
+            {
+              "readyMs": 119,
+              "speechEndToResultMs": 11,
+              "result": "stt.final",
+              "confidence": 0.4946562647819519,
+              "text": "What are my agents working on"
+            },
+            {
+              "readyMs": 124,
+              "speechEndToResultMs": 13,
+              "result": "stt.final",
+              "confidence": 0.4946562647819519,
+              "text": "What are my agents working on"
+            }
+          ],
+          "readyMs": {
+            "n": 5,
+            "p50": 127,
+            "p95": 162,
+            "min": 119,
+            "max": 162
+          },
+          "speechEndToResultMs": {
+            "n": 5,
+            "p50": 14,
+            "p95": 15,
+            "min": 11,
+            "max": 15
+          }
+        }
+      }
+    },
+    "cleanup": {
+      "voiceWorkersAfterClose": 0
+    }
+  },
+  "localModels": [
+    "huihui_ai/qwen2.5-abliterate:7b",
+    "huihui_ai/Qwen3.8-abliterated:27b",
+    "huihui_ai/qwen3-abliterated:30b",
+    "qwen2.5-coder:7b"
+  ],
+  "speechEngine": {
+    "engine": "sapi",
+    "reason": "bunny-whisper-shim.dll differs from the pin"
+  },
+  "failure": null,
+  "workersAfterShutdown": 0
+}

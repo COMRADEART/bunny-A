@@ -107,6 +107,7 @@ export function answerTeam(question: string, agents: AgentFact[], missions: Miss
   const working = (agent: AgentFact) => agent.state === "RUNNING" || agent.state === "VERIFYING";
   const doing = (agent: AgentFact) => (agent.task ? KIND_WORD[agent.task.kind] ?? agent.task.kind : "no task right now");
   const named = (agent: AgentFact) => (agent.role ? `the ${ROLE_WORD[agent.role] ?? agent.role} agent` : agent.name);
+  if (question === "any_failed") return answerFailures(missions);
   if (question === "count") {
     const active = agents.filter((agent) => !isTerminalAgent(agent.state));
     // The Coordinator represents the team and owns no task of its own, so it is never counted as working.
@@ -234,6 +235,29 @@ export function answerMissionFinished(missions: MissionFact[]): string {
   if (mission.status === "failed") return `The mission ${mission.title} has failed.`;
   if (mission.status === "stopped") return `The mission ${mission.title} was stopped.`;
   return `The mission ${mission.title} has not finished. It is ${humanState(mission.status)}.`;
+}
+
+/** MA5-S2 P3: "what failed?" across every recorded Mission, plain or team, newest first (at most three named). */
+export function answerFailures(missions: MissionFact[]): string {
+  const failed = missions
+    .filter((mission) => mission.status === "failed" || mission.steps.some((step) => step.status === "failed" && !step.team?.superseded))
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+  if (!failed.length) return missions.length ? "Nothing has failed in the recorded Missions." : "No mission is recorded.";
+  return failed
+    .slice(0, 3)
+    .map((mission) => {
+      const steps = mission.steps.filter((step) => step.status === "failed" && !step.team?.superseded).map((step) => step.title);
+      const head = mission.status === "failed" ? `The mission ${mission.title} failed` : `The mission ${mission.title} is ${humanState(mission.status)}`;
+      return `${head}${steps.length ? `; failed ${steps.length === 1 ? "task" : "tasks"}: ${steps.join("; ")}` : ""}.`;
+    })
+    .join(" ");
+}
+
+/** MA5-S2 P3: the spoken notice when a watched Mission ends. Read from the canonical record at that moment. */
+export function missionOverNotice(mission: MissionFact): string {
+  if (mission.status === "completed") return `Update: the mission ${mission.title} has finished.`;
+  if (mission.status === "failed") return `Update: the mission ${mission.title} has failed.`;
+  return `Update: the mission ${mission.title} was stopped.`;
 }
 
 /** The Mission a follow-up or a Host answer is about. An Agent subject carries its own Mission when it has one. */

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { VoiceSessionManager, type VoiceTaskEvent } from "./voice-session.server.ts";
+import type { MissionFact } from "./voice-answers.server.ts";
 import type { VoiceWorkerPort } from "./voice-worker.server.ts";
 import { VOICE_LIMITS, VOICE_PROTOCOL, type WorkerCommand, type WorkerEvent } from "./voice-protocol.ts";
 import { VoiceTurnTaking, echoMatch, echoOverlap, echoTokens, tokenize, type TurnEvidence } from "./voice-turn-taking.ts";
@@ -47,7 +48,7 @@ const SENTENCE = "The moon circles Earth once every twenty seven days and always
 type Capture = Extract<WorkerCommand, { op: "capture.start" }>;
 
 /** A virtual clock: `advance` fires every timer due within the window, in order. Real time is never used. */
-async function harness(options: { softBudget?: number; hardBudget?: number; duplex?: boolean } = {}) {
+async function harness(options: { softBudget?: number; hardBudget?: number; duplex?: boolean; /** MA5-S2 P3: canonical Mission rows (mutable by the test). */ missions?: MissionFact[] } = {}) {
   let clock = 10_000;
   const timers: { at: number; fn: () => void; done: boolean }[] = [];
   const schedule = (fn: () => void, ms: number) => {
@@ -110,7 +111,8 @@ async function harness(options: { softBudget?: number; hardBudget?: number; dupl
     },
     agents: {
       rows: () => [{ id: "a1", name: "Builder", state: "RUNNING", revision: 3 }],
-      facts: () => ({ agents: [], missions: [], approvals: [] }),
+      facts: () => ({ agents: [], missions: (options.missions ?? []).map((m) => ({ ...m })), approvals: [] }),
+      ...(options.missions ? { activeMissions: () => options.missions!.filter((m) => !["completed", "failed", "stopped"].includes(m.status)).map((m) => ({ ...m })), mission: (id: string) => options.missions!.find((m) => m.id === id) ?? null } : {}),
       draftMission: (input: { objective: string; projectId: string | null }) => {
         drafted.push(input);
         return { id: `draft-${drafted.length}`, title: input.objective.slice(0, 40), state: "waiting_for_approval" };
@@ -1750,4 +1752,32 @@ test("T12 review r7: a cut-off draft that timed out creates nothing, and a worke
   await tick();
   assert.equal(m.admissions.length, 0, "a worker-reported mute dropped the held words");
   await m.session.close();
+});
+
+test("MA5-S2 P3: a completion notice waits while the user speaks and never closes the hands-free microphone", async () => {
+  const missions: MissionFact[] = [{ id: "m1", title: "Inventory report", status: "running", updatedAt: 1, steps: [] }];
+  const h = await harness({ missions });
+  await h.begin();
+  await h.session.text("Tell me when the mission finishes.");
+  const ack = h.session.snapshot();
+  assert.match(ack.answer ?? "", /^I'll tell you when the mission Inventory report finishes/);
+  h.worker().emit({ ev: "playback.idle", turn: ack.turnId, gen: ack.generation });
+  await tick();
+  const speaks = () => h.worker().sent.filter((c) => c.op === "speak").length;
+  // The user starts talking; the Mission ends meanwhile. Nothing is said over the user.
+  h.emitInput({ ev: "vad", state: "speech_start" });
+  missions[0].status = "completed";
+  const before = speaks();
+  h.advance(VOICE_LIMITS.watchPollMs);
+  assert.equal(speaks(), before, `no notice while the user speaks: ${JSON.stringify(h.worker().sent.filter((c) => c.op === "speak" || c.op === "capture.start" || c.op === "capture.abort").map((c) => [c.op, (c as { text?: string; turn?: string }).text ?? (c as { turn?: string }).turn]))} state=${h.session.snapshot().state} input=${h.session.snapshot().inputTurnId}`);
+  // The utterance ends with nothing recognized; at the next quiet poll the notice is spoken on the open duplex lane.
+  h.emitInput({ ev: "vad", state: "speech_end", speechMs: 120, short: true });
+  h.emitInput({ ev: "stt.none", reason: "too_short" });
+  await tick();
+  h.advance(VOICE_LIMITS.watchPollMs);
+  const spoken = h.worker().sent.filter((c) => c.op === "speak").map((c) => (c as { text: string }).text).join(" ");
+  assert.match(spoken, /Update: the mission Inventory report has finished\./);
+  assert.equal(h.worker().sent.some((c) => c.op === "duplex.stop"), false, "the notice never stops the echo-cancelled lane");
+  assert.equal(h.session.snapshot().duplex?.active, true);
+  assert.deepEqual(h.controls, [], "read-only: no Agent command");
 });

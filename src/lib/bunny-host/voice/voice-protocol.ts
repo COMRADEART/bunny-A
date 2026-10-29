@@ -155,6 +155,7 @@ export type VoiceTurnKind =
   | "mission_control" // T12: "stop the mission" -> screen-confirmed mission.stop proposal (never folded into agent.stop)
   | "mission_draft" // T12: "prepare a plan for X" -> a Mission DRAFT via canonical mission.create; approval/start stay on screen
   | "speech_stop" // T12: "stop", "wait", "be quiet", "stop talking": silences Bunny's speech only; never an Agent or Mission control
+  | "agent_watch" // MA5-S2 P3: "tell me when it finishes": a read-only spoken notice when a watched Mission ends
   | "agent_followup" // T12: "did it finish?", "what about the second one?": a Host-facts follow-up resolved against the last referent
   | "open_ui" // open Agentic workspace / show results
   | "confirm" // spoken confirmation of a pending voice proposal (pause only)
@@ -303,6 +304,8 @@ export type VoiceSnapshot = {
   /** Inference route of the current chat turn, as the router reported it. Model may be "UNKNOWN", never invented. */
   route: { taskId: string; provider: string; model: string } | null;
   proposal: VoiceProposal | null;
+  /** MA5-S2 P3: Missions this session will announce when they end. In memory only: a closed session or a new Host drops them. */
+  watches?: { missionId: string; title: string; expiresAt: number }[];
   clarification: { question: string; candidates: { id: string; name: string }[]; expiresAt: number } | null;
   /** One-shot UI request the clients may honor (open a workspace); carries no authority. */
   uiIntent: { seq: number; kind: "open_agentic" | "open_agent" | "open_approvals" | "open_accounts"; agentId: string | null } | null;
@@ -377,6 +380,10 @@ export const VOICE_LIMITS = {
   maxWaitingVoiceTasks: 3,
   /** T12: a spoken follow-up ("did it finish?", "the second one") resolves against the last Host-facts subject this long. */
   referentTtlMs: 180_000,
+  /** MA5-S2 P3: at most this many completion notices per session, each for at most this long, checked at this interval. */
+  maxWatches: 3,
+  watchTtlMs: 60 * 60_000,
+  watchPollMs: 2_000,
   proposalTtlMs: 30_000,
   clarificationTtlMs: 30_000,
   workerStdinSoftBudget: 384 * 1024, // the F04 interactive budget is 512 KiB cumulative per group; relaunch at idle before it
