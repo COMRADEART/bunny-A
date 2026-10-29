@@ -1,0 +1,393 @@
+{
+  "schema": "ma5-s2.voice-latency.v2",
+  "at": "2026-10-29T05:46:31.876Z",
+  "boundaries": {
+    "measured": "Host receipt stamps (VoiceTiming: Host epoch ms) and worker receipts (speak.cancelled wait). Playback start is the worker's playback.started for the null sink.",
+    "notMeasured": "Microphone-to-worker capture delay, speaker output latency and audible silence. The null sink has no render endpoint, so meterSilentMs is null by design. speechEndAt is the Host receipt of the VAD speech_end event, which the worker emits after its 900 ms endpoint silence."
+  },
+  "sections": {
+    "open": {
+      "coldOpenMs": 312,
+      "workerMemoryKb": 228920,
+      "workers": 1
+    },
+    "hostFacts": {
+      "turns": 30,
+      "answerSources": [
+        "host_facts"
+      ],
+      "modelRoutes": 0,
+      "receiptToFirstPlayback": {
+        "n": 30,
+        "p50": 16,
+        "p95": 22,
+        "min": 15,
+        "max": 91
+      }
+    },
+    "bargeIn": {
+      "target": "P95 <= 200 ms, software acknowledgment in controlled tests",
+      "boundary": "workerCancelWaitMs: from the Host's speak.cancel to the worker playback thread's waveOutReset acknowledgment (null sink). Not proof that sound stopped at a speaker.",
+      "samples": 30,
+      "workerCancelAckMs": {
+        "n": 30,
+        "p50": 9.8,
+        "p95": 13.2,
+        "min": 1.9,
+        "max": 15
+      },
+      "hostInterruptHttpRoundTripMs": {
+        "n": 30,
+        "p50": 7.8,
+        "p95": 12.3,
+        "min": 7.2,
+        "max": 14
+      },
+      "resetPending": 0,
+      "wasPlaying": 30,
+      "droppedChunks": {
+        "n": 30,
+        "p50": 1,
+        "p95": 1,
+        "min": 1,
+        "max": 1
+      },
+      "meterSilentMs": 0
+    },
+    "model": {
+      "question": "In one short sentence, what does a rabbit eat?",
+      "route": {
+        "provider": "ollama",
+        "model": "huihui_ai/qwen2.5-abliterate:7b"
+      },
+      "cold": {
+        "stages": {
+          "activationToFirstAudio": null,
+          "speechEndToFinal": null,
+          "finalToAdmitted": 107,
+          "admittedToFirstToken": 6093,
+          "firstTokenToFirstTts": 594,
+          "firstTtsToPlayback": 0,
+          "speechEndToFirstPlayback": null,
+          "admittedToInferenceDone": 6666
+        },
+        "receiptToFirstPlayback": 6794
+      },
+      "warm": {
+        "finalToAdmitted": {
+          "n": 10,
+          "p50": 82,
+          "p95": 87,
+          "min": 76,
+          "max": 87
+        },
+        "admittedToFirstToken": {
+          "n": 10,
+          "p50": 345,
+          "p95": 400,
+          "min": 200,
+          "max": 400
+        },
+        "firstTokenToFirstTts": {
+          "n": 10,
+          "p50": 547,
+          "p95": 579,
+          "min": 538,
+          "max": 579
+        },
+        "firstTtsToPlayback": {
+          "n": 10,
+          "p50": 0,
+          "p95": 1,
+          "min": 0,
+          "max": 1
+        },
+        "admittedToInferenceDone": {
+          "n": 10,
+          "p50": 873,
+          "p95": 960,
+          "min": 721,
+          "max": 960
+        },
+        "speechEndToFinal": {
+          "n": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null
+        },
+        "speechEndToFirstPlayback": {
+          "n": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null
+        },
+        "admittedToFirstPlayback": {
+          "n": 10,
+          "p50": 892,
+          "p95": 980,
+          "min": 747,
+          "max": 980
+        },
+        "receiptToFirstPlayback": {
+          "n": 10,
+          "p50": 968,
+          "p95": 1064,
+          "min": 828,
+          "max": 1064
+        }
+      },
+      "target": "warm first audible model response P50 <= 3000 ms"
+    },
+    "underLoad": {
+      "turns": 6,
+      "agentsActiveAtStart": [
+        1,
+        1,
+        2,
+        1,
+        2,
+        1
+      ],
+      "turnsWithAgentsActive": 6,
+      "warm": {
+        "finalToAdmitted": {
+          "n": 6,
+          "p50": 74,
+          "p95": 75,
+          "min": 67,
+          "max": 75
+        },
+        "admittedToFirstToken": {
+          "n": 6,
+          "p50": 12179,
+          "p95": 18494,
+          "min": 7090,
+          "max": 18494
+        },
+        "firstTokenToFirstTts": {
+          "n": 6,
+          "p50": 476,
+          "p95": 604,
+          "min": 471,
+          "max": 604
+        },
+        "firstTtsToPlayback": {
+          "n": 6,
+          "p50": 0,
+          "p95": 1,
+          "min": 0,
+          "max": 1
+        },
+        "admittedToInferenceDone": {
+          "n": 2,
+          "p50": 12165,
+          "p95": 15807,
+          "min": 12165,
+          "max": 15807
+        },
+        "speechEndToFinal": {
+          "n": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null
+        },
+        "speechEndToFirstPlayback": {
+          "n": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null
+        },
+        "admittedToFirstPlayback": {
+          "n": 6,
+          "p50": 12653,
+          "p95": 18995,
+          "min": 7573,
+          "max": 18995
+        },
+        "receiptToFirstPlayback": {
+          "n": 6,
+          "p50": 12728,
+          "p95": 19069,
+          "min": 7640,
+          "max": 19069
+        }
+      },
+      "hostFactsTurn": {
+        "receiptToFirstPlayback": 99,
+        "answerSource": "host_facts",
+        "modelRoute": null
+      },
+      "voiceCloseDuringMission": {
+        "mission": "f339e61e-a6bf-4213-8130-57357def4729",
+        "before": "running",
+        "afterClose": "running",
+        "workersAfterClose": 0
+      },
+      "missions": {
+        "count": 4,
+        "finalStates": [
+          "completed",
+          "completed",
+          "completed",
+          "completed"
+        ],
+        "stoppedByVoice": 0
+      }
+    },
+    "endToEnd": {
+      "input": "SAPI-synthesized phrase via --input-synth, VAD endpointing (half duplex), worker recognizer",
+      "transcripts": [
+        "In one short sentence, what does a rabbit eat?"
+      ],
+      "routes": [
+        "huihui_ai/qwen2.5-abliterate:7b"
+      ],
+      "warm": {
+        "finalToAdmitted": {
+          "n": 5,
+          "p50": 73,
+          "p95": 74,
+          "min": 67,
+          "max": 74
+        },
+        "admittedToFirstToken": {
+          "n": 5,
+          "p50": 380,
+          "p95": 436,
+          "min": 187,
+          "max": 436
+        },
+        "firstTokenToFirstTts": {
+          "n": 5,
+          "p50": 428,
+          "p95": 495,
+          "min": 300,
+          "max": 495
+        },
+        "firstTtsToPlayback": {
+          "n": 5,
+          "p50": 0,
+          "p95": 0,
+          "min": 0,
+          "max": 0
+        },
+        "admittedToInferenceDone": {
+          "n": 0,
+          "p50": null,
+          "p95": null,
+          "min": null,
+          "max": null
+        },
+        "speechEndToFinal": {
+          "n": 5,
+          "p50": 1022,
+          "p95": 1028,
+          "min": 1011,
+          "max": 1028
+        },
+        "speechEndToFirstPlayback": {
+          "n": 5,
+          "p50": 1878,
+          "p95": 1960,
+          "min": 1755,
+          "max": 1960
+        },
+        "admittedToFirstPlayback": {
+          "n": 5,
+          "p50": 793,
+          "p95": 880,
+          "min": 658,
+          "max": 880
+        },
+        "receiptToFirstPlayback": {
+          "n": 5,
+          "p50": 6173,
+          "p95": 6253,
+          "min": 6038,
+          "max": 6253
+        }
+      },
+      "endpointSilenceMs": 900,
+      "note": "speechEndToFirstPlayback starts at the VAD speech_end receipt, which follows 900 ms of endpoint silence after the last word."
+    },
+    "stt": {
+      "fixture": "SAPI-synthesized phrase via --input-synth; not human speech",
+      "selection": {
+        "engine": "whisper"
+      },
+      "engines": {
+        "whisper.cpp v1.9.4 (ggml-base.en)": {
+          "runs": [
+            {
+              "readyMs": 277,
+              "speechEndToResultMs": 896,
+              "result": "stt.final",
+              "confidence": 0.9670519232749939,
+              "text": "What are my agents working on?"
+            },
+            {
+              "readyMs": 273,
+              "speechEndToResultMs": 901,
+              "result": "stt.final",
+              "confidence": 0.9670519232749939,
+              "text": "What are my agents working on?"
+            },
+            {
+              "readyMs": 273,
+              "speechEndToResultMs": 901,
+              "result": "stt.final",
+              "confidence": 0.9670519232749939,
+              "text": "What are my agents working on?"
+            },
+            {
+              "readyMs": 281,
+              "speechEndToResultMs": 887,
+              "result": "stt.final",
+              "confidence": 0.9670519232749939,
+              "text": "What are my agents working on?"
+            },
+            {
+              "readyMs": 279,
+              "speechEndToResultMs": 891,
+              "result": "stt.final",
+              "confidence": 0.9670519232749939,
+              "text": "What are my agents working on?"
+            }
+          ],
+          "readyMs": {
+            "n": 5,
+            "p50": 277,
+            "p95": 281,
+            "min": 273,
+            "max": 281
+          },
+          "speechEndToResultMs": {
+            "n": 5,
+            "p50": 896,
+            "p95": 901,
+            "min": 887,
+            "max": 901
+          }
+        }
+      }
+    },
+    "cleanup": {
+      "voiceWorkersAfterClose": 0
+    }
+  },
+  "localModels": [
+    "huihui_ai/qwen2.5-abliterate:7b",
+    "huihui_ai/Qwen3.8-abliterated:27b",
+    "huihui_ai/qwen3-abliterated:30b",
+    "qwen2.5-coder:7b"
+  ],
+  "speechEngine": {
+    "engine": "whisper"
+  },
+  "failure": null,
+  "workersAfterShutdown": 0
+}
