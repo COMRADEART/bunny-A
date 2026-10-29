@@ -30,7 +30,10 @@ public sealed record TaskRow(
     bool CanResume = false,
     // "orch" (direct task), "mission" or "ptask": the one Host command family that may act on this row.
     string Kind = "orch",
-    string? Progress = null
+    string? Progress = null,
+    // MA5-S2: a team Mission's Coordinator Agent (from the Host's teamView), which owns its start/pause/stop/approval.
+    string? CoordinatorId = null,
+    bool CanStartTeam = false
 )
 {
     public override string ToString() =>

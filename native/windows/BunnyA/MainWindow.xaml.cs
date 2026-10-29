@@ -44,6 +44,7 @@ public partial class MainWindow : Window
     private string chatModelSignature = "";
 
     private List<PendingApprovalItem> currentApprovals = new();
+    private List<TaskRow> currentTaskRows = new();
     private readonly Dictionary<string, (bool ok, string scope, string effects, string context)> inspected = new();
     private readonly List<string> decisions = new();
 
@@ -329,12 +330,40 @@ public partial class MainWindow : Window
             var mTitle = mission.Json("title") ?? "Mission";
             var mState = mission.Json("state") ?? "unknown";
             var progress = mission.JsonObj("progress");
-            var row = new TaskRow(mId, $"[Mission] {mTitle}", mState.ToUpperInvariant(),
+            // MA5-S2: a team Mission is controlled through its Coordinator, identified by the Host's teamView (never guessed).
+            var teamView = mission.JsonObj("teamView");
+            var coordinatorId = teamView.ValueKind == JsonValueKind.Object ? teamView.Json("coordinatorAgentId") : null;
+            var coordinator = coordinatorId == null ? default : AgentRow(root, coordinatorId);
+            var cState = coordinator.ValueKind == JsonValueKind.Object ? coordinator.Json("state") : null;
+            var row = new TaskRow(mId, $"[{(coordinatorId != null ? "Team" : "Mission")}] {mTitle}", mState.ToUpperInvariant(),
                 Progress: progress.ValueKind == JsonValueKind.Object ? $"{progress.JsonLong("completed")}/{progress.JsonLong("total")} steps done" : null,
-                CanCancel: mState is "draft" or "planning" or "waiting_for_approval" or "ready" or "running" or "waiting_for_user" or "verifying", Kind: "mission");
+                CanCancel: coordinatorId != null ? cState is not (null or "COMPLETED" or "FAILED" or "STOPPED")
+                    : mState is "draft" or "planning" or "waiting_for_approval" or "ready" or "running" or "waiting_for_user" or "verifying",
+                CanPause: coordinatorId != null && AgentStarted(coordinator)
+                    && cState is "PLANNING" or "RUNNING" or "VERIFYING" or "WAITING_FOR_DEPENDENCY" or "WAITING_FOR_USER",
+                CanResume: cState == "PAUSED",
+                Kind: "mission", CoordinatorId: coordinatorId,
+                CanStartTeam: cState == "CREATED" && !AgentStarted(coordinator));
             (mState is "completed" or "failed" or "stopped" ? historyTasks : activeTasks).Add(row);
 
-            if (mState == "waiting_for_approval")
+            if (coordinatorId != null)
+            {
+                // A team plan is reviewable only once its Planner proposed it; before that the team is started, not approved.
+                var reference = teamView.Json("planReference");
+                if (mState == "waiting_for_approval" && teamView.Json("phase") == "review" && reference != null)
+                {
+                    var plan = string.Join("\n", mission.JsonArr("steps").Where(s => s.JsonObj("team").ValueKind == JsonValueKind.Object && s.Json("state") != "skipped")
+                        .Select(s => $"{s.JsonObj("team").Json("key")} · {s.JsonObj("team").Json("role")} · {s.JsonObj("team").Json("kind")}: {s.Json("objective")}"));
+                    var reqs = string.Join("\n", teamView.JsonArr("requirements").Select(r => $"{r.Json("id")}: {r.Json("text")}"));
+                    approvals.Add(new PendingApprovalItem(
+                        TaskId: mId, TaskTitle: mTitle, ActionId: coordinatorId, OperationKind: "agent.team.approve",
+                        Summary: $"Team plan: {mTitle}", PayloadSha256: reference, Category: "team_plan", Reversible: true, ExpiresAt: 0,
+                        Scope: $"Output folder {teamView.Json("outputDir")} only · {teamView.JsonArr("members").Count()} agents · plan revisions {teamView.JsonLong("planRevisions")}",
+                        ProposedDiff: $"Objective: {mission.Json("objective")}\n\nRequirements:\n{reqs}\n\nPlan:\n{plan}",
+                        ExpectedEffects: "Approves this exact team plan through its Coordinator and starts the members."));
+                }
+            }
+            else if (mState == "waiting_for_approval")
             {
                 var plan = string.Join("\n", mission.JsonArr("steps").Select(s => $"{s.JsonLong("index") + 1}. [{s.Json("role")}] {s.Json("objective")}"));
                 approvals.Add(new PendingApprovalItem(
@@ -434,6 +463,7 @@ public partial class MainWindow : Window
         {
             SetItems(ActiveTasksList, activeTasks, r => r.Id);
             SetItems(TaskHistoryList, historyTasks, r => r.Id);
+            currentTaskRows = [.. activeTasks, .. historyTasks];
             currentApprovals = approvals;
             SetItems(PendingApprovalsList, approvals, a => a.Key);
         }
@@ -643,8 +673,21 @@ public partial class MainWindow : Window
         MessageBox.Show(this, message, title, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes;
 
     /// <summary>Stops one item with the single command its kind accepts; nothing guesses between command families.</summary>
+    /// <summary>A run record can exist before anything ran; only a Host start time means the Agent actually started.</summary>
+    private static bool AgentStarted(JsonElement agent) =>
+        agent.ValueKind == JsonValueKind.Object && agent.JsonObj("run").ValueKind == JsonValueKind.Object && agent.JsonObj("run").JsonLong("startedAt") > 0;
+
+    private static JsonElement AgentRow(JsonElement root, string agentId) =>
+        root.JsonObj("agents").JsonArr("agents").FirstOrDefault(a => a.Json("id") == agentId);
+
     public async Task StopItemAsync(string kind, string id, string reason)
     {
+        // A team stops through its Coordinator, which stops every member (scope "team" in the Host's lifecycle).
+        if (kind == "mission" && currentTaskRows.FirstOrDefault(r => r.Id == id)?.CoordinatorId is { } coordinator)
+        {
+            await RunCommandAsync("agent.stop", new { id = coordinator }, "Stop Failed");
+            return;
+        }
         _ = kind switch
         {
             "mission" => await RunCommandAsync("mission.stop", new { id }, "Stop Failed"),
@@ -939,9 +982,49 @@ public partial class MainWindow : Window
     {
         var row = ActiveTasksList.SelectedItem as TaskRow;
         CancelActiveTaskButton.IsEnabled = row?.CanCancel == true;
-        PauseTaskButton.IsEnabled = row is { Kind: "ptask", CanPause: true };
-        ResumeTaskButton.IsEnabled = row is { Kind: "ptask", CanResume: true };
-        RunWithAgentsButton.IsEnabled = row is { Kind: "mission", State: "WAITING_FOR_APPROVAL" };
+        PauseTaskButton.IsEnabled = row is { Kind: "ptask", CanPause: true } or { Kind: "mission", CoordinatorId: not null, CanPause: true };
+        ResumeTaskButton.IsEnabled = row is { Kind: "ptask", CanResume: true } or { Kind: "mission", CoordinatorId: not null, CanResume: true };
+        StartTeamButton.IsEnabled = row is { CanStartTeam: true };
+        RunWithAgentsButton.IsEnabled = row is { Kind: "mission", State: "WAITING_FOR_APPROVAL" } && currentApprovals.Any(a => a.TaskId == row.Id);
+    }
+
+    /// <summary>
+    /// MA5-S2: a team as the Host reports it. Agent states come from the Agent runtime; a configured or created member is
+    /// never shown as working. Reviewer findings are advisory; requirement verdicts are Bunny's own Tester checks.
+    /// </summary>
+    private string TeamSummary(JsonElement mission, string coordinatorId)
+    {
+        var view = mission.JsonObj("teamView");
+        var agents = lastRoot.JsonObj("agents").JsonArr("agents").ToList();
+        string RoleOf(string? agentId) => agents.FirstOrDefault(a => a.Json("id") == agentId).JsonObj("team").Json("role") ?? "Bunny";
+        var coordinator = agents.FirstOrDefault(a => a.Json("id") == coordinatorId);
+        var lines = new List<string>
+        {
+            $"Team · Coordinator “{coordinator.Json("name") ?? "?"}” {(AgentStarted(coordinator) ? coordinator.Json("state") : "not started")} · phase {view.Json("phase")} · output folder {view.Json("outputDir")}",
+        };
+        foreach (var a in agents.Where(a => a.Json("missionId") == mission.Json("id") && a.JsonObj("team").ValueKind == JsonValueKind.Object && a.Json("id") != coordinatorId))
+        {
+            var current = a.JsonObj("current");
+            var owned = a.JsonObj("owned");
+            var failure = a.JsonObj("failure");
+            // The Agent state names a role phase (a Planner is PLANNING from team creation, with its step still pending);
+            // "working" is claimed only while the Host reports the member's current step running or verifying.
+            var working = current.ValueKind == JsonValueKind.Object && current.Json("state") is "running" or "verifying";
+            lines.Add($"  {a.JsonObj("team").Json("role"),-12} {(working ? "working" : "idle")} · Host state {(AgentStarted(a) ? a.Json("state") : "not started")}" +
+                (current.ValueKind == JsonValueKind.Object ? $" · {current.Json("kind")} ({current.Json("state")}){(current.Json("model") is { } m ? $" · {current.Json("provider")} · {m}" : "")}" : "") +
+                (owned.ValueKind == JsonValueKind.Object ? $" · {owned.JsonLong("verified")}/{owned.JsonLong("total")} verified, {owned.JsonLong("failed")} failed" : "") +
+                (failure.ValueKind == JsonValueKind.Object ? $" · FAILED {failure.Json("code")}: {failure.Json("detail")}" : ""));
+        }
+        var handoffs = view.JsonArr("handoffs").TakeLast(8).Select(h =>
+            $"  {RoleOf(h.Json("sourceAgentId"))} → {RoleOf(h.Json("destinationAgentId"))} · {h.Json("artifactType")} sha {(h.Json("artifactSha256") ?? "")[..Math.Min(12, (h.Json("artifactSha256") ?? "").Length)]} · {h.Json("purpose")} · {h.Json("state")}").ToList();
+        if (handoffs.Count > 0) lines.Add("Handoffs:"); lines.AddRange(handoffs);
+        var requirements = view.JsonArr("requirementResults").Select(r =>
+        {
+            var passed = r.TryGetProperty("passed", out var p) ? p.ValueKind : JsonValueKind.Null;
+            return $"  {r.Json("id")} {(passed == JsonValueKind.True ? "PASSED (Host check)" : passed == JsonValueKind.False ? "FAILED (Host check)" : "not checked yet")} · {r.Json("text")}";
+        }).ToList();
+        if (requirements.Count > 0) lines.Add("Requirements:"); lines.AddRange(requirements);
+        return string.Join("\n", lines);
     }
 
     private void RenderMissionSteps()
@@ -950,9 +1033,12 @@ public partial class MainWindow : Window
         {
             MissionStepsHeader.Text = "Select a Mission to see its Host-reported steps.";
             MissionStepsList.ItemsSource = null;
+            MissionTeamText.Visibility = Visibility.Collapsed;
             return;
         }
         var mission = lastRoot.JsonObj("missions").JsonArr("missions").FirstOrDefault(m => m.Json("id") == row.Id);
+        MissionTeamText.Text = row.CoordinatorId is { } coordinatorId ? TeamSummary(mission, coordinatorId) : "";
+        MissionTeamText.Visibility = row.CoordinatorId != null ? Visibility.Visible : Visibility.Collapsed;
         var steps = mission.JsonArr("steps").Select(s =>
         {
             var result = s.JsonObj("result");
@@ -960,7 +1046,9 @@ public partial class MainWindow : Window
             var verified = result.ValueKind != JsonValueKind.Object ? null
                 : flag == JsonValueKind.True ? "Host-verified" : flag == JsonValueKind.False ? "verification failed" : "not verified";
             var task = s.Json("taskId") is { } tid ? FindTask(tid) : null;
-            return new StepRow(s.Json("id") ?? "", $"Step {s.JsonLong("index") + 1}", (s.Json("state") ?? "unknown").ToUpperInvariant(), s.Json("role"),
+            var team = s.JsonObj("team");
+            var role = team.ValueKind == JsonValueKind.Object ? $"{team.Json("role")} · {team.Json("kind")}{(team.JsonLong("round") > 0 ? $" · rework {team.JsonLong("round")}" : "")}" : s.Json("role");
+            return new StepRow(s.Json("id") ?? "", $"Step {s.JsonLong("index") + 1}", (s.Json("state") ?? "unknown").ToUpperInvariant(), role,
                 task is JsonElement t ? $"{t.Json("provider")} · {t.Json("model")}" : null,
                 null, result.Json("summary") ?? s.Json("objective"), verified);
         }).ToList();
@@ -973,7 +1061,14 @@ public partial class MainWindow : Window
         if (ActiveTasksList.SelectedItem is not TaskRow { Kind: "mission" } row) return;
         // A plan is approved only after its exact steps and reference are shown; this button opens that review.
         SelectTab("Approvals");
-        PendingApprovalsList.SelectedItem = currentApprovals.FirstOrDefault(a => a.Category == "agent_plan" && a.TaskId == row.Id);
+        PendingApprovalsList.SelectedItem = currentApprovals.FirstOrDefault(a => a.Category is "agent_plan" or "team_plan" && a.TaskId == row.Id);
+    }
+
+    private async void StartTeam_Click(object sender, RoutedEventArgs e)
+    {
+        if (ActiveTasksList.SelectedItem is not TaskRow { CanStartTeam: true, CoordinatorId: { } coordinator } row) return;
+        if (!Confirm("Start Team Planning", $"{row.Title}\n\nThe Coordinator starts and its Planner proposes a plan on the local model. No member runs until you approve that exact plan in the Approval Center.")) return;
+        await RunCommandAsync("agent.start", new { id = coordinator }, "Team Not Started");
     }
 
     private async void CancelSelectedTask_Click(object sender, RoutedEventArgs e)
@@ -986,12 +1081,16 @@ public partial class MainWindow : Window
     {
         if (ActiveTasksList.SelectedItem is TaskRow { Kind: "ptask", CanPause: true } row)
             await RunCommandAsync("ptask.pause", new { id = row.Id }, "Pause Failed");
+        else if (ActiveTasksList.SelectedItem is TaskRow { Kind: "mission", CanPause: true, CoordinatorId: { } coordinator })
+            await RunCommandAsync("agent.pause", new { id = coordinator }, "Pause Failed");
     }
 
     private async void ResumeSelectedTask_Click(object sender, RoutedEventArgs e)
     {
         if (ActiveTasksList.SelectedItem is TaskRow { Kind: "ptask", CanResume: true } row)
             await RunCommandAsync("ptask.resume", new { id = row.Id }, "Resume Failed");
+        else if (ActiveTasksList.SelectedItem is TaskRow { Kind: "mission", CanResume: true, CoordinatorId: { } coordinator })
+            await RunCommandAsync("agent.resume", new { id = coordinator }, "Resume Failed");
     }
 
     // ==========================================
@@ -1027,6 +1126,7 @@ public partial class MainWindow : Window
         ApprovalContextText.Text = app.Category switch
         {
             "agent_plan" => "Bound to the plan reference above; a re-planned Mission is refused until reviewed again.",
+            "team_plan" => "Approved through the team's Coordinator and bound to the plan reference above; a re-planned team is refused until reviewed again. Deny stops the whole team.",
             "consequential" => "Answers this one request once; a new request needs a new decision.",
             "task_launch" => "Launch only; the task can be stopped from the Agent Dashboard.",
             "ptask_launch" => "Approves this task for up to 24 hours or until its envelope expires. Deny cancels it.",
@@ -1084,7 +1184,7 @@ public partial class MainWindow : Window
         var reviewable = app != null && hostClient.IsConnected && app.Category switch
         {
             "action" => inspected.TryGetValue(app.Key, out var f) && f.ok,
-            "agent_plan" => app.PayloadSha256 != "-",
+            "agent_plan" or "team_plan" => app.PayloadSha256 != "-",
             _ => true,
         };
         ApproveActionButton.IsEnabled = reviewable;
@@ -1122,6 +1222,8 @@ public partial class MainWindow : Window
             {
                 ("agent_plan", true) => ("mission.approve", new { id = app.TaskId, start = true, plan = app.PayloadSha256 }),
                 ("agent_plan", false) => ("mission.stop", new { id = app.TaskId }),
+                ("team_plan", true) => ("agent.team.approve", new { id = app.ActionId, planReference = app.PayloadSha256 }),
+                ("team_plan", false) => ("agent.stop", new { id = app.ActionId }),
                 ("task_launch", true) => ("approve", new { id = app.TaskId }),
                 ("task_launch", false) => ("stop", new { id = app.TaskId, reason = "User denied task approval." }),
                 ("ptask_launch", true) => ("ptask.approve", new { id = app.TaskId, version = long.Parse(app.ActionId, System.Globalization.CultureInfo.InvariantCulture) }),
@@ -1463,6 +1565,50 @@ public partial class MainWindow : Window
 
     private void ConnectedMonitor_Click(object sender, RoutedEventArgs e) => SelectTab("Agents");
     private void ConnectedApprovals_Click(object sender, RoutedEventArgs e) => SelectTab("Approvals");
+
+    private static readonly string[] TeamChecks = ["html_id", "html_text", "markdown_heading", "link_to", "dataset_values", "no_external_resources"];
+
+    /// <summary>Same grammar as the web workstation's parseRequirementLines: `check [value] | description`. The Host validates again.</summary>
+    internal static (List<object> Requirements, List<string> Errors) ParseTeamRequirements(string text)
+    {
+        var requirements = new List<object>();
+        var errors = new List<string>();
+        var lines = text.Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var bar = lines[i].IndexOf('|');
+            var spec = (bar < 0 ? lines[i] : lines[i][..bar]).Trim();
+            var description = bar < 0 ? "" : lines[i][(bar + 1)..].Trim();
+            var parts = spec.Split((char[]?)null, 2, StringSplitOptions.RemoveEmptyEntries);
+            var kind = parts.Length > 0 ? parts[0] : "";
+            var value = parts.Length > 1 ? parts[1].Trim() : "";
+            if (!TeamChecks.Contains(kind)) { errors.Add($"Line {i + 1}: unknown check \"{kind}\". Use one of {string.Join(", ", TeamChecks)}."); continue; }
+            var needsValue = kind is not ("dataset_values" or "no_external_resources");
+            if (needsValue && value.Length == 0) { errors.Add($"Line {i + 1}: {kind} needs a value."); continue; }
+            if (description.Length == 0) { errors.Add($"Line {i + 1}: add a description after \"|\"."); continue; }
+            var id = $"R{requirements.Count + 1}";
+            var clipped = description[..Math.Min(200, description.Length)];
+            requirements.Add(needsValue ? new { id, text = clipped, check = new { kind, value } } : new { id, text = clipped, check = new { kind } });
+        }
+        if (requirements.Count > 12) errors.Add("At most 12 requirements.");
+        return (requirements, errors);
+    }
+
+    private async void CreateTeam_Click(object sender, RoutedEventArgs e)
+    {
+        var objective = TeamObjectiveInput.Text.Trim();
+        var (requirements, errors) = ParseTeamRequirements(TeamRequirementsInput.Text);
+        if (objective.Length == 0) errors.Insert(0, "Describe what the team should build.");
+        if (requirements.Count == 0 && errors.Count == 0) errors.Add("Add at least one requirement; the team succeeds only when Bunny's own checks pass.");
+        if (errors.Count > 0) { TeamCreateStatus.Text = string.Join("\n", errors); return; }
+        var projectId = (ProjectsList.SelectedItem as ProjectItem)?.Id;
+        var output = TeamOutputInput.Text.Trim();
+        var team = output.Length > 0 ? (object)new { requirements, outputDir = output } : new { requirements };
+        var res = await RunCommandAsync("agent.create", projectId != null ? new { objective, projectId, team } : new { objective, team }, "Team Not Created");
+        if (res == null) { TeamCreateStatus.Text = "No team was confirmed created (see the message)."; return; }
+        TeamObjectiveInput.Clear(); TeamRequirementsInput.Clear(); TeamOutputInput.Clear();
+        TeamCreateStatus.Text = "Team created. Select it in the Agent Dashboard and press Start Team Planning; nothing runs before that.";
+    }
 
     private void TaskHistoryList_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateHistoryButtons();
 

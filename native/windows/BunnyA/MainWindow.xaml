@@ -223,6 +223,7 @@
           <DockPanel>
             <TextBlock Text="Active Tasks &amp; Workflow Execution" FontSize="16" FontWeight="SemiBold" DockPanel.Dock="Top" Margin="0,0,0,12"/>
             <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,12,0,0">
+              <Button x:Name="StartTeamButton" Content="▶ Start Team Planning" Click="StartTeam_Click" Margin="0,0,8,0" IsEnabled="False" ToolTip="Starts the team's Coordinator; its Planner proposes a plan for your review. Nothing else runs before you approve."/>
               <Button x:Name="RunWithAgentsButton" Content="⚖️ Review Plan &amp; Approve" Style="{StaticResource PrimaryButtonStyle}" Click="RunWithAgents_Click" Margin="0,0,8,0" IsEnabled="False" ToolTip="Opens this Mission's plan in the Approval Center"/>
               <Button x:Name="CancelActiveTaskButton" Content="Cancel Task" Style="{StaticResource DangerButtonStyle}" Click="CancelSelectedTask_Click" Margin="0,0,8,0" IsEnabled="False"/>
               <Button x:Name="PauseTaskButton" Content="Pause Task" Click="PauseSelectedTask_Click" Margin="0,0,8,0" IsEnabled="False"/>
@@ -235,7 +236,10 @@
                 <RowDefinition Height="*"/>
               </Grid.RowDefinitions>
               <ListBox x:Name="ActiveTasksList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" SelectionChanged="ActiveTasksList_SelectionChanged" AutomationProperties.Name="Active tasks and missions"/>
-              <TextBlock Grid.Row="1" x:Name="MissionStepsHeader" Text="Select a Mission to see its Host-reported steps." FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,8,0,4" TextWrapping="Wrap"/>
+              <StackPanel Grid.Row="1">
+                <TextBlock x:Name="MissionStepsHeader" Text="Select a Mission to see its Host-reported steps." FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource MutedBrush}" Margin="0,8,0,4" TextWrapping="Wrap"/>
+                <TextBlock x:Name="MissionTeamText" FontSize="12" FontFamily="Consolas" TextWrapping="Wrap" Margin="0,0,0,6" Visibility="Collapsed"/>
+              </StackPanel>
               <ListBox Grid.Row="2" x:Name="MissionStepsList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="Mission steps"/>
             </Grid>
           </DockPanel>
@@ -245,6 +249,7 @@
       <!-- 3. PROJECTS & TASK EXECUTION SCREEN -->
       <Grid x:Name="ScreenProjects" Visibility="Collapsed">
         <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
           <RowDefinition Height="Auto"/>
           <RowDefinition Height="Auto"/>
           <RowDefinition Height="Auto"/>
@@ -287,8 +292,24 @@
           </StackPanel>
         </Border>
 
+        <!-- MA5-S2: New Agent Team (Coordinator + Planner; members are assigned by the reviewed plan) -->
+        <Border Grid.Row="3" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,0,0,16">
+          <StackPanel>
+            <TextBlock Text="New Agent Team" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,6"/>
+            <TextBlock Text="Builds a deliverable in a new output folder of the selected project. One requirement per line: check [value] | description. Checks: html_id, html_text, markdown_heading, link_to, dataset_values, no_external_resources." FontSize="12" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+            <TextBox x:Name="TeamObjectiveInput" MinHeight="34" MaxLength="2000" TextWrapping="Wrap" Margin="0,0,0,8" AutomationProperties.Name="Team objective"/>
+            <TextBox x:Name="TeamRequirementsInput" MinHeight="60" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,0,0,8" AutomationProperties.Name="Team requirements, one per line"/>
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="Output folder (optional):" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}" Margin="0,0,6,0"/>
+              <TextBox x:Name="TeamOutputInput" Width="200" MaxLength="60" Margin="0,0,12,0" AutomationProperties.Name="Team output folder"/>
+              <Button x:Name="CreateTeamButton" Content="Create Team" Style="{StaticResource PrimaryButtonStyle}" Click="CreateTeam_Click"/>
+            </StackPanel>
+            <TextBlock x:Name="TeamCreateStatus" FontSize="12" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,6,0,0" AutomationProperties.LiveSetting="Polite"/>
+          </StackPanel>
+        </Border>
+
         <!-- Registered Projects List -->
-        <Border Grid.Row="3" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18">
+        <Border Grid.Row="4" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18">
           <DockPanel>
             <TextBlock Text="Registered Project Roots" FontSize="16" FontWeight="SemiBold" DockPanel.Dock="Top" Margin="0,0,0,12"/>
             <ListBox x:Name="ProjectsList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" AutomationProperties.Name="Registered projects"/>

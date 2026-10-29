@@ -1,0 +1,147 @@
+{
+  "schema": "ma5-s2.windows-team.v1",
+  "at": "2026-10-29T00:50:43.247Z",
+  "host": "disposable, Ollama adapter only",
+  "stages": {
+    "t1-create-team-from-form": {
+      "ok": true,
+      "parseError": "Line 1: unknown check \"bogus_check\". Use one of html_id, html_text, markdown_heading, link_to, dataset_values, no_external_resources.",
+      "status": "Team created. Select it in the Agent Dashboard and press Start Team Planning; nothing runs before that.",
+      "coordinatorState": "CREATED",
+      "roles": [
+        "coordinator:CREATED",
+        "planner:PLANNING"
+      ]
+    },
+    "t2-team-shown-not-working-before-start": {
+      "ok": true,
+      "selected": "[Team] Build an offline inventory dashboard page from data/inventory.csv. · WAITING_FOR_APPROVAL · 0/1 steps done",
+      "team": "Team · Coordinator “Team 2026-10-29 00:50” not started · phase planning · output folder bunny-team-mvstumod\n  planner      idle · Host state PLANNING · plan (pending) · 0/1 verified, 0 failed\nRequirements:\n  R1 not checked yet · The page has a summary section\n  R2 not checked yet · The page loads nothing from the internet",
+      "startEnabled": true,
+      "reviewEnabled": false,
+      "approvalRows": 0
+    },
+    "t3-start-planning-to-review": {
+      "ok": true,
+      "dialog": {
+        "invoked": "StartTeamButton",
+        "dialogTitle": "Start Team Planning",
+        "dialogText": "[Team] Build an offline inventory dashboard page from data/inventory.csv.\n\nThe Coordinator starts and its Planner proposes a plan on the local model. No member runs until you approve that exact plan in the Approval Center."
+      },
+      "planMs": 15607,
+      "planReference": "team:9f45baa504f3ee943685e41cbbe8c1e57ab7735824676c414944c42388a49aec",
+      "team": "Team · Coordinator “Team 2026-10-29 00:50” VERIFYING · phase review · output folder bunny-team-mvstumod\n  planner      idle · Host state WAITING_FOR_DEPENDENCY · plan (completed) · ollama · huihui_ai/qwen2.5-abliterate:7b · 1/1 verified, 0 failed\n  researcher   idle · Host state WAITING_FOR_DEPENDENCY · observe (pending) · 0/1 verified, 0 failed\n  implementer  idle · Host state WAITING_FOR_DEPENDENCY · generate_html (pending) · 0/2 verified, 0 failed\n  reviewer     idle · Host state WAITING_FOR_DEPENDENCY · review (pending) · 0/1 verified, 0 failed\n  tester       idle · Host state WAITING_FOR_DEPENDENCY · verify_output (pending) · 0/1 verified, 0 failed\nRequirements:\n  R1 not checked yet · The page has a summary section\n  R2 not checked yet · The page loads nothing from the internet",
+      "steps": [
+        "Step 1 · planner · plan · COMPLETED · ollama · huihui_ai/qwen2.5-abliterate:7b · Host-verified\n   {\"version\":\"bunny.team-plan.v1\",\"summary\":\"Read the inputs, build each deliverable, save it, review it and have Bunny verify it.\",\"tasks\":[{\"id\":\"t1\",\"role\":\"researcher\",\"kind\":\"observe\",\"objective\":\"Read the inventory data from the CSV file.\",\"dependsOn\":[],\"path\":\"data/inventory.csv\"},{\"id\":\"t2\",\"role\":\"implementer\",\"kind\":\"generate_html\",\"objective\":\"Create the HTML page with the summary of the inventory data.\",\"dependsOn\":[\"t1\"],\"requirements\":[\"R1\",\"R2\"]},{\"id\":\"t3\",\"role\":\"implementer\",\"kind\":\"write_file\",\"objective\":\"Store the generated HTML page in the output folder.\",\"dependsOn\":[\"t2\"],\"target\":\"index.html\",\"content\":\"t2\"},{\"id\":\"t4\",\"role\":\"reviewer\",\"kind\":\"review\",\"objective\":\"Ensure the HTML page meets the summary and internet requirement criteria.\",\"dependsOn\":[\"t3\"],\"subject\":\"t3\",\"requirements\":[\"R1\",\"R2\"]},{\"id\":\"t5\",\"role\":\"tester\",\"kind\":\"verify_output\",\"objective\":\"Confirm the HTML page fulfills all requirements with Bunny.\",\"dependsOn\":[\"t3\",\"t4\"],\"subject\":\"t3\",\"requirements\":[\"R1\",\"R2\"]}]}",
+        "Step 2 · researcher · observe · PENDING\n   Read the inventory data from the CSV file.",
+        "Step 3 · implementer · generate_html · PENDING\n   Create the HTML page with the summary of the inventory data."
+      ],
+      "reviewEnabled": true
+    },
+    "t4-approve-exact-plan-via-coordinator": {
+      "ok": true,
+      "shown": {
+        "operation": "Operation: agent.team.approve",
+        "scope": "Output folder bunny-team-mvstumod only · 5 agents · plan revisions 0",
+        "context": "Approved through the team's Coordinator and bound to the plan reference above; a re-planned team is refused until reviewed again. Deny stops the whole team.",
+        "plan": "Objective: Build an offline inventory dashboard page from data/inventory.csv.\n\nRequirements:\nR1: The page has a summary section\nR2: The page loads nothing from the internet\n\nPlan:\nplan · planner · plan: Propose a bounded team plan for the objective as one JSON document.\nt1 · researcher · observe: Read the inventory data from the CSV file.\nt2 · implementer · generate_html: Create the HTML page with the summary of the inventory data.\nt3 · implementer · write_file: Store the generated HTML page in the output folder.\nt4 · reviewer · review: Ensure the HTML page meets the summary and internet requirement criteria.\nt5 · tester · verify_output: Confirm the HTML page fulfills all requirements with Bunny.\nt2_r1 · implementer · generate_html: Create the HTML page with the summary of the inventory data.\nt3_r1 · implementer · write_file: Store the generated HTML page in the output folder.\nt5_r1 · tester · verify_output: Confirm the HTML page fulfills all requirements with Bunny."
+      },
+      "receipt": "8:51:23 PM  APPROVED · agent.team.approve · Build an offline inventory dashboard page from data/inventory.csv. · digest team:9f45baa504f… · Host operation cf68fcf4-475c-441e-b496-565703aa3667 applied",
+      "runMs": 8343,
+      "missionState": "completed",
+      "coordinator": "COMPLETED",
+      "members": [
+        {
+          "role": "coordinator",
+          "state": "COMPLETED",
+          "owned": null,
+          "failure": null
+        },
+        {
+          "role": "planner",
+          "state": "COMPLETED",
+          "owned": {
+            "total": 1,
+            "completed": 1,
+            "running": 0,
+            "failed": 0,
+            "verified": 1
+          },
+          "failure": null
+        },
+        {
+          "role": "researcher",
+          "state": "COMPLETED",
+          "owned": {
+            "total": 1,
+            "completed": 1,
+            "running": 0,
+            "failed": 0,
+            "verified": 1
+          },
+          "failure": null
+        },
+        {
+          "role": "implementer",
+          "state": "COMPLETED",
+          "owned": {
+            "total": 2,
+            "completed": 2,
+            "running": 0,
+            "failed": 0,
+            "verified": 2
+          },
+          "failure": null
+        },
+        {
+          "role": "reviewer",
+          "state": "COMPLETED",
+          "owned": {
+            "total": 1,
+            "completed": 1,
+            "running": 0,
+            "failed": 0,
+            "verified": 1
+          },
+          "failure": null
+        },
+        {
+          "role": "tester",
+          "state": "COMPLETED",
+          "owned": {
+            "total": 1,
+            "completed": 1,
+            "running": 0,
+            "failed": 0,
+            "verified": 1
+          },
+          "failure": null
+        }
+      ],
+      "requirements": [
+        {
+          "id": "R1",
+          "passed": true
+        },
+        {
+          "id": "R2",
+          "passed": true
+        }
+      ]
+    },
+    "t5-deny-stops-the-whole-team": {
+      "ok": true,
+      "mission": "stopped",
+      "coordinator": "STOPPED",
+      "members": [
+        "coordinator:STOPPED",
+        "planner:STOPPED",
+        "researcher:STOPPED",
+        "implementer:STOPPED",
+        "reviewer:STOPPED",
+        "tester:STOPPED"
+      ]
+    }
+  },
+  "failures": []
+}
