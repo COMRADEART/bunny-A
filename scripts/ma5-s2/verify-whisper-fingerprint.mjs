@@ -3,7 +3,7 @@
 // pinned source tarball, the linked DLLs, the compiler, the flags), then builds the shim twice by two different paths
 // (the build script's own function, and a literal gcc command written here) in two unrelated folders with different
 // temp directories, and inspects the PE headers. It never writes native/voice/bunny-voice-worker.json: it writes the
-// evidence and a re-pin proposal that stays PENDING until the owner approves it.
+// evidence and a re-pin proposal that stays PENDING until the owner approves it (ADOPTED once the record holds it).
 // Usage: node scripts/ma5-s2/verify-whisper-fingerprint.mjs [--expect <sha256>]
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -116,14 +116,16 @@ try {
   for (const d of made) rmSync(d, { recursive: true, force: true });
 }
 
-// 3. The approved record is untouched; the proposal stays pending.
+// 3. The approved record is untouched; a proposal stays pending until the owner re-pins.
 const recordAfter = sha(join(root, RECORD));
 check("approvedRecordUntouched", recordBefore === recordAfter, { sha256: recordAfter });
 out.allPass = Object.values(out.checks).every((c) => c.pass);
 out.currentPin = record.whisperShim?.binarySha256 ?? null;
+// The fields a re-pin would change, computed (a hardcoded "everything else unchanged" was wrong once: flags were added).
+const changed = Object.keys({ ...record.whisperShim, ...out.proposedWhisperShim }).filter((k) => JSON.stringify(record.whisperShim?.[k]) !== JSON.stringify(out.proposedWhisperShim?.[k]));
 out.proposal = {
-  status: "PENDING_OWNER_APPROVAL",
-  change: `whisperShim.binarySha256 ${out.currentPin} -> ${out.proposedWhisperShim?.binarySha256 ?? "(not built)"}; every other whisperShim field unchanged`,
+  status: changed.length === 0 ? "ADOPTED" : "PENDING_OWNER_APPROVAL",
+  change: changed.length === 0 ? "none: the record already holds the verified shim" : `whisperShim fields that change: ${changed.join(", ")} (binarySha256 ${out.currentPin} -> ${out.proposedWhisperShim?.binarySha256 ?? "(not built)"})`,
   adoptWith: "node scripts/build-voice-worker.mjs --repin-whisper-shim  (must print build:whisper-shim built; then check the record holds the proposed hash, commit native/voice/bunny-voice-worker.json alone, and rerun the whisper selection and integrity tests)",
 };
 writeEvidence("docs/ma5-s2/evidence/voice/whisper-fingerprint-verification.json", out, []);
