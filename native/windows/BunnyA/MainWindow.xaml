@@ -534,7 +534,17 @@
               <Button x:Name="ReconcileNotHappenedButton" Content="Mark as Not Happened" Margin="0,0,8,0" Click="ReconcileNotHappened_Click" IsEnabled="False"/>
               <Button x:Name="ReconcileAbandonButton" Content="Abandon" Style="{StaticResource DangerButtonStyle}" Click="ReconcileAbandon_Click" IsEnabled="False"/>
             </StackPanel>
-            <ListBox x:Name="TaskHistoryList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" SelectionChanged="TaskHistoryList_SelectionChanged" AutomationProperties.Name="Task history"/>
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="1.4*"/>
+              </Grid.ColumnDefinitions>
+              <ListBox x:Name="TaskHistoryList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" SelectionChanged="TaskHistoryList_SelectionChanged" AutomationProperties.Name="Task history"/>
+              <!-- MA5-S2: the selected item's record as the Host reports it (workstation-only reads). -->
+              <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="12,0,0,0">
+                <TextBlock x:Name="HistoryDetailText" Text="Select an item to see its Host record." FontSize="12" FontFamily="Consolas" TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" AutomationProperties.LiveSetting="Polite"/>
+              </ScrollViewer>
+            </Grid>
           </DockPanel>
         </Border>
       </Grid>

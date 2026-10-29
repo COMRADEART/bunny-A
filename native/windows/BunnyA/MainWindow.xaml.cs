@@ -1610,7 +1610,154 @@ public partial class MainWindow : Window
         TeamCreateStatus.Text = "Team created. Select it in the Agent Dashboard and press Start Team Planning; nothing runs before that.";
     }
 
-    private void TaskHistoryList_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateHistoryButtons();
+    private void TaskHistoryList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        UpdateHistoryButtons();
+        _ = RenderHistoryDetailAsync();
+    }
+
+    // ==========================================
+    // MA5-S2 MISSION HISTORY: the selected record as the Host reports it. Nothing is estimated: no progress percentages,
+    // no verdicts the Host did not record. Workstation-only reads (mission.get, ptask.get, action.receipts).
+    // ==========================================
+
+    private string? historyDetailKey;
+
+    private static string When(long ms) => ms > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(ms).LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss") : "—";
+    private static string Span(long from, long to) => from > 0 && to >= from ? $" ({TimeSpan.FromMilliseconds(to - from).TotalSeconds:0.#} s)" : "";
+
+    private async Task RenderHistoryDetailAsync()
+    {
+        if (TaskHistoryList.SelectedItem is not TaskRow row) { historyDetailKey = null; HistoryDetailText.Text = "Select an item to see its Host record."; return; }
+        // Refreshes rebind the list every few seconds; refetch only when the selection or its Host state changed.
+        var key = $"{row.Kind}|{row.Id}|{row.State}|{row.Progress}";
+        if (key == historyDetailKey) return;
+        historyDetailKey = key;
+        string text;
+        try
+        {
+            text = row.Kind switch
+            {
+                "mission" => MissionDetail((await hostClient.SendCommandAsync("mission.get", new { id = row.Id }, lifetime.Token)).JsonObj("data")),
+                "ptask" => PtaskDetail((await hostClient.SendCommandAsync("ptask.get", new { id = row.Id }, lifetime.Token)).JsonObj("data"),
+                    (await hostClient.SendCommandAsync("action.receipts", new { id = row.Id }, lifetime.Token)).JsonObj("data")),
+                _ => DirectTaskDetail(row.Id),
+            };
+        }
+        catch (HostException ex) { text = $"The Host record is unavailable: {ex.Message}"; historyDetailKey = null; }
+        catch (OperationCanceledException) { return; }
+        // A newer selection may have rendered while this one was loading.
+        if (historyDetailKey == key) HistoryDetailText.Text = text;
+    }
+
+    private string MissionDetail(JsonElement data)
+    {
+        var m = data.JsonObj("mission");
+        var lines = new List<string>
+        {
+            $"{(m.JsonObj("teamView").ValueKind == JsonValueKind.Object ? "Team Mission" : "Mission")} “{m.Json("title")}” — {m.Json("state")?.ToUpperInvariant()}",
+            $"Objective: {m.Json("objective")}",
+            $"Created {When(m.JsonLong("createdAt"))} · started {When(m.JsonLong("startedAt"))} · finished {When(m.JsonLong("finishedAt"))}{Span(m.JsonLong("startedAt"), m.JsonLong("finishedAt"))}",
+        };
+        var planning = m.JsonObj("planning");
+        if (planning.ValueKind == JsonValueKind.Object) lines.Add($"Planner: {planning.Json("planner")} · {planning.Json("complexity")} · planned {When(planning.JsonLong("plannedAt"))} · replans {planning.JsonLong("replans")}");
+        var result = m.JsonObj("result");
+        if (result.ValueKind == JsonValueKind.Object) lines.Add($"Result: {result.Json("summary")} · {result.JsonLong("verifiedSteps")} verified, {result.JsonLong("unverifiedSteps")} unverified step(s)");
+        var failure = m.JsonObj("failure");
+        if (failure.ValueKind == JsonValueKind.Object) lines.Add($"Failure: {failure.Json("category")} — {failure.Json("detail")}");
+        var recovery = m.JsonObj("recovery");
+        if (recovery.ValueKind == JsonValueKind.Object) lines.Add($"Recovery {When(recovery.JsonLong("at"))}: {recovery.Json("detail")}");
+        if (m.JsonObj("teamView") is { ValueKind: JsonValueKind.Object } tv && tv.Json("coordinatorAgentId") is { } coordinator)
+            lines.Add(TeamSummary(m, coordinator));
+
+        var steps = m.JsonArr("steps").ToList();
+        string Label(string? id) { var s = steps.FirstOrDefault(x => x.Json("id") == id); return s.ValueKind != JsonValueKind.Object ? "?" : s.JsonObj("team").Json("key") ?? $"{s.JsonLong("index") + 1}"; }
+        lines.Add("Steps:");
+        foreach (var s in steps)
+        {
+            var team = s.JsonObj("team");
+            var verifiedFlag = s.JsonObj("result").ValueKind == JsonValueKind.Object && s.JsonObj("result").TryGetProperty("verified", out var v) ? v.ValueKind : JsonValueKind.Undefined;
+            var deps = s.JsonArr("dependsOn").Select(d => Label(d.GetString())).ToList();
+            lines.Add($"  {Label(s.Json("id"))}. [{(team.ValueKind == JsonValueKind.Object ? $"{team.Json("role")} · {team.Json("kind")}" : s.Json("role"))}] {s.Json("state")?.ToUpperInvariant()}" +
+                (deps.Count > 0 ? $" · after {string.Join(", ", deps)}" : "") +
+                (verifiedFlag == JsonValueKind.True ? " · Host-verified" : verifiedFlag == JsonValueKind.False ? " · verification FAILED" : "") +
+                $" — {s.Json("objective")}");
+            foreach (var a in s.JsonArr("attempts"))
+            {
+                var task = a.Json("taskId") is { } tid ? FindTask(tid) : null;
+                var served = task is JsonElement t && t.Json("model") is { } model ? $"{t.Json("provider")} · {model}" : a.Json("provider") ?? "no model (Host step)";
+                lines.Add($"     attempt {a.JsonLong("attempt")}: {served} · {When(a.JsonLong("startedAt"))}{Span(a.JsonLong("startedAt"), a.JsonLong("finishedAt"))} · {a.Json("outcome")}" +
+                    (a.Json("category") is { } cat ? $" · {cat}: {a.Json("detail")}" : ""));
+            }
+        }
+        var requests = m.JsonArr("requests").ToList();
+        lines.Add(requests.Count > 0 ? "Permission decisions:" : "Permission decisions: none requested");
+        foreach (var r in requests)
+            lines.Add($"  {When(r.JsonLong("createdAt"))} {r.Json("action")} ({r.Json("risk")}) · " +
+                (r.JsonLong("resolvedAt") > 0 ? $"{r.Json("resolution")} by {r.Json("resolvedBy")} at {When(r.JsonLong("resolvedAt"))}" : "PENDING"));
+        var events = data.JsonArr("events").ToList();
+        var agentRoles = lastRoot.JsonObj("agents").JsonArr("agents").Where(a => a.Json("id") != null)
+            .ToDictionary(a => a.Json("id")!, a => a.JsonObj("team").Json("role") ?? a.Json("name") ?? "agent");
+        // Decisions the Host logged: a team plan approval is an agent.started event marked approved "team-plan".
+        var approvals = events.Where(e => e.Json("type") is { } t && (t.Contains("approv") || (t == "agent.started" && (e.Json("detail") ?? "").Contains("\"approved\"")))).ToList();
+        lines.Add(approvals.Count > 0 ? "Approvals logged by the Host:" : "Approvals logged by the Host: none in the retained events");
+        lines.AddRange(approvals.Select(e => $"  {When(e.JsonLong("at"))} {EventLine(e, agentRoles)}"));
+        lines.Add($"Host events (latest {Math.Min(60, events.Count)} of {events.Count} retained):");
+        lines.AddRange(events.TakeLast(60).Select(e => $"  {When(e.JsonLong("at"))} {EventLine(e, agentRoles)}"));
+        return string.Join("\n", lines);
+    }
+
+    /// <summary>One Host event, readable: agent ids become their team role; internal run/step ids are dropped.</summary>
+    private static string EventLine(JsonElement e, IReadOnlyDictionary<string, string> roles)
+    {
+        var type = e.Json("type") ?? "event";
+        var detail = e.Json("detail") ?? "";
+        if (!detail.StartsWith('{')) return detail.Length > 0 ? $"{type} — {ClipText(detail, 160)}" : type;
+        try
+        {
+            using var doc = JsonDocument.Parse(detail);
+            var d = doc.RootElement;
+            var who = d.Json("agentId") is { } id ? roles.GetValueOrDefault(id, "agent") + " " : "";
+            var change = d.Json("from") is { } from ? $" {from} → {d.Json("to")}" : "";
+            var rest = string.Join(", ", d.EnumerateObject()
+                .Where(p => p.Name is not ("kind" or "agentId" or "runId" or "stepId" or "from" or "to" or "missionId") && p.Value.ValueKind is JsonValueKind.String or JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False)
+                .Select(p => $"{p.Name}={ClipText(p.Value.ToString(), 60)}"));
+            return $"{who}{type}{change}{(rest.Length > 0 ? $" ({rest})" : "")}";
+        }
+        catch (JsonException) { return $"{type} — {ClipText(detail, 160)}"; }
+    }
+
+    private static string PtaskDetail(JsonElement t, JsonElement receiptsData)
+    {
+        var lines = new List<string>
+        {
+            $"Persistent task “{t.Json("title")}” — {t.Json("state")} ({t.Json("display")})",
+            $"Created {When(t.JsonLong("createdAt"))} · last change {When(t.JsonLong("updatedAt"))} · version {t.JsonLong("version")}",
+            $"Steps done: {t.JsonObj("progress").JsonLong("done")} of {t.JsonObj("progress").JsonLong("total")} · models: {string.Join(", ", t.JsonArr("models").Select(m => m.GetString()))}",
+            $"Approval: {(t.JsonObj("approval").JsonBool("required") ? $"required · approved until {When(t.JsonObj("approval").JsonLong("approvedUntil"))}" : "not required (read-only, foreground)")}",
+        };
+        if (t.JsonObj("failure") is { ValueKind: JsonValueKind.Object } f) lines.Add($"Failure: {f.Json("code")} — {f.Json("detail")}");
+        if (t.JsonObj("blocked") is { ValueKind: JsonValueKind.Object } b) lines.Add($"Blocked: {b.Json("code")} — {b.Json("detail")}");
+        if (t.Json("uncertainOperation") is { } u) lines.Add($"Uncertain operation: {u} — reconcile it below; Bunny never re-runs it on its own.");
+        var evidence = t.JsonArr("evidence").ToList();
+        lines.Add(evidence.Count > 0 ? "Completed steps (output digests):" : "Completed steps: none");
+        lines.AddRange(evidence.Select(e => $"  {e.Json("stepId")} · sha256 {e.Json("outputSha256")}"));
+        var receipts = receiptsData.JsonArr("receipts").ToList();
+        var chain = receiptsData.JsonObj("chain");
+        lines.Add($"Receipts ({receipts.Count}) · ledger chain {(chain.ValueKind != JsonValueKind.Object ? "not available" : chain.JsonBool("ok") ? $"verified ({chain.JsonLong("entries")} entries)" : $"BROKEN at {chain.JsonLong("brokenAt")}")}:");
+        lines.AddRange(receipts.Select(r => $"  {When(r.JsonLong("at"))} {r.Json("stepId")} · {r.Json("kind")} · {r.Json("event")}{(r.Json("detail") is { Length: > 0 } d ? $" — {ClipText(d, 120)}" : "")}"));
+        return string.Join("\n", lines);
+    }
+
+    private string DirectTaskDetail(string id)
+    {
+        if (FindTask(id) is not JsonElement t) return "This task is no longer in the Host's recent task list.";
+        return string.Join("\n",
+            $"Task “{t.Json("title")}” — {t.Json("state")?.ToUpperInvariant()}",
+            $"Served by: {t.Json("provider")} · {t.Json("model")}",
+            $"Created {When(t.JsonLong("createdAt"))} · last change {When(t.JsonLong("updatedAt"))}",
+            t.Json("error") is { Length: > 0 } err ? $"Error: {err}" : "");
+    }
 
     private void UpdateHistoryButtons()
     {

@@ -15,7 +15,7 @@ Host, which remains the only authority for routing, models, approvals, voice ses
 | Per-action approval | `action.inspect/approve/deny`, payload-hash bound | present (MA5-S1) | none |
 | Pause/Resume/Cancel/Reconcile | `ptask.pause/resume/cancel/reconcile` | present (MA5-S1) | none |
 | Agent teams / coordinator | `agent.create` (team), `agent.start`, `agent.team.approve/revise`, `agent.pause/resume/stop`; `teamView.coordinatorAgentId` | team plans approved with `mission.approve`, which the Host refuses for teams; coordinator not read | **Closed in Phase 1B** (TEAM_COORDINATION.md) |
-| Mission history | `mission.get`, ptask views, `action.receipts` | Task History list + reconcile | Phase 1C (not started) |
+| Mission history | `mission.get` (events, attempts, requests), `ptask.get`, `action.receipts` | Task History list + reconcile only | **Closed in Phase 1C** (MISSION_HISTORY.md) |
 | Voice | `voice.session.open/close`, `voice.listen.start/end`, `voice.interrupt`, `voice.mute`, `voice.text`, `voice.control.confirm/cancel`, `voice.devices`, `voice.state`; worker `native/voice/BunnyVoiceWorker.cs` (`bunny-voice/1`); `voice-session.server.ts`, `voice-turn-taking.ts` | Voice Studio wiring (MA5-S1) | Phases 3–4 (not started); physical acoustic qualification is BLOCKED until a real microphone/speaker run is authorized |
 | Paired devices | `device-authority.server.ts` allowlist; `publicTask` blanks outputs | Android companion (MA5-S1R2) | Phase 5 (not started); re-pair after address change is open |
 
