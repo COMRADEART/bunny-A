@@ -381,48 +381,60 @@ async function main() {
     // Hands-free: Bunny speaks a long answer; each trial is one reply.
     const speakLong = async () => { await cmd("voice.text", { text: "Tell me a six sentence story about a careful rabbit who plans a garden." }); return until(async () => { const s = await voice(); return s.playing ? s : null; }, 120_000); };
     const settle = () => until(async () => { const s = await voice(); return !s.playing && ["IDLE", "INTERRUPTED", "LISTENING"].includes(s.state) ? s : null; }, 120_000);
+    // T12-PRIV-01: opening hands-free mode never opens the microphone; only an explicit Start hands-free does (attended
+    // S3, 2026-10-30, ran without it: 0/12 interruptions and an empty echo result).
+    const startDuplex = async () => { await cmd("voice.listen.start", { source: "hands_free" }); return until(async () => (await voice()).duplex?.active, 15_000); };
     // Without a live duplex lane the microphone is closed while Bunny speaks, so echo and barge-in trials would be vacuous.
-    const requireDuplex = async () => { if (!(await voice()).duplex?.active) throw new SessionStop("DUPLEX_NOT_ACTIVE", "the hands-free microphone is not listening during playback"); };
+    // The lane can end mid-section (fixture check, 2026-10-30: DEVICE_BUSY "capture already active" after an interrupted
+    // reply). Each loss is evidence; the start is repeated, and a lane that does not come back stops the session.
+    const duplexLosses = (out.duplexLosses = []);
+    const requireDuplex = async () => {
+      const v = await voice();
+      if (v.duplex?.active) return;
+      duplexLosses.push({ reason: v.duplex?.stopped?.reason ?? null, errorCode: v.error?.code ?? null, state: v.state ?? null });
+      if (!(await startDuplex())) throw new SessionStop("DUPLEX_NOT_ACTIVE", "the hands-free microphone is not listening during playback");
+    };
     const bargeTrial = async (phraseId, phrase) => {
       await requireDuplex();
       const before = (await voice()).lastBargeIn?.inputTurnId ?? null;
       const playing = await speakLong();
       if (!playing) return null;
-      if (phrase && !(await say(phrase))) { await cmd("voice.interrupt", { source: "button" }); await settle(); return null; }
-      if (!phrase) await sleep(8_000);
+      // Replies end on their own, never by the stop button: with the hands-free microphone live, interrupt() aborts and
+      // re-arms the capture before the worker released it, and the lane ends with DEVICE_BUSY (fixture check 2026-10-30, 4/4).
+      // A silent trial so listens through the whole reply.
+      if (phrase && !(await say(phrase))) { await settle(); return null; }
+      if (!phrase) await settle();
       const s = await until(async () => { const v = await voice(); return v.lastBargeIn && v.lastBargeIn.inputTurnId !== before && v.lastBargeIn.outcome !== "pending" ? v : null; }, phrase ? 15_000 : 1_000);
       const r = s?.lastBargeIn ?? null;
-      if ((await voice()).playing) await cmd("voice.interrupt", { source: "button" });
       await settle();
       return { phraseId, outcome: r?.outcome ?? "none", onsetToSilenceMs: r?.onsetToSilenceMs ?? null, detectionToSilenceMs: r?.detectionToSilenceMs ?? null, wasAudible: r?.wasAudible ?? null, echoRejected: r?.echoRejected ?? 0, reason: r?.reason ?? null };
     };
     if ([2, 3, 4, 5, 6, 9].some(want)) {
       await cmd("voice.session.open", { mode: "hands_free" });
-      // T12-PRIV-01: opening hands-free mode never opens the microphone; only an explicit Start hands-free does (attended
-      // S3, 2026-10-30, ran without it: 0/12 interruptions and an empty echo result).
-      await cmd("voice.listen.start", { source: "hands_free" });
-      await until(async () => (await voice()).duplex?.active, 15_000);
-      await requireDuplex();
+      if (!(await startDuplex())) throw new SessionStop("DUPLEX_NOT_ACTIVE", "the hands-free microphone did not start");
       if (want(2) || want(3)) {
         await prompt(`Stay silent while Bunny speaks (${TRIALS.echo} replies). Normal room noise is fine.`);
-        const rows = [];
-        for (let i = 0; i < TRIALS.echo; i++) rows.push(await bargeTrial("silent", null));
-        const r = rows.filter(Boolean);
-        out.sections.echo = { class: cls("acoustic"), trials: r, falseInterruptRate: rate(r.filter((x) => x.outcome === "interrupted").length, r.length), echoTranscriptsRejected: r.reduce((s, x) => s + x.echoRejected, 0) };
+        const r = [];
+        out.sections.echo = { class: cls("acoustic"), trials: r };
+        for (let i = 0; i < TRIALS.echo; i++) { const x = await bargeTrial("silent", null); if (x) r.push(x); }
+        Object.assign(out.sections.echo, { falseInterruptRate: rate(r.filter((x) => x.outcome === "interrupted").length, r.length), echoTranscriptsRejected: r.reduce((s, x) => s + x.echoRejected, 0) });
       }
       if (want(4)) {
         const rows = [];
+        out.sections.interrupt = { class: cls("acoustic"), trials: rows };
         for (const [i, p] of PHRASES.interrupt.entries()) for (let k = 0; k < Math.ceil(TRIALS.interrupt / 2); k++) { const r = await bargeTrial(`interrupt-${i}`, p); if (r) rows.push(r); }
         const ok = rows.filter((x) => x.outcome === "interrupted");
-        out.sections.interrupt = { class: cls("acoustic"), boundary: "worker-monotonic speech onset to render-meter silence (onsetToSilenceMs); capture delay before the worker sees a frame is not included", target: `P95 <= ${BARGE_IN_TARGET_MS} ms where applicable`, trials: rows, interruptRate: rate(ok.length, rows.length), onsetToSilenceMs: stats(ok.map((x) => x.onsetToSilenceMs)), detectionToSilenceMs: stats(ok.map((x) => x.detectionToSilenceMs)) };
+        Object.assign(out.sections.interrupt, { boundary: "worker-monotonic speech onset to render-meter silence (onsetToSilenceMs); capture delay before the worker sees a frame is not included", target: `P95 <= ${BARGE_IN_TARGET_MS} ms where applicable`, trials: rows, interruptRate: rate(ok.length, rows.length), onsetToSilenceMs: stats(ok.map((x) => x.onsetToSilenceMs)), detectionToSilenceMs: stats(ok.map((x) => x.detectionToSilenceMs)) });
       }
       if (want(5)) {
         const rows = [];
+        out.sections.backchannel = { class: cls("acoustic"), trials: rows };
         for (const [i, p] of PHRASES.backchannel.entries()) for (let k = 0; k < Math.ceil(TRIALS.backchannel / 2); k++) { const r = await bargeTrial(`backchannel-${i}`, p); if (r) rows.push(r); }
-        out.sections.backchannel = { class: cls("acoustic"), trials: rows, resumedRate: rate(rows.filter((x) => x.outcome === "resumed" || x.outcome === "none").length, rows.length), falseInterruptRate: rate(rows.filter((x) => x.outcome === "interrupted").length, rows.length) };
+        Object.assign(out.sections.backchannel, { resumedRate: rate(rows.filter((x) => x.outcome === "resumed" || x.outcome === "none").length, rows.length), falseInterruptRate: rate(rows.filter((x) => x.outcome === "interrupted").length, rows.length) });
       }
       if (want(6)) {
         const rows = [];
+        out.sections.pauses = { class: cls("acoustic"), trials: rows };
         for (const [i, p] of PHRASES.pause.entries()) for (let k = 0; k < TRIALS.pause; k++) {
           const before = (await voice()).turnId;
           await requireDuplex();
@@ -432,7 +444,7 @@ async function main() {
           rows.push({ ...score, splitIntoTwoTurns: score.wordErrors == null ? null : score.wordErrors / score.refWords > 0.4 });
           await settle();
         }
-        out.sections.pauses = { class: cls("acoustic"), trials: rows, wholeUtteranceRate: rate(rows.filter((r) => r.splitIntoTwoTurns === false).length, rows.length) };
+        out.sections.pauses.wholeUtteranceRate = rate(rows.filter((r) => r.splitIntoTwoTurns === false).length, rows.length);
       }
       if (want(9)) {
         let stop = false; let done = 0; let failed = 0;
