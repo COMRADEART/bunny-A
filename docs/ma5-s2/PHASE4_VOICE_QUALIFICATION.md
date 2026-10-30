@@ -623,8 +623,8 @@ here; the owner sets it.
    immediately (`voice-session.server.ts:752-753`). The worker releases a capture only when its thread exits
    (`BunnyVoiceWorker.cs:2537`), so the new start is refused with `DEVICE_BUSY` (`:5146`) and the hands-free lane
    ends. Fixture: 4 / 4. A user who presses stop during a hands-free reply loses the microphone. Recommended: re-arm on
-   the aborted turn's `capture.stopped`, in a separate PR with a regression test.
-3. **Harness, open:** closing the session window skips cleanup. The worker still dies, but the temp Host folder, which
+   the aborted turn's `capture.stopped`, in a separate PR with a regression test. **Fixed in S3R1 (§12.1).**
+3. **Harness, fixed in S3R1 (§12.2):** closing the session window skips cleanup. The worker still dies, but the temp Host folder, which
    may hold recognized text, stays behind. Recommended: handle the console close (`SIGHUP`) and sweep stale
    `bunny-p4-acoustic-*` folders at start.
 4. The fixture cannot speak an interruption on cue, so barge-in detection has never been exercised by this harness.
@@ -636,7 +636,7 @@ here; the owner sets it.
 |---|---|
 | A16 echo cancellation | **BLOCKED**: not measured (S3 pending) |
 | A17 spoken interruption ≤ 200 ms | **BLOCKED**: not measured (S3 pending) |
-| A18 human recognition | **MEASURED, no threshold**: 62.5 % exact, WER 10.9 % (§11.2) |
+| A18 human recognition | **MEASURED, no threshold at the time**: 62.5 % exact, WER 10.9 % (§11.2). Criteria now set prospectively (§12.3) |
 | A19 response latency, acoustic | **BLOCKED**: needs this PR's section 7 (S2) and section 9 (S5). Known under-load MISS (6.5 s P50) unchanged |
 | A20 device shutdown and recovery | **BLOCKED**: section 10 not run |
 | Backchannels, pauses (sections 5, 6) | not run |
@@ -646,3 +646,149 @@ here; the owner sets it.
 
 **Remaining sessions, each with a fresh authorization:** S3 rerun (`2,3,4`), S2 (`7,10`), S4 (`5,6`), S5 (`9`), then
 the Narrator walk. Phase 4 acceptance: **not claimed.**
+
+## 12. S3R1: reliability corrections before resuming attended tests
+
+No microphone session was started for this section. Every result below comes from synthetic protocol tests, the real
+worker with synthesized input and null output, or the harness's own unit and process tests.
+
+### 12.1 DEVICE_BUSY after a hands-free interrupt (engine, finding 2): FIXED
+
+**Root cause.** `interrupt()` sent `capture.abort` for the armed input turn, then `capture.start` for a new one, both
+at once. The worker clears its active capture only when the capture thread exits (`BunnyVoiceWorker.cs:2537`). It
+refused the new start (`:5146`, `DEVICE_BUSY`), and the Host's duplex-lane `capture.error` path then ended the
+hands-free lane and revoked the grant.
+
+**Fix (`voice-session.server.ts`, Host only; the worker is unchanged).** The worker's rule (one attached capture) is
+correct and stays.
+
+- `abortInput()` marks the aborted turn `releasingInput` and drops its words (`dropped`). No new turn is armed while
+  a capture is releasing: `armDuplexTurn()` returns.
+- Only that turn's own `capture.stopped` (same turn id and gen) clears it and arms exactly one new turn. The worker's
+  finalizer can report `stt.none aborted` before `capture.stopped` (the whisper path does not join the capture thread),
+  so the stop is matched even after the turn left the lane.
+- Mute, close, mode switch, a push-to-talk press, worker exit and duplex errors all clear the pending re-arm
+  (`stopDuplex`, `finishDuplexStop`). Arming also checks mute, close and lane state.
+- A capture that never reports `capture.stopped` within 2 s is a worker fault. The owned worker is closed
+  (`AEC_UNAVAILABLE`), as for a missed duplex release.
+- The explicit hands-free grant is untouched: an interrupt is a user stop of output, not of the lane.
+
+**Tests (`voice-duplex.test.ts`).** The synthetic worker now follows the real device rule: it refuses an overlapping
+start with `DEVICE_BUSY` and acknowledges an aborted capture with `stt.none` then `capture.stopped`. Seven new tests
+cover:
+
+- a stop pressed mid-reply re-arms only on the acknowledgment, keeps the grant and the lane, and hears the next
+  utterance;
+- five rounds of triple rapid interrupts: 0 `DEVICE_BUSY`, one abort and one re-arm per round;
+- stale or mismatched acknowledgments, plus a duplicate, re-arm nothing, and the aborted turn's late words are never
+  routed;
+- mute during the pending re-arm;
+- close, and a push-to-talk press, during the pending re-arm;
+- worker exit, and a capture that never releases (the worker is closed);
+- a worker restart: the old worker's late acknowledgment and final arm and route nothing.
+
+With the gate removed, 6 of the 7 fail. The seventh checks worker isolation, which already held. Two existing tests
+assumed an instant re-arm and now wait for the acknowledgment.
+
+### 12.2 Abnormal termination of the attended harness (finding 3): FIXED
+
+**The two leaked folders.** They were deleted by hand on 2026-10-30 (§11.3) and are no longer on disk, so their
+contents cannot be re-inspected. From the code, each was the disposable Host's data directory:
+
+- `host.sqlite` (plus WAL), holding each voice turn as a Task: the prompt is the recognized transcript, the output is
+  Bunny's answer;
+- events, a loopback-only bearer token, and the runtime, logs and workspace folders.
+
+They held no audio: the worker processes audio in memory. They leaked because closing the console terminates `node`
+before the harness's `finally` (`rmSync`) runs.
+
+**Changes.**
+
+| Change | Where |
+|---|---|
+| Host database in memory and no provider session logs for the harness Host: transcripts and answers never reach disk | `startHost({ ephemeral: true })`, test-only option, refused for installed state |
+| Recognition-only Host for sections 1 and 8: a final is shown and never classified, answered, routed or executed | `voice: { recognitionOnly }`, test-only |
+| Exit cleanup: `exit` handler removes the folder; `SIGINT`, `SIGTERM`, `SIGHUP` (console close) and `SIGBREAK` stop the session at once, with a forced exit at 8 s (Windows allows about 10 s after `SIGHUP`) | `installExitCleanup` |
+| Recovery at start, because a forced termination runs no handler: a folder is removed only if it has the exact mkdtemp name, is a real directory (no link or junction), carries an owner marker naming itself, and its owner process is gone. Anything else is left untouched and only counted in evidence | `createOwnedTempDir`, `recoverInterruptedSessions` |
+| The owner can stop at any moment: `q` + Enter between prompts, or Ctrl+C. Before, `q` worked only at a prompt, and Ctrl+C was swallowed by readline | `wireOwnerStop` |
+
+**Capture ends with the controlling process.** A new containment test starts a child Host that opens a live 30 s
+capture (synthesized input, null output), kills it with `TerminateProcess` (no handler runs), and checks that the
+capturing worker is gone. It passes: kill-on-close reaps it. The existing idle-worker H9 test also passes.
+
+**Tests (`scripts/ma5-s2-acoustic-session.test.mjs`, 23 / 23).**
+
+- Recovery removes only identified, dead-owner folders. It keeps an unmarked folder, a marker naming another folder,
+  a non-mkdtemp name, an unrelated folder, a junction (its target untouched) and a running owner's folder.
+- A real child process: a normal exit removes its folder. A forced kill leaves the folder, and recovery then removes
+  it.
+- `q` between prompts, and Ctrl+C, end a 60 s wait in under 1 s; other lines are ignored.
+- The CLI refuses to mix recognition and action sections (the default "all sections" is refused) and reports
+  `recognitionOnly`.
+
+### 12.3 A18 recognition acceptance criteria (prospective)
+
+These criteria are set before the qualification run. S1 (§11.2) is **not** re-scored, and its measurements stand
+as recorded.
+
+| Criterion | Threshold |
+|---|---|
+| Overall WER, a missing transcript counted as deletion of every reference word | ≤ 15 % |
+| No-result rate | ≤ 5 % |
+| Speech-triggered unauthorized actions | 0 |
+| Sample for final qualification | ≥ 48 scripted utterances and ≥ 200 reference words |
+
+**Harness.**
+
+- Script `p4-v2` runs 6 trials per recognition phrase: 48 utterances and 222 reference words. A new authorization
+  must name `p4-v2`.
+- Section 1 evidence carries `a18`: utterances, reference words, errors including deletions, WER, no-result rate,
+  Tasks created during the trials, a check per criterion, and `pass`.
+- Recognition (sections 1 and 8) runs on the recognition-only Host, separately from every action section. A scripted
+  "goodbye bunny" or "pause the current mission" therefore cannot close the session or act. The S1 no-results for
+  "goodbye bunny" (§11.2) are consistent with that artifact.
+
+For orientation only, not a verdict: S1 by these rules would be WER 18.9 %, no-result 12.5 %, 24 utterances. That is
+below the sample size, and it includes the "goodbye bunny" artifact.
+
+### 12.4 Verification
+
+| Check | Result |
+|---|---|
+| Voice suite (`src/lib/bunny-host/voice/*.test.ts`), real worker included | **473 pass, 0 fail, 1 skipped** (whisper runtime not staged in this worktree) |
+| Worker containment, including the new mid-capture kill | **8 pass, 1 skipped** (whisper) |
+| Acoustic harness tests | **23 / 23** |
+| `tsc --noEmit` | clean |
+| Host suite (`host.test.ts`) | **12 / 12** |
+| Stage 1 (`scripts/*.test.mjs` without the local whisper gate), locally | **423 / 424**. The one failure is `bunny-release.test.mjs` M-A-1D: the packager's Node license fallback (`releases/installed/…`) exists only in the main checkout, not in this worktree. That is environmental and unrelated to this change; hosted CI is authoritative |
+| Hosted CI | recorded on the PR |
+
+### 12.5 Matrix
+
+| Item | Status |
+|---|---|
+| DEVICE_BUSY on hands-free interrupt | **PASS** (synthetic + fixture worker; not yet observed acoustically) |
+| Grant and continuous listening preserved after interrupt | **PASS** |
+| Stale acknowledgments, mute, close, cancellation, worker failure, restart during pending re-arm | **PASS** |
+| Never concurrent captures | **PASS** (0 `DEVICE_BUSY` under the strict device model) |
+| No transcripts in temporary Host storage | **PASS** (in-memory database, no session logs) |
+| Exit cleanup and recovery of interrupted sessions (identified folders only) | **PASS** |
+| Capture ends when the controlling process disappears | **PASS** (real worker, synthesized input, null output) |
+| Stop responsive without a prompt | **PASS** |
+| A18 criteria recorded; recognition separated from actions | **PASS** |
+| Acoustic gates A16, A17, A18, A19, A20 | **BLOCKED**: need owner-attended sessions |
+
+### 12.6 Requirements for safely resuming S3
+
+1. This PR's hosted CI is green, and the owner has reviewed the diff. The harness copy used for the session is
+   hash-checked against this PR's head.
+2. No `bunny-voice-worker.exe` is running, and no Host is on port 43216. The harness checks the worker; recovery
+   removes only identified folders.
+3. A fresh `/2` authorization names script `p4-v2`, the exact device names read live, `maxPlaybackVolumePercent`
+   ≤ 25, and is signed under 12 h before the session. The owner sets the output volume by hand at or below the limit.
+4. Sections run separately: S3 = `--sections 2,3,4`. Recognition qualification = `--sections 1,8` (48 utterances).
+   Mixed runs are refused.
+5. The owner ends the session with `q` + Enter or Ctrl+C. Closing the window is still safe: the worker dies with the
+   process, no transcript is on disk, and the next start recovers the folder.
+6. Barge-in has never been exercised acoustically. The S3 interrupt trials are its first real measurement, and the
+   §12.1 fix is first observed there.
