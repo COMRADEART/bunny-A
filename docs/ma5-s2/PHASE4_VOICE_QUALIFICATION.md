@@ -557,3 +557,92 @@ plays at 1.6 s P50. Not re-measured; no inference or scheduling code changed.
 **Classification: PARTIAL.** Every software gate passes and the whisper pin is adopted. Phase 4 acoustic acceptance is
 **not** claimed: A16–A20 and the Narrator walk need an owner-attended session with a signed `/2` authorization (§4).
 The latency MISS also remains open (§10.8).
+
+## 11. Owner-attended acoustic testing (in progress, paused by the owner)
+
+**Status: IN PROGRESS.** One valid physical session ran (S1, recognition). S3 (echo and spoken interruption) was run
+once with a defective harness, fixed in this PR, and the rerun was ended by the owner before any section finished. No
+Phase 4 acoustic gate is claimed yet.
+
+### 11.1 Preflight (2026-10-30, main `f29ab04` = PR #66 merge, tree identical to `99b1930`)
+
+| Check | Result |
+|---|---|
+| Whisper fingerprint (`verify-whisper-fingerprint.mjs`) | two independent builds `45f64172…67e3`; `ADOPTED` |
+| Engine selection (`verify-whisper.mjs`) | checkout and candidate select **whisper**, no fallback reason; WER 0 on synthesized speech |
+| `scripts/voice-worker.test.mjs` | **77 / 77** |
+| `scripts/ma5-s2-acoustic-session.test.mjs` | **17 / 17** (18 / 18 with this PR's regression test) |
+| Other voice workers / Host | none before or after any step |
+| Harness | authorization schema `bunny-acoustic-authorization/2`; watchdog, 1 s endpoint and volume monitor, bounded shutdown present |
+| Evidence directory | no audio, user paths, credentials or device names. The only stored text is the synthesized fixture phrase |
+
+**Endpoints (read-only, the worker's own `devices` report, no capture or playback).** Default microphone: the laptop
+microphone array; default output: the laptop speakers. The output read 26 % at first, so the session would have refused
+to start. The owner lowered it to 24 % by hand. Bunny never changed a volume, mute, privacy or driver setting.
+
+**Authorization.** Each session had its own `/2` authorization: `maxMinutes` 15, `maxPlaybackVolumePercent` 25, script
+`p4-v1`, kept outside the repository. At the owner's explicit instruction, Claude Code wrote the files. The device names
+were copied from the live read, not typed, and the four consent fields reflect the owner's chat confirmation. Each file
+carries a note recording that.
+
+### 11.2 S1: human speech recognition (A18)
+
+`evidence/voice/acoustic-session-s1.json`. Push-to-talk; 24 trials (8 phrases × 3); whisper.cpp v1.9.4; COMPLETED in
+244 s of 15 min. Devices authorized; the volume monitor took 187 reads, max 24 %; shutdown clean; 0 workers afterwards.
+
+| Measure | Result |
+|---|---|
+| Exact phrase | **15 / 24 (62.5 %)** |
+| WER over recognized trials | **11 / 101 words = 10.9 %** (21 trials) |
+| WER counting no-results as fully missed | 21 / 111 = 18.9 % |
+| No result | 3: once "what are my agents working on", twice "goodbye bunny" |
+| Per phrase | "what failed", "how many agents are working", "open the approvals": 3/3 exact. "what are my agents working on": 0/3 exact |
+
+The two "goodbye bunny" no-results are most likely a script artifact. The phrase is Bunny's voice-close command
+(`voice-intent.ts:274`), so the first exact recognition closes the session. This is not proven by the evidence.
+
+**A18: MEASURED, no verdict.** No numeric A18 threshold has been set in this report or in Phase 3. None is invented
+here; the owner sets it.
+
+### 11.3 S3: echo and spoken interruption (A16, A17): not measured
+
+- **First run** (`acoustic-session-s3-invalid-no-handsfree.json`, kept only as a record): COMPLETED safely in 377 s,
+  but invalid. The harness never sent the explicit hands-free start, so the microphone was closed while Bunny spoke:
+  echo showed 0 false interrupts and interruptions 0 / 12 "none". These are **not** results.
+- **Rerun** with this PR's harness (identical bytes to `3eb2c94`): the owner postponed it. The process ended without
+  running the harness's own shutdown or evidence step, most likely because the window was closed before the typed `q`
+  was read. The worker ended with the process (kill-on-close job): 0 workers, no Host port, volume unchanged at 24 %.
+  The run left two disposable Host data folders in `%TEMP%`; one came from a killed fixture run. Both were deleted by
+  hand. **No S3 trial is recorded.**
+
+### 11.4 Findings
+
+1. **Harness, fixed in this PR:** no hands-free start; section 7 read latency before playback (S1: 24/24 null); a stop
+   button pressed mid-reply ended the lane; partial sections were lost on a stop.
+2. **Engine, reported and not fixed:** during hands-free, `interrupt()` aborts the input capture and re-arms
+   immediately (`voice-session.server.ts:752-753`). The worker releases a capture only when its thread exits
+   (`BunnyVoiceWorker.cs:2537`), so the new start is refused with `DEVICE_BUSY` (`:5146`) and the hands-free lane
+   ends. Fixture: 4 / 4. A user who presses stop during a hands-free reply loses the microphone. Recommended: re-arm on
+   the aborted turn's `capture.stopped`, in a separate PR with a regression test.
+3. **Harness, open:** closing the session window skips cleanup. The worker still dies, but the temp Host folder, which
+   may hold recognized text, stays behind. Recommended: handle the console close (`SIGHUP`) and sweep stale
+   `bunny-p4-acoustic-*` folders at start.
+4. The fixture cannot speak an interruption on cue, so barge-in detection has never been exercised by this harness.
+   It will be first exercised by the attended rerun.
+
+### 11.5 Gate status
+
+| Gate | Status |
+|---|---|
+| A16 echo cancellation | **BLOCKED**: not measured (S3 pending) |
+| A17 spoken interruption ≤ 200 ms | **BLOCKED**: not measured (S3 pending) |
+| A18 human recognition | **MEASURED, no threshold**: 62.5 % exact, WER 10.9 % (§11.2) |
+| A19 response latency, acoustic | **BLOCKED**: needs this PR's section 7 (S2) and section 9 (S5). Known under-load MISS (6.5 s P50) unchanged |
+| A20 device shutdown and recovery | **BLOCKED**: section 10 not run |
+| Backchannels, pauses (sections 5, 6) | not run |
+| Host and Mission concurrency (section 9) | not run |
+| Narrator walkthrough | not run |
+| Privacy and cleanup | S1 clean. S3 rerun ended abruptly: no worker left, temp folders removed by hand (finding 3) |
+
+**Remaining sessions, each with a fresh authorization:** S3 rerun (`2,3,4`), S2 (`7,10`), S4 (`5,6`), S5 (`9`), then
+the Narrator walk. Phase 4 acceptance: **not claimed.**
