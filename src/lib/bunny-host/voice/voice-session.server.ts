@@ -145,6 +145,11 @@ export type VoiceSessionDeps = {
   /** Test-only stdin budgets (bytes). Production uses the defaults below; never set from HTTP. */
   workerStdinSoftBudget?: number;
   workerStdinHardBudget?: number;
+  /**
+   * MA5-S2 S3R1 test-only (attended recognition trials): a final transcript is shown and nothing is classified, answered,
+   * routed or executed, so a scripted "goodbye Bunny" or "pause the current mission" cannot act. Never set from HTTP.
+   */
+  recognitionOnly?: boolean;
   chat: VoiceChatPort;
   agents: VoiceAgentPort;
   accounts?: () => import("../connections.ts").DeviceConnectionView[];
@@ -255,6 +260,9 @@ export class VoiceSessionManager {
   private inputSequence = 0;
   /** The armed input turn of the echo-cancelled lane, or null between turns. */
   private input: InputTurn | null = null;
+  /** S3R1: an aborted input turn whose capture.stopped has not arrived. The worker refuses a second capture (DEVICE_BUSY) until it does. */
+  private releasingInput: InputTurn | null = null;
+  private cancelReleaseWait: (() => void) | null = null;
   /** Input turns whose capture ended and whose recognition has not reported yet, keyed by turn id. */
   private readonly finalizing = new Map<string, InputTurn>();
   /** The reply held on speech onset (paused, not cancelled) while the controller decides. */
@@ -893,6 +901,11 @@ export class VoiceSessionManager {
     this.snap.route = null;
     this.snap.timing = this.snap.timing ? { ...this.snap.timing, finalAt: this.now() } : null;
     this.setState("PROCESSING");
+    if (this.deps.recognitionOnly) {
+      this.deps.journal("voice.turn", "Recognition-only trial: the turn was not routed.");
+      this.settleIdle(false);
+      return;
+    }
     // Speech is untrusted input: a barely-heard final is never routed, and never controls an agent.
     if (confidence < VOICE_LIMITS.minFinalConfidence) {
       // T12 F1: a barely heard "stop" while Bunny speaks still silences her, and nothing else is said.
@@ -2323,6 +2336,7 @@ export class VoiceSessionManager {
     }
     this.input = null;
     this.finalizing.clear();
+    this.clearReleasing();
     this.duplexStarting = false;
     if (this.snap.duplex) this.snap.duplex.active = false;
     this.snap.inputTurnId = null;
@@ -2355,6 +2369,7 @@ export class VoiceSessionManager {
     for (const turn of this.finalizing.values()) turn.cancelDeadline?.();
     this.input = null;
     this.finalizing.clear();
+    this.clearReleasing();
     this.duplexToken = null;
     this.duplexStarting = false;
     if (this.snap.duplex) this.snap.duplex.active = false;
@@ -2383,7 +2398,7 @@ export class VoiceSessionManager {
       this.relaunchDuplex();
       return;
     }
-    if (this.input) return;
+    if (this.input || this.releasingInput) return;
     const gen = ++this.inputSequence;
     const turn = `input-${gen}-${randomUUID().slice(0, 8)}`;
     this.input = {
@@ -2499,12 +2514,33 @@ export class VoiceSessionManager {
     this.snap.inputTurnId = this.input?.turn ?? null;
   }
 
-  /** Aborts the armed input turn with its own turn and gen. The output generation is never named. */
+  /**
+   * Aborts the armed input turn with its own turn and gen. The output generation is never named. Its words are discarded, and
+   * the next turn is armed only on this turn's capture.stopped (S3R1: an immediate capture.start met DEVICE_BUSY).
+   */
   private abortInput() {
     const input = this.input;
     if (!input) return;
+    input.dropped = true;
+    this.clearReleasing();
+    this.releasingInput = input;
+    // A capture thread that never stops is a worker fault: the owned worker is closed, as for a missed duplex release.
+    this.cancelReleaseWait = this.schedule(() => {
+      this.cancelReleaseWait = null;
+      if (this.releasingInput !== input || this.closing) return;
+      this.detach("capture release", async () => {
+        await this.close("audio_release_timeout");
+        this.setError("AEC_UNAVAILABLE", "Microphone release timed out; the owned voice worker was closed. Start voice again.");
+      });
+    }, FINALIZE_ACK_MS);
     this.tryWorker({ op: "capture.abort", gen: input.gen, turn: input.turn });
     this.retireInput(input);
+  }
+
+  private clearReleasing() {
+    this.cancelReleaseWait?.();
+    this.cancelReleaseWait = null;
+    this.releasingInput = null;
   }
 
   /**
@@ -2533,6 +2569,16 @@ export class VoiceSessionManager {
   private onDuplexInput(event: WorkerEvent) {
     if (!("turn" in event) || !("gen" in event) || typeof event.turn !== "string" || typeof event.gen !== "number") {
       this.lateEventsDropped += 1;
+      return;
+    }
+    // S3R1: the aborted turn released the device. Only its own acknowledgment (turn and gen) re-arms the lane; its stt.none may
+    // arrive first (the finalizer does not wait for the capture thread), so it is matched even after it left the lane.
+    const releasing = this.releasingInput;
+    if (event.ev === "capture.stopped" && releasing && releasing.turn === event.turn && releasing.gen === event.gen) {
+      this.clearReleasing();
+      this.leaveInputLane(releasing);
+      this.armDuplexTurn(true);
+      this.touch();
       return;
     }
     const input = this.inputFor(event.turn, event.gen);
