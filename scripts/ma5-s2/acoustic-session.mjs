@@ -272,6 +272,16 @@ function stats(values) {
   return { n: v.length, p50: at(50), p95: at(95), max: v.at(-1) };
 }
 const since = (t, field) => (t?.[field] && t?.speechEndAt ? t[field] - t.speechEndAt : null);
+/** Every response stage from the end of speech, separately (P4-2): the status line is never counted as the answer. */
+export function latencyRow(t) {
+  return { transcriptMs: since(t, "finalAt"), firstModelTokenMs: since(t, "firstTokenAt"), statusAckAudibleMs: since(t, "delayAckPlaybackAt"), firstAudibleAnswerMs: since(t, "firstPlaybackAt"), completedMs: since(t, "completedAt"), delayAck: !!t?.delayAckAt };
+}
+export const latencyStats = (rows) => Object.fromEntries(["transcriptMs", "firstModelTokenMs", "statusAckAudibleMs", "firstAudibleAnswerMs", "completedMs"].map((k) => [k, stats(rows.map((r) => r[k]))]));
+/**
+ * A push-to-talk turn is over once its answer completed, or it ended with no recognition. The transcript alone is not
+ * enough: it arrives before any playback (attended S1, 2026-10-30: 24/24 answer-audio timings were empty when read then).
+ */
+export const answerSettled = (v, beforeTurnId) => v.turnId !== beforeTurnId && !v.capturing && (v.timing?.completedAt != null || (v.state === "IDLE" && v.finalTranscript == null));
 
 async function main() {
   const argv = process.argv.slice(2);
@@ -346,12 +356,13 @@ async function main() {
     }
 
     const lastTurn = async (before, ms = 30_000) => until(async () => { const s = await voice(); return s.turnId !== before && (s.finalTranscript != null || s.state === "IDLE") && !s.capturing ? s : null; }, ms);
-    const pushToTalk = async (phraseId, phrase) => {
+    // `waitAnswer`: also wait for the spoken answer to complete, so the turn's timing holds every stage.
+    const pushToTalk = async (phraseId, phrase, waitAnswer = false) => {
       const before = (await voice()).turnId;
       await cmd("voice.listen.start", { source: "button" });
       if (!(await say(phrase))) { await cmd("voice.listen.end", {}); return null; }
-      const s = await lastTurn(before, 20_000);
-      return { ...scoreTurn(phraseId, phrase, s?.finalTranscript ?? null), speechEndToFirstAudioMs: since(s?.timing, "firstPlaybackAt") };
+      const s = waitAnswer ? await until(async () => { const v = await voice(); return answerSettled(v, before) ? v : null; }, 60_000) : await lastTurn(before, 20_000);
+      return { ...scoreTurn(phraseId, phrase, s?.finalTranscript ?? null), ...(waitAnswer ? latencyRow(s?.timing) : {}) };
     };
     const want = (n) => sections.includes(n);
 
@@ -363,14 +374,17 @@ async function main() {
     }
     if (want(7)) {
       const rows = [];
-      for (let i = 0; i < TRIALS.latency; i++) { const r = await pushToTalk(`stt-${i % 2}`, PHRASES.stt[i % 2]); if (r) rows.push(r.speechEndToFirstAudioMs); await sleep(3_000); }
-      out.sections.latency = { class: cls("software receipt with real capture"), boundary: "Host speechEndAt (VAD speech_end after 900 ms endpoint silence) to the worker's playback.started of the answer; speaker output latency not included", speechEndToFirstAnswerAudioMs: stats(rows) };
+      for (let i = 0; i < TRIALS.latency; i++) { const r = await pushToTalk(`stt-${i % 2}`, PHRASES.stt[i % 2], true); if (r) rows.push(r); await sleep(3_000); }
+      out.sections.latency = { class: cls("software receipt with real capture"), boundary: "Host speechEndAt (VAD speech_end after 900 ms endpoint silence) to each stage; audible = the worker's playback.started, speaker output latency not included", trials: rows, ...latencyStats(rows) };
     }
 
     // Hands-free: Bunny speaks a long answer; each trial is one reply.
     const speakLong = async () => { await cmd("voice.text", { text: "Tell me a six sentence story about a careful rabbit who plans a garden." }); return until(async () => { const s = await voice(); return s.playing ? s : null; }, 120_000); };
     const settle = () => until(async () => { const s = await voice(); return !s.playing && ["IDLE", "INTERRUPTED", "LISTENING"].includes(s.state) ? s : null; }, 120_000);
+    // Without a live duplex lane the microphone is closed while Bunny speaks, so echo and barge-in trials would be vacuous.
+    const requireDuplex = async () => { if (!(await voice()).duplex?.active) throw new SessionStop("DUPLEX_NOT_ACTIVE", "the hands-free microphone is not listening during playback"); };
     const bargeTrial = async (phraseId, phrase) => {
+      await requireDuplex();
       const before = (await voice()).lastBargeIn?.inputTurnId ?? null;
       const playing = await speakLong();
       if (!playing) return null;
@@ -384,7 +398,11 @@ async function main() {
     };
     if ([2, 3, 4, 5, 6, 9].some(want)) {
       await cmd("voice.session.open", { mode: "hands_free" });
+      // T12-PRIV-01: opening hands-free mode never opens the microphone; only an explicit Start hands-free does (attended
+      // S3, 2026-10-30, ran without it: 0/12 interruptions and an empty echo result).
+      await cmd("voice.listen.start", { source: "hands_free" });
       await until(async () => (await voice()).duplex?.active, 15_000);
+      await requireDuplex();
       if (want(2) || want(3)) {
         await prompt(`Stay silent while Bunny speaks (${TRIALS.echo} replies). Normal room noise is fine.`);
         const rows = [];
@@ -407,6 +425,7 @@ async function main() {
         const rows = [];
         for (const [i, p] of PHRASES.pause.entries()) for (let k = 0; k < TRIALS.pause; k++) {
           const before = (await voice()).turnId;
+          await requireDuplex();
           if (!(await say(p))) continue;
           const s = await until(async () => { const v = await voice(); return v.turnId !== before && v.finalTranscript ? v : null; }, 20_000);
           const score = scoreTurn(`pause-${i}`, p, s?.finalTranscript ?? null);
@@ -432,16 +451,15 @@ async function main() {
         try {
           for (let i = 0; i < TRIALS.load; i++) {
             const before = (await voice()).turnId;
+            await requireDuplex();
             if (!(await say("in one short sentence what does a rabbit eat"))) continue;
             const s = await until(async () => { const v = await voice(); return v.turnId !== before && v.timing?.completedAt ? v : null; }, 120_000);
-            const t = s?.timing;
-            // Reported separately (P4-2): the status line is never counted as the answer.
-            rows.push({ statusAckAudibleMs: since(t, "delayAckPlaybackAt"), firstModelTokenMs: since(t, "firstTokenAt"), firstAudibleAnswerMs: since(t, "firstPlaybackAt"), completedMs: since(t, "completedAt"), delayAck: !!t?.delayAckAt });
+            rows.push(latencyRow(s?.timing));
           }
         } finally { stop = true; }
         await guard.race(Promise.all(lanes));
         const minutes = (performance.now() - t0) / 60_000;
-        out.sections.concurrency = { class: cls("acoustic capture + software receipts"), trials: rows, statusAckAudibleMs: stats(rows.map((r) => r.statusAckAudibleMs)), firstModelTokenMs: stats(rows.map((r) => r.firstModelTokenMs)), firstAudibleAnswerMs: stats(rows.map((r) => r.firstAudibleAnswerMs)), completedMs: stats(rows.map((r) => r.completedMs)), background: { completed: done, notCompleted: failed, completedPerMinute: minutes ? Math.round((done / minutes) * 100) / 100 : null } };
+        out.sections.concurrency = { class: cls("acoustic capture + software receipts"), trials: rows, ...latencyStats(rows), background: { completed: done, notCompleted: failed, completedPerMinute: minutes ? Math.round((done / minutes) * 100) / 100 : null } };
       }
     }
     if (want(10)) {

@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { createInterface } from "node:readline/promises";
 import {
-  assertPrivateEvidence, authorizationTemplate, checkEndpoints, createSessionGuard, createShutdown, redact, safeFailure, scoreTurn,
+  answerSettled, assertPrivateEvidence, authorizationTemplate, checkEndpoints, latencyRow, latencyStats, createSessionGuard, createShutdown, redact, safeFailure, scoreTurn,
   sessionBudgetMs, sessionPrimitives, SessionStop, validateAuthorization, watchEndpoints, wer, PHRASES, TRIALS,
 } from "./ma5-s2/acoustic-session.mjs";
 
@@ -270,4 +270,20 @@ test("P4R1-2 the monitor checks only while a voice session is open (a closed ses
   assert.equal(reads, 1, "closed polls were skipped; the first open poll was checked");
   assert.match(guard.signal.reason.message, /OUTPUT_VOLUME_ABOVE_LIMIT/);
   guard.dispose();
+});
+
+test("P4 attended: a push-to-talk latency turn waits for the answer, not just the transcript", () => {
+  const t = { speechEndAt: 1_000, finalAt: 1_400, firstTokenAt: 2_000, delayAckAt: 1_500, delayAckPlaybackAt: 1_600, firstPlaybackAt: 3_000, completedAt: 5_000 };
+  const base = { turnId: "t2", capturing: false, state: "PROCESSING", finalTranscript: "what failed" };
+  assert.equal(answerSettled({ ...base, timing: { ...t, firstPlaybackAt: null, completedAt: null } }, "t1"), false, "a transcript alone is not a settled turn");
+  assert.equal(answerSettled({ ...base, timing: t }, "t1"), true);
+  assert.equal(answerSettled({ ...base, timing: t }, "t2"), false, "the previous turn never counts");
+  assert.equal(answerSettled({ ...base, state: "IDLE", finalTranscript: null, timing: { ...t, completedAt: null } }, "t1"), true, "no recognition ends the turn");
+  assert.equal(answerSettled({ ...base, capturing: true, timing: t }, "t1"), false);
+  // Each stage is reported separately; the status line is never the answer.
+  assert.deepEqual(latencyRow(t), { transcriptMs: 400, firstModelTokenMs: 1_000, statusAckAudibleMs: 600, firstAudibleAnswerMs: 2_000, completedMs: 4_000, delayAck: true });
+  assert.deepEqual(latencyRow(null), { transcriptMs: null, firstModelTokenMs: null, statusAckAudibleMs: null, firstAudibleAnswerMs: null, completedMs: null, delayAck: false });
+  const s = latencyStats([latencyRow(t), latencyRow({ ...t, firstPlaybackAt: 2_500 }), latencyRow(null)]);
+  assert.deepEqual(s.firstAudibleAnswerMs, { n: 2, p50: 1_500, p95: 2_000, max: 2_000 });
+  assert.equal(s.statusAckAudibleMs.n, 2);
 });
