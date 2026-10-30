@@ -1,14 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { PassThrough } from "node:stream";
 import { createInterface } from "node:readline/promises";
 import {
   answerSettled, assertPrivateEvidence, authorizationTemplate, checkEndpoints, latencyRow, latencyStats, createSessionGuard, createShutdown, redact, safeFailure, scoreTurn,
   sessionBudgetMs, sessionPrimitives, SessionStop, validateAuthorization, watchEndpoints, wer, PHRASES, TRIALS,
+  A18, a18Verdict, createOwnedTempDir, planSections, recoverInterruptedSessions, wireOwnerStop, TEMP_PREFIX,
 } from "./ma5-s2/acoustic-session.mjs";
 
 // MA5-S2 P4-4: the attended acoustic harness opens nothing without a complete, current owner authorization.
@@ -50,9 +52,13 @@ test("P4-4 the CLI refuses before loading any Host code when the authorization i
     assert.equal(refused.status, 1);
     assert.match(refused.stderr, /Refused: the authorization is not valid/);
     writeFileSync(bad, JSON.stringify({ ...valid(), authorizedAt: new Date().toISOString() }));
-    const check = run("--authorization", bad, "--check");
+    // S3R1: recognition sections never run with action sections; the default (every section) is refused as mixed.
+    assert.match(run("--authorization", bad, "--check").stderr, /Refused: run the recognition sections \(1,8\) separately/);
+    const check = run("--authorization", bad, "--sections", "1,8", "--check");
     assert.equal(check.status, 0, check.stderr);
     assert.equal(JSON.parse(check.stdout).valid, true);
+    assert.equal(JSON.parse(check.stdout).recognitionOnly, true);
+    assert.equal(JSON.parse(run("--authorization", bad, "--sections", "2,3,4", "--check").stdout).recognitionOnly, false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -286,4 +292,136 @@ test("P4 attended: a push-to-talk latency turn waits for the answer, not just th
   const s = latencyStats([latencyRow(t), latencyRow({ ...t, firstPlaybackAt: 2_500 }), latencyRow(null)]);
   assert.deepEqual(s.firstAudibleAnswerMs, { n: 2, p50: 1_500, p95: 2_000, max: 2_000 });
   assert.equal(s.statusAckAudibleMs.n, 2);
+});
+
+// -----------------------------------------------------------------------------------------------------------------
+// S3R1: recognition separated from actions, A18 criteria, abnormal-exit cleanup and an always-available owner stop
+// -----------------------------------------------------------------------------------------------------------------
+
+test("S3R1 recognition sections run alone, on a Host that routes nothing; mixing them with action sections is refused", () => {
+  assert.deepEqual(planSections([1, 8]), { sections: [1, 8], recognitionOnly: true });
+  assert.deepEqual(planSections([1]), { sections: [1], recognitionOnly: true });
+  assert.deepEqual(planSections([2, 3, 4]), { sections: [2, 3, 4], recognitionOnly: false });
+  assert.throws(() => planSections([1, 7]), /separately/);
+  assert.throws(() => planSections([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]), /separately/);
+  // "goodbye bunny" is a scripted recognition phrase: it is safe only because recognition runs never route.
+  assert.ok(PHRASES.stt.includes("goodbye bunny"));
+});
+
+test("S3R1 A18: WER <= 15% counting missing transcripts as deletions, no-result <= 5%, zero actions, 48 utterances / 200 words", () => {
+  assert.deepEqual(A18, { maxWer: 0.15, maxNoResultRate: 0.05, maxUnauthorizedActions: 0, minUtterances: 48, minRefWords: 200 });
+  const refWords = PHRASES.stt.reduce((s, p) => s + p.split(" ").length, 0) * TRIALS.stt;
+  assert.ok(PHRASES.stt.length * TRIALS.stt >= A18.minUtterances && refWords >= A18.minRefWords, "a full recognition run meets the sample minimum");
+  const exact = Array.from({ length: 48 }, (_, i) => ({ phraseId: `stt-${i % 8}`, refWords: 5, wordErrors: 0, outcome: "exact" }));
+  assert.equal(a18Verdict(exact, 0).pass, true);
+  // Two missing transcripts: 10 deleted words of 240 (4.2%) and a no-result rate of 4.2%, still within A18.
+  const missing = exact.map((t, i) => (i < 2 ? { ...t, wordErrors: null, outcome: "no-result" } : t));
+  const v = a18Verdict(missing, 0);
+  assert.equal(v.wordErrorsWithDeletions, 10);
+  assert.equal(v.noResultRate, 0.042);
+  assert.equal(v.pass, true);
+  // A third missing transcript crosses the no-result limit, though WER (6.3%) does not.
+  const three = a18Verdict(exact.map((t, i) => (i < 3 ? { ...t, wordErrors: null, outcome: "no-result" } : t)), 0);
+  assert.equal(three.checks.noResultRate, false);
+  assert.equal(three.checks.wer, true);
+  assert.equal(a18Verdict(exact, 1).checks.unauthorizedActions, false, "one speech-triggered Task fails A18");
+  assert.equal(a18Verdict(exact.slice(0, 24), 0).checks.sample, false, "24 utterances (the S1 size) is below the qualification sample");
+  const errors = exact.map((t) => ({ ...t, wordErrors: 1, outcome: "errors" }));
+  assert.equal(a18Verdict(errors, 0).checks.wer, false, "20% WER fails");
+});
+
+test("S3R1 recovery removes only positively identified directories whose owner process is gone", () => {
+  const root = mkdtempSync(join(tmpdir(), "bunny-s3r1-recovery-"));
+  try {
+    const first = createOwnedTempDir(root);
+    const second = createOwnedTempDir(root);
+    const deadName = first.split(/[\\/]/).at(-1), otherName = second.split(/[\\/]/).at(-1);
+    const unmarked = join(root, `${TEMP_PREFIX}abc123`);
+    mkdirSync(unmarked);
+    writeFileSync(join(unmarked, "host.sqlite"), "unknown");
+    const foreign = join(root, `${TEMP_PREFIX}xyz789`);
+    mkdirSync(foreign);
+    writeFileSync(join(foreign, ".bunny-acoustic-owner.json"), JSON.stringify({ schema: "bunny-acoustic-temp/1", name: deadName, pid: 1 }));
+    const oddName = join(root, `${TEMP_PREFIX}not-a-mkdtemp-name`);
+    mkdirSync(oddName);
+    writeFileSync(join(oddName, ".bunny-acoustic-owner.json"), JSON.stringify({ schema: "bunny-acoustic-temp/1", name: `${TEMP_PREFIX}not-a-mkdtemp-name`, pid: 1 }));
+    const unrelated = join(root, "something-else");
+    mkdirSync(unrelated);
+    // A link that carries the prefix and points at an identified directory is never followed or removed.
+    const target = createOwnedTempDir(mkdtempSync(join(tmpdir(), "bunny-s3r1-target-")));
+    const link = join(root, `${TEMP_PREFIX}lnk456`);
+    symlinkSync(target, link, "junction");
+    // Every owner is reported gone: only the name, the directory type and the self-naming marker decide what is removed.
+    const result = recoverInterruptedSessions({ root, alive: () => false });
+    assert.deepEqual(result.removed.sort(), [deadName, otherName].sort());
+    for (const kept of [unmarked, foreign, oddName, unrelated, link]) assert.ok(existsSync(kept), `${kept} must remain`);
+    assert.ok(existsSync(join(target, ".bunny-acoustic-owner.json")), "the link target is untouched");
+    assert.equal(result.kept.filter((k) => k.reason === "unidentified").length, 4);
+    // A running owner keeps its directory.
+    const running = createOwnedTempDir(root);
+    const again = recoverInterruptedSessions({ root, alive: () => true });
+    assert.ok(existsSync(running));
+    assert.ok(again.kept.some((k) => k.reason === "owner-running"));
+    rmSync(link, { force: true, recursive: false });
+    rmSync(join(target, ".."), { recursive: true, force: true });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("S3R1 a normal exit removes the session directory; a forced termination leaves it for recovery, which then removes it", async () => {
+  const root = mkdtempSync(join(tmpdir(), "bunny-s3r1-exit-"));
+  const child = (exit) => spawn(process.execPath, ["--input-type=module", "-e", `
+    import { createOwnedTempDir, installExitCleanup } from ${JSON.stringify(pathToFileURL(join(process.cwd(), "scripts/ma5-s2/acoustic-session.mjs")).href)};
+    const dir = createOwnedTempDir(${JSON.stringify(root)});
+    installExitCleanup(dir, () => process.exit(2));
+    console.log(dir);
+    ${exit ? "process.exit(0);" : "setInterval(() => {}, 1000);"}
+  `], { stdio: ["ignore", "pipe", "inherit"] });
+  const firstLine = (proc) => new Promise((done) => proc.stdout.once("data", (b) => done(String(b).trim())));
+  try {
+    const normal = child(true);
+    const normalDir = await firstLine(normal);
+    await new Promise((done) => normal.once("exit", done));
+    assert.equal(existsSync(normalDir), false, "the exit handler removed it");
+
+    const forced = child(false);
+    const forcedDir = await firstLine(forced);
+    forced.kill("SIGKILL"); // TerminateProcess on Windows: no handler runs
+    await new Promise((done) => forced.once("exit", done));
+    assert.equal(existsSync(forcedDir), true, "a forced termination bypasses every handler");
+    const recovered = recoverInterruptedSessions({ root });
+    assert.deepEqual(recovered.removed, [forcedDir.split(/[\\/]/).at(-1)]);
+    assert.equal(existsSync(forcedDir), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("S3R1 the owner can stop the session between prompts (q + Enter) or with Ctrl+C, and waiting work ends at once", async () => {
+  for (const how of ["q", "ctrl-c"]) {
+    const input = new PassThrough();
+    const rl = createInterface({ input, output: new PassThrough(), terminal: false });
+    const guard = createSessionGuard({ budgetMs: 60_000 });
+    wireOwnerStop(rl, guard);
+    const ops = sessionPrimitives({ guard, send: async () => ({}), ask: null });
+    const waiting = ops.sleep(60_000);
+    const t = performance.now();
+    if (how === "q") input.write("q\n");
+    else rl.emit("SIGINT");
+    await assert.rejects(waiting, (e) => e instanceof SessionStop && e.code === "ENDED_BY_OWNER");
+    assert.ok(performance.now() - t < 1_000, "the stop takes effect without waiting for a prompt");
+    guard.dispose();
+    rl.close();
+  }
+  // Any other line between prompts is ignored.
+  const input = new PassThrough();
+  const rl = createInterface({ input, output: new PassThrough(), terminal: false });
+  const guard = createSessionGuard({ budgetMs: 60_000 });
+  wireOwnerStop(rl, guard);
+  input.write("hello\n");
+  await new Promise((r) => setImmediate(r));
+  assert.equal(guard.signal.aborted, false);
+  guard.dispose();
+  rl.close();
 });
