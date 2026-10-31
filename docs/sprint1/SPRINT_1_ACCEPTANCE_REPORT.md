@@ -87,10 +87,17 @@ node scripts/browser-smoke.mjs http://127.0.0.1:8081/ screenshots/sprint1-previe
 2. **Owner live session:** (a) live-Host Mission Control demonstration round with screenshots
    (criterion 1 finish); (b) fresh keyboard + Narrator round and AXTree capture
    (criterion 6 finish); (c) approval click-through on the live UI (criterion 3 visual demo).
-3. **Security lanes, still unmerged:** `sec/resolve-better-auth-advisory` (better-auth → 1.7.14)
-   and `sec/seroval-1.7.3` (merging them closes the 14 moderate `npm audit` findings seen on a
-   fresh install of this baseline). Flagged, not patched ad hoc here — the security line
-   deserves its own reviewed PRs as already built.
+3. 3. **Security lanes - status CORRECTED 2026-10-31 (this bullet was stale at report time):**
+   both lanes were already MERGED into main before this sprint - PR #54
+   `sec/resolve-better-auth-advisory` (better-auth -> 1.7.14, commit `68951b5`,
+   GHSA-q84f-53jg-9ppm, merged 2026-10-27) and PR #62 `sec/seroval-1.7.3` (seroval ->
+   1.7.3, commit `0e49c7b`, GHSA-f86p-h4j2-7qgj and four related advisories, merged
+   2026-10-29). Cross-verified 2026-10-31 on main `b58611b` via
+   `gh pr list --state all` and the lockfile (better-auth@1.7.14, seroval@1.7.3);
+   their advisories no longer appear in `npm audit`. The residual `npm audit`
+   findings on this baseline are dev-toolchain-only (eslint/minimatch chain,
+   GHSA-g3hv-75wg-m249) and are being cleared by the follow-on lane
+   `sec/minimatch-toolchain-override`.
 4. **Lint debt:** 58 pre-existing errors across milestone scripts/tests (`scripts/ma4-*`,
    `scripts/verify-*`, `src/lib/bunny-host/ma4/*`, …), untouched since before this sprint.
    Recommend a separate owner-approved hygiene PR — deliberately out of this sprint's scope.
