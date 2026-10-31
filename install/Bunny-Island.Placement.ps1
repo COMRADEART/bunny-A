@@ -193,6 +193,29 @@ function Select-BunnyMonitor {
   return $primary
 }
 
+# MA5-S2 Sprint 2: the preference keys the Island knows, and the startup load rule itself, moved from the
+# UI layer into the pure rules file so both are unit-tested like every other placement rule. Rules kept:
+# ONLY known keys are applied, the table keeps its defaults when the file is unreadable or corrupt, and
+# the function reports how many keys were applied. Values stay raw here: edge/offset/position are validated
+# at placement time (ConvertTo-BunnyEdge / ConvertTo-BunnyOffset), never trusted from the file.
+$script:BunnyPreferenceKeys = @('size', 'position', 'idle', 'glass', 'motion', 'collapse', 'theme', 'primary', 'edge', 'edgeOffset', 'blur', 'monitor')
+function Get-BunnyPreferenceKeys { return $script:BunnyPreferenceKeys }
+function Import-BunnyPreferences {
+  param([object]$Table, [string]$SavedJson, [string[]]$KnownKeys)
+  $keys = @([string[]]$KnownKeys)
+  $applied = 0
+  try {
+    $saved = ConvertFrom-Json $SavedJson
+    foreach ($property in $saved.PSObject.Properties) {
+      if (($keys -contains $property.Name) -and ($Table -and $Table.ContainsKey($property.Name))) {
+        $Table[$property.Name] = $property.Value
+        $applied += 1
+      }
+    }
+  } catch { return 0 }
+  return $applied
+}
+
 # The edge nearest to a point (the pointer at release, in DIPs) on the monitor's work area, plus the notch's position along
 # that edge as an offset 0..1. The offset centres the notch on the pointer's position along the edge, clamped so the notch
 # stays inside the inner box that Get-BunnyPlacement uses (the same gap rule). Ties resolve top, bottom, left, right.
