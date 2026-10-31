@@ -11,7 +11,10 @@ $bunnyPreferencePath = if($PreferencePath) {$PreferencePath} else {throw 'Instal
 $bunnyPreferences = @{ size='compact'; position='center'; idle='providers'; glass='medium'; motion='full'; collapse=10; theme='dark'; primary=@('codex','claude','ollama'); edge='top'; edgeOffset=0.5; blur='off'; monitor=$null }
 . (Join-Path $PSScriptRoot 'Bunny-Island.Placement.ps1')
 . (Join-Path $PSScriptRoot 'Bunny-Island.Characters.ps1')
-try { if (Test-Path -LiteralPath $bunnyPreferencePath) { $saved=Get-Content -LiteralPath $bunnyPreferencePath -Raw | ConvertFrom-Json; foreach ($property in $saved.PSObject.Properties) { if ($bunnyPreferences.ContainsKey($property.Name)) { $bunnyPreferences[$property.Name]=$property.Value } } } } catch { }
+ # MA5-S2 Sprint 2: the startup load rule moved to the pure rules file (Import-BunnyPreferences) so the
+ # only-known-keys and corrupt-file behaviors are unit-tested like the rest of placement. Same semantics
+ # as the previous inline loop: defaults stay when the file is unreadable or corrupt.
+ try { if (Test-Path -LiteralPath $bunnyPreferencePath) { Import-BunnyPreferences -Table $bunnyPreferences -SavedJson (Get-Content -LiteralPath $bunnyPreferencePath -Raw) -KnownKeys (Get-BunnyPreferenceKeys) } } catch { }
 $bunnyView='idle'; $bunnyExpanded=$false; $bunnyTaskExpanded=$false; $bunnyPending=$null; $bunnyFinishedAt=$null; $bunnySeenTaskState=''; $bunnyHeatDismissed=$null; $bunnyHot=$null; $bunnyOnline=$false; $bunnySettingsUpdating=$false
 $bunnyAnimate = -not $SmokeTest -and [Windows.SystemParameters]::ClientAreaAnimation -and -not [Windows.SystemParameters]::HighContrast
 [xml]$bunnyVisualXaml = @'

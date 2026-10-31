@@ -211,3 +211,255 @@ test('no random value anywhere in the Island layer (placement, indicators and la
     assert.doesNotMatch(readFileSync(join(root, 'install', name), 'utf8'), /Get-Random|System\.Random/, name);
   }
 });
+
+// --- MA5-S2 Sprint 2: notch persistence (restart restore + preference loading + save wiring) ---
+
+// One extra rules batch: monitor restore (Select-BunnyMonitor), the preference load rule
+// (Import-BunnyPreferences) placed through Set-BunnyPosition's exact composition, and work-area
+// fingerprint stability. All pure rules, so the same dot-source + JSON runner pattern applies.
+const rulesRunnerSource = `param([string]$Placement, [string]$Cases, [string]$Out)
+. $Placement
+$items = Get-Content -LiteralPath $Cases -Raw | ConvertFrom-Json
+$results = foreach ($c in $items) {
+  $kind = [string]$c.kind
+  if ($kind -eq 'monitor') {
+    $list = @()
+    foreach ($m in $c.monitors) {
+      $wa = @{ Left = [double]$m.left; Top = [double]$m.top; Width = [double]$m.width; Height = [double]$m.height }
+      $list += @{ Device = [string]$m.device; WorkArea = $wa; Primary = [bool]$m.primary }
+    }
+    $saved = $null
+    if ($null -ne $c.saved) { $saved = @{ device = [string]$c.saved.device; fingerprint = [string]$c.saved.fingerprint } }
+    $chosen = Select-BunnyMonitor -Saved $saved -Monitors $list
+    $deviceOut = ''
+    $primaryOut = $false
+    $printOut = ''
+    if ($null -ne $chosen) {
+      $deviceOut = [string]$chosen.Device
+      $primaryOut = [bool]$chosen.Primary
+      $printOut = Get-BunnyWorkAreaFingerprint $chosen.WorkArea
+    }
+    [pscustomobject]@{ id = $c.id; kind = $kind; device = $deviceOut; primary = $primaryOut; fingerprint = $printOut }
+  }
+  elseif ($kind -eq 'load') {
+    # The Island's defaults, then the saved file through the same rules the Island runs at startup:
+    # Import-BunnyPreferences (only known keys, corrupt file tolerated), then Set-BunnyPosition's
+    # exact composition (position left/right override, ConvertTo-BunnyEdge, Get-BunnyPlacement).
+    $defaults = @{ size = 'compact'; position = 'center'; idle = 'providers'; glass = 'medium'; motion = 'full'; collapse = 10; theme = 'dark'; primary = @('codex', 'claude', 'ollama'); edge = 'top'; edgeOffset = 0.5; blur = 'off'; monitor = $null }
+    $table = @{}
+    foreach ($p in $defaults.GetEnumerator()) { $table[$p.Key] = $p.Value }
+    $applied = 0
+    $failed = $false
+    try { $applied = Import-BunnyPreferences -Table $table -SavedJson ([string]$c.savedJson) -KnownKeys (Get-BunnyPreferenceKeys) } catch { $failed = $true }
+    $edge = ConvertTo-BunnyEdge $table.edge
+    $offset = switch ([string]$table.position) { 'left' { 0.0 } 'right' { 1.0 } default { $table.edgeOffset } }
+    $area = @{ Left = [double]$c.area.left; Top = [double]$c.area.top; Width = [double]$c.area.width; Height = [double]$c.area.height }
+    $size = @{ Width = [double]$c.size.width; Height = [double]$c.size.height }
+    $p = Get-BunnyPlacement -Edge $edge -WorkArea $area -Size $size -Offset $offset
+    # The reference is the direct placement from the UNserialized values, proving the JSON round trip lost nothing.
+    $refEdge = ConvertTo-BunnyEdge $c.reference.edge
+    $refOffset = switch ([string]$c.reference.position) { 'left' { 0.0 } 'right' { 1.0 } default { $c.reference.edgeOffset } }
+    $ref = Get-BunnyPlacement -Edge $refEdge -WorkArea $area -Size $size -Offset $refOffset
+    [pscustomobject]@{ id = $c.id; kind = $kind
+      applied = $applied; failed = $failed
+      tableEdge = $edge; tablePosition = [string]$table.position
+      left = $p.Left; top = $p.Top; width = $p.Width; height = $p.Height
+      refLeft = $ref.Left; refTop = $ref.Top; refWidth = $ref.Width; refHeight = $ref.Height
+      refEdge = $ref.Edge }
+  }
+  elseif ($kind -eq 'fingerprint') {
+    $a = @{ Left = [double]$c.a.left; Top = [double]$c.a.top; Width = [double]$c.a.width; Height = [double]$c.a.height }
+    $b = @{ Left = [double]$c.b.left; Top = [double]$c.b.top; Width = [double]$c.b.width; Height = [double]$c.b.height }
+    [pscustomobject]@{ id = $c.id; kind = $kind; printA = (Get-BunnyWorkAreaFingerprint $a); printB = (Get-BunnyWorkAreaFingerprint $b) }
+  }
+}
+[IO.File]::WriteAllText($Out, (ConvertTo-Json -InputObject @($results) -Depth 4 -Compress), [Text.UTF8Encoding]::new($false))
+`;
+
+function buildRulesCases() {
+  const cases = [];
+  let n = 0;
+  // Restore matrix: saved monitor configs against candidate monitor lists. The primary work area is the
+  // 1920x1040 DIP one; a secondary sits at -1920 (negative coordinates of a left-side display).
+  const primaryArea = { left: 0, top: 0, width: 1920, height: 1040 };
+  const secondaryArea = { left: -1920, top: 0, width: 2560, height: 1400 };
+  const dpiChangedArea = { left: 0, top: 0, width: 1536, height: 816 };
+  const saved = (device, area) => ({ device, fingerprint: [area.left, area.top, area.width, area.height].join(',') });
+  const monitorList = (entries) => entries.map(([device, area, primary]) => ({ device, left: area.left, top: area.top, width: area.width, height: area.height, primary }));
+  const onPrimary = monitorList([['\\\\.\\DISPLAY1', primaryArea, true]]);
+  const twoMonitors = monitorList([
+    ['\\\\.\\DISPLAY1', primaryArea, true],
+    ['\\\\.\\DISPLAY2', secondaryArea, false],
+  ]);
+  const push = (expect) => {
+    cases.push({ id: n++, kind: 'monitor', ...expect });
+  };
+  // Exact match on the primary, exact match on a secondary (the notch restores where it was docked),
+  // fingerprint changed (resolution/DPI), device gone, no monitor at all.
+  push({ saved: saved('\\\\.\\DISPLAY1', primaryArea), monitors: onPrimary, want: '\\\\.\\DISPLAY1', primary: true });
+  push({ saved: saved('\\\\.\\DISPLAY2', secondaryArea), monitors: twoMonitors, want: '\\\\.\\DISPLAY2', primary: false });
+  push({ saved: saved('\\\\.\\DISPLAY1', primaryArea), monitors: monitorList([['\\\\.\\DISPLAY1', dpiChangedArea, true]]), want: '\\\\.\\DISPLAY1', primary: true, note: 'fingerprint changed -> fallback still primary' });
+  push({ saved: saved('\\\\.\\DISPLAY3', secondaryArea), monitors: twoMonitors, want: '\\\\.\\DISPLAY1', primary: true, note: 'device gone -> primary' });
+  push({ saved: null, monitors: twoMonitors, want: '\\\\.\\DISPLAY1', primary: true });
+  push({ saved: saved('\\\\.\\DISPLAY1', primaryArea), monitors: [], want: '', primary: false, note: 'no monitors -> null' });
+  push({ saved: saved('\\\\.\\DISPLAY1', dpiChangedArea), monitors: monitorList([['\\\\.\\DISPLAY1', dpiChangedArea, true], ['\\\\.\\DISPLAY2', secondaryArea, false]]), want: '\\\\.\\DISPLAY1', primary: true });
+  // Preference round trip through the file format the Island itself writes (dock release shape).
+  const area = primaryArea;
+  const size = { width: 360, height: 76 };
+  const savedShape = (edge, edgeOffset, position) => JSON.stringify({ size: 'compact', position, idle: 'providers', glass: 'medium', motion: 'full', collapse: 10, theme: 'dark', primary: ['codex', 'claude', 'ollama'], edge, edgeOffset, blur: 'off', monitor: { device: '\\\\.\\DISPLAY1', fingerprint: [area.left, area.top, area.width, area.height].join(',') } });
+  for (const edge of edges) {
+    for (const [edgeOffset, position] of [[0.25, 'center'], [0.75, 'center'], [0.5, 'left'], [0.5, 'right']]) {
+      cases.push({
+        id: n++, kind: 'load', area,
+        size,
+        savedJson: savedShape(edge, edgeOffset, position),
+        reference: { edge, edgeOffset, position },
+      });
+    }
+  }
+  // Unsafe files: corrupt JSON keeps defaults; unknown keys are skipped; hostile values are validated
+  // at placement time (edge normalises to top, offset falls back to 0.5).
+  cases.push({ id: n++, kind: 'load', area, size, savedJson: 'not-json-at-all {{{', reference: { edge: 'top', edgeOffset: 0.5, position: 'center' }, expectApplied: 0, expectDefaultOnly: true });
+  cases.push({
+    id: n++, kind: 'load', area, size,
+    savedJson: JSON.stringify({ edge: 'diagonal', edgeOffset: 'not-a-number', fancy: 'x' }),
+    reference: { edge: 'top', edgeOffset: 0.5, position: 'center' },
+    expectApplied: 2, expectDefaultOnly: true,
+  });
+  cases.push({
+    id: n++, kind: 'load', area, size,
+    savedJson: JSON.stringify({ edge: 'left', edgeOffset: '0.2', position: 'center' }),
+    reference: { edge: 'left', edgeOffset: 0.2, position: 'center' },
+  });
+  // Fingerprint stability (Get-BunnyWorkAreaFingerprint rounds each DIP coordinate): drift smaller than half a
+  // DIP cell must keep the key, and every real geometry change (resolution, DPI, another display) must break it.
+  cases.push({ id: n++, kind: 'fingerprint', a: { left: 100.2, top: 10.3, width: 1920.1, height: 1040.2 }, b: { left: 100.4, top: 10.1, width: 1920.3, height: 1040.4 }, same: true });
+  cases.push({ id: n++, kind: 'fingerprint', a: primaryArea, b: dpiChangedArea, same: false });
+  cases.push({ id: n++, kind: 'fingerprint', a: primaryArea, b: secondaryArea, same: false });
+  return cases;
+}
+
+let rulesPlacements = null;
+let rulesCases = null;
+
+function runRulesBatch() {
+  if (rulesPlacements) return rulesPlacements;
+  const dir = mkdtempSync(join(tmpdir(), 'island-persist-'));
+  try {
+    rulesCases = buildRulesCases();
+    const casesPath = join(dir, 'rules-cases.json');
+    const runnerPath = join(dir, 'rules-runner.ps1');
+    const outPath = join(dir, 'rules-out.json');
+    writeFileSync(casesPath, JSON.stringify(rulesCases));
+    writeFileSync(runnerPath, rulesRunnerSource, 'utf8');
+    const run = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', runnerPath, '-Placement', placementPath, '-Cases', casesPath, '-Out', outPath], { encoding: 'utf8', timeout: 120000 });
+    assert.equal(run.status, 0, 'powershell persistence rules run failed: ' + (run.stderr || run.stdout));
+    rulesPlacements = JSON.parse(readFileSync(outPath, 'utf8').replace(/^\uFEFF/, ''));
+    assert.equal(rulesPlacements.length, rulesCases.length);
+    return rulesPlacements;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('Sprint 2: Select-BunnyMonitor restore matrix — matched device with the same work-area fingerprint is chosen, a DPI/resolution change or a detached display falls back to the primary, and an empty list returns no monitor at all', { skip }, () => {
+  const results = runRulesBatch();
+  for (const result of results) {
+    if (result.kind !== 'monitor') continue;
+    const c = rulesCases[result.id];
+    const label = 'monitor case ' + result.id + (c.note ? ' (' + c.note + ')' : '');
+    assert.equal(result.device, c.want, label);
+    if (result.device === '') {
+      assert.equal(result.primary, false, label + ': an empty monitor list returns no monitor');
+      assert.equal(result.fingerprint, '', label + ': an empty monitor list has no fingerprint');
+    } else {
+      assert.equal(result.primary, c.primary, label + ': primary flag matches the chosen entry');
+      assert.ok(result.fingerprint.length > 0, label + ': chosen fingerprint computed');
+    }
+  }
+});
+
+test('Sprint 2: preferences saved by a dock release (edge, along-edge offset, position, monitor) reload through the startup load rule and place the notch at the identical footprint', { skip }, () => {
+  const results = runRulesBatch();
+  for (const result of results) {
+    if (result.kind !== 'load') continue;
+    const c = rulesCases[result.id];
+    const label = 'load case ' + result.id + ' edge=' + c.reference.edge + ' position=' + c.reference.position;
+    if (c.expectApplied !== undefined) {
+      assert.equal(result.applied, c.expectApplied, label + ': applied-key count');
+      assert.equal(result.failed, false, label + ': the load rule never throws to its caller');
+      assert.equal(result.tableEdge, 'top', label + ': unsafe input falls back to the normalised placement edge');
+    } else {
+      assert.ok(result.applied >= 2, label + ': edge and offset keys applied');
+      assert.equal(result.failed, false, label + ': the load rule never throws to its caller');
+    }
+    for (const key of ['left', 'top', 'width', 'height']) {
+      assert.equal(Math.abs(result[key] - result['ref' + key.charAt(0).toUpperCase() + key.slice(1)]), 0, label + ': ' + key + ' identical to the direct placement');
+    }
+  }
+});
+
+test('Sprint 2: the saved monitor footprint lies inside the chosen work area after restore (placement recomputed from the loaded values stays in the primary when the display changes)', { skip }, () => {
+  const results = runRulesBatch();
+  for (const result of results) {
+    if (result.kind !== 'load') continue;
+    const c = rulesCases[result.id];
+    const label = 'load case ' + result.id;
+    assert.ok(result.top >= c.area.top - EPS, label + ': top of the work area');
+    assert.ok(result.left >= c.area.left - EPS, label + ': left of the work area');
+    assert.ok(result.left + result.width <= c.area.left + c.area.width + EPS, label + ': right of the work area');
+    assert.ok(result.top + result.height <= c.area.top + c.area.height + EPS, label + ': bottom of the work area');
+  }
+});
+
+test('Sprint 2: a work-area fingerprint is stable for drift smaller than half a DIP cell (rounding) and distinguishes every real geometry change (resolution, DPI, another display)', { skip }, () => {
+  const results = runRulesBatch();
+  for (const result of results) {
+    if (result.kind !== 'fingerprint') continue;
+    const c = rulesCases[result.id];
+    const label = 'fingerprint case ' + result.id;
+    if (c.same) assert.equal(result.printA, result.printB, label + ': within-half-cell drift keeps the fingerprint');
+    else assert.notEqual(result.printA, result.printB, label + ': a real geometry change breaks the fingerprint');
+  }
+});
+
+test('Sprint 2 source lock: a drag release saves edge, along-edge offset, centre position and the monitor fingerprint through the Island save, and routes the snap through the tested nearest-edge rule', () => {
+  const visual = readFileSync(visualPath, 'utf8');
+  const start = visual.indexOf('function Invoke-BunnyDockRelease');
+  assert.ok(start >= 0, 'Invoke-BunnyDockRelease present');
+  const body = visual.slice(start, start + 1500);
+  for (const fragment of [
+    '$target=Get-BunnyNearestEdge',
+    '$bunnyPreferences.edge=$target.Edge',
+    '$bunnyPreferences.edgeOffset=$target.Offset',
+    "$bunnyPreferences.position='center'",
+    '$bunnyPreferences.monitor=@{device=',
+    'Save-BunnyPreferences',
+  ]) {
+    assert.ok(body.includes(fragment), 'dock release missing: ' + fragment);
+  }
+});
+
+test('Sprint 2 source lock: the keyboard chord body (Set-BunnyDockEdge) saves the edge through the same Island save as a drag release', () => {
+  const visual = readFileSync(visualPath, 'utf8');
+  const start = visual.indexOf('function Set-BunnyDockEdge');
+  assert.ok(start >= 0, 'Set-BunnyDockEdge present');
+  const body = visual.slice(start, start + 300);
+  assert.ok(body.includes('$bunnyPreferences.edge=ConvertTo-BunnyEdge $Edge'), 'keyboard dock normalises the edge');
+  assert.ok(body.includes("$bunnyPreferences.position='center'"), 'keyboard dock re-centres');
+  assert.ok(body.includes('Save-BunnyPreferences'), 'keyboard dock saves');
+  for (const edgeKey of ['Up', 'Down', 'Left', 'Right']) {
+    assert.match(visual, new RegExp("'" + edgeKey + "'\\{'(top|bottom|left|right)'\\}"), 'chord maps ' + edgeKey);
+  }
+  assert.match(visual, /Set-BunnyDockEdge \$edge;return \$true/, 'the chord path ends in the saving body, never a fallback');
+});
+
+test('Sprint 2 source lock: startup applies only known preference keys (extracted Import-BunnyPreferences behind a file-existence guard; corrupt files never break the show; unknown keys ignored)', () => {
+  const visual = readFileSync(visualPath, 'utf8');
+  assert.match(visual, /try \{ if \(Test-Path -LiteralPath \$bunnyPreferencePath\) \{ Import-BunnyPreferences -Table \$bunnyPreferences -SavedJson \(Get-Content -LiteralPath \$bunnyPreferencePath -Raw\) -KnownKeys \(Get-BunnyPreferenceKeys\) \} \} catch \{ \}/);
+  assert.doesNotMatch(visual, /\$bunnyPreferences\.ContainsKey\(\$property\.Name\)/, 'the inline load loop is retired, not duplicated');
+  const placement = readFileSync(placementPath, 'utf8');
+  assert.match(placement, /function Get-BunnyPreferenceKeys \{ return \$script:BunnyPreferenceKeys \}/);
+  assert.match(placement, /function Import-BunnyPreferences \{[\s\S]{0,900}?\$keys -contains \$property\.Name[\s\S]{0,200}?\$Table\.ContainsKey[\s\S]{0,300}?\$Table\[\$property\.Name\] = \$property\.Value/);
+  assert.match(placement, /function Import-BunnyPreferences \{[\s\S]{0,1400}?return 0/, 'the load rule reports zero on unreadable input');
+});
