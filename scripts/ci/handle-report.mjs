@@ -22,7 +22,7 @@ if (dir) {
         join(dir, `handles-${process.pid}.json`),
         JSON.stringify({ pid: process.pid, ppid: process.ppid, argv: process.argv.slice(1, 4), cwd: process.cwd(), started, at: new Date().toISOString(), resources: process.getActiveResourcesInfo(), handles: process._getActiveHandles().map(describe) }, null, 1),
       );
-    } catch {}
+    } catch { /* diagnostics must never disturb the traced run */ }
   };
   setInterval(write, 20_000).unref();
 }

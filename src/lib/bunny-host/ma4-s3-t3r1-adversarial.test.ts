@@ -1,8 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { join } from "node:path";
-import { writeFileSync, mkdirSync } from "node:fs";
-import { rig, fakeModel, MODEL, envelope, spec } from "./ma4-s2t2-fixtures.ts";
+import { fakeModel, rig, MODEL, envelope, spec } from "./ma4-s2t2-fixtures.ts";
 import { executeDeterministicTest, verifyTestReceipt, sha256 } from "./ma4/test-runner.server.ts";
 import { localTest } from "./ma4/task-executors.server.ts";
 import { SimulatedCrash } from "./ma4/task-runtime.server.ts";

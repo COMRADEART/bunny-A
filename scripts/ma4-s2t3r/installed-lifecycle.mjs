@@ -59,7 +59,7 @@ try {
   await cmd('ptask.policy',{policy});
   check('background and startup opt-ins returned to defaults',!(await cmd('ptask.list')).policy.background&&!(await cmd('ptask.list')).policy.resumeOnStart);
 } catch(e){check('lifecycle driver completed',false,String(e.message));}
-finally { try { await cmd('ptask.policy',{policy:{background:false,resumeOnStart:false}}); } catch {} }
+finally { try { await cmd('ptask.policy',{policy:{background:false,resumeOnStart:false}}); } catch { /* the Host is already gone */ } }
 mkdirSync(join(resolve(outputArg),'..'),{recursive:true});
 writeFileSync(outputArg,JSON.stringify({at:new Date().toISOString(),sourceCommit:config.currentRelease.sourceCommit,package:config.currentRelease.name,checks,failed:checks.filter(c=>!c.pass).length,note:'Installed production entry, real SQLite/Host, bounded synthetic file.stat task. Running-model cancellation and physical UI drag are separate checks.'},null,2)+'\n');
 process.exitCode=checks.some(c=>!c.pass)?1:0;

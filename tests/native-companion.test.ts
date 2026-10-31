@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   assertDeviceAction,
-  deviceRight,
   deviceApprovalRefusal,
   APPROVAL_ON_HOST,
   WorkstationRequiredError

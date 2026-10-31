@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -382,7 +382,7 @@ async function main() {
   } finally {
     try {
       rmSync(tempDir, { recursive: true, force: true });
-    } catch {}
+    } catch { /* best-effort fixture cleanup */ }
   }
 }
 

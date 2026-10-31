@@ -48,7 +48,12 @@ export function descendants(rows, root) {
   const tree = new Set([root]);
   for (let grew = true; grew; ) {
     grew = false;
-    for (const row of rows) if (!tree.has(row.pid) && tree.has(row.ppid)) tree.add(row.pid), (grew = true);
+    for (const row of rows) {
+      if (!tree.has(row.pid) && tree.has(row.ppid)) {
+        tree.add(row.pid);
+        grew = true;
+      }
+    }
   }
   return rows.filter((row) => tree.has(row.pid));
 }
@@ -67,7 +72,7 @@ function stop(pids, force) {
     else {
       try {
         process.kill(pid, force ? "SIGKILL" : "SIGTERM");
-      } catch {}
+      } catch { /* the process is already gone */ }
     }
   }
 }

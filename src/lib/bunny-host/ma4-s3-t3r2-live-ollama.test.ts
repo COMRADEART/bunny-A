@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { rig, envelope, spec } from "./ma4-s2t2-fixtures.ts";
+import { rig } from "./ma4-s2t2-fixtures.ts";
 import { localModelCall, localModelAvailable } from "./ma4/task-executors.server.ts";
 import { type TaskSpec, type Envelope } from "./ma4/task-runtime.ts";
 import { SimulatedCrash } from "./ma4/task-runtime.server.ts";
@@ -44,11 +44,6 @@ test("Live Ollama Workflow A: Grounded read with evidence-backed summary", { tim
     const rootPath = r.root("project-read", {
       "SECURITY_NOTE.txt": textContent,
     });
-
-    const steps = [
-      { id: "read-note", kind: "file.read", input: { root: "project-read", path: "SECURITY_NOTE.txt" }, model: null },
-      { id: "summarize-worker", kind: "local.generate", input: { prompt: "Summarize the component and finding from the note in one sentence.", contextFrom: "read-note" }, model: REAL_MODEL },
-    ];
 
     const taskSpec: TaskSpec = {
       title: "Workflow A Grounded Read",

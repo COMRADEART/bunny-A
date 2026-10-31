@@ -407,7 +407,7 @@ async function main() {
   } finally {
     try {
       fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
-    } catch {}
+    } catch { /* best-effort workspace cleanup */ }
   }
 
   const modelContractPassed = areas.every(a => a.status === "PASS");

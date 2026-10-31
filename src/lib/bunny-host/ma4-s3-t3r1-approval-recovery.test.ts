@@ -2,12 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
-import { rig, fakeModel, envelope, spec, MODEL } from "./ma4-s2t2-fixtures.ts";
+import { rig, envelope, spec, MODEL } from "./ma4-s2t2-fixtures.ts";
 import { TaskManager } from "./manager.server.ts";
 import { providerBase } from "./adapters.server.ts";
 import type { ProviderAdapter } from "./contracts.ts";
 import { SimulatedCrash } from "./ma4/task-runtime.server.ts";
-import { StaleLeaseError } from "./ma4/task-store.server.ts";
 
 const RESULTS_DIR = join(process.cwd(), "test-results", "ma4-s3-t3r1");
 mkdirSync(RESULTS_DIR, { recursive: true });

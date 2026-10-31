@@ -308,7 +308,7 @@ test("S2 leakage: the extraction prompt carries only public material, never hidd
   // The public spec states the signature the reference also uses; everything else must share no 6-token run.
   for (const secret of [TASK.hiddenTests, TASK.reference!]) assert.equal(sharedRun(prompt.replace(GOOD, "").replace(TASK.spec, ""), secret), null);
   assert.ok(!prompt.includes("test_secret_case"), "oracle and hidden evidence lines are not included");
-  const wrong = await extractSkill({ call: async req => ({ ok: true, text: "{}", servedModel: "other:7b", durationMs: 1 }), model: "coder:7b", task: TASK, result, signal: new AbortController().signal });
+  const wrong = await extractSkill({ call: async _req => ({ ok: true, text: "{}", servedModel: "other:7b", durationMs: 1 }), model: "coder:7b", task: TASK, result, signal: new AbortController().signal });
   assert.match(wrong.error!, /served by other:7b/, "the extractor pin is enforced too");
 });
 

@@ -1,6 +1,3 @@
-import { freemem, totalmem } from "node:os";
-import { type ModelCall } from "./coding-workflow.server.ts";
-
 export type GpuTelemetry = {
   name: string;
   totalVramBytes: number;

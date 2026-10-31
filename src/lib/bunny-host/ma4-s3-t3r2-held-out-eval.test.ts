@@ -3,9 +3,8 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { writeFileSync, mkdirSync, readFileSync, symlinkSync } from "node:fs";
 import { rig, envelope, spec } from "./ma4-s2t2-fixtures.ts";
-import { localModelCall, localModelAvailable } from "./ma4/task-executors.server.ts";
+import { localModelCall } from "./ma4/task-executors.server.ts";
 import { executeDeterministicTest } from "./ma4/test-runner.server.ts";
-import { type TaskSpec, type Envelope } from "./ma4/task-runtime.ts";
 import { SimulatedCrash } from "./ma4/task-runtime.server.ts";
 
 const REAL_MODEL = "qwen2.5-coder:7b";
@@ -897,7 +896,7 @@ test("Held-Out Evaluation Suite (C0 - C43)", { timeout: 300_000 }, async (t) => 
       try {
         symlinkSync(process.cwd(), join(rootPath, "escaped_link"), "junction");
         symlinkCreated = true;
-      } catch {}
+      } catch { /* junction creation may be denied on Windows; the escape probe is then skipped with the evidence intact */ }
 
       if (symlinkCreated) {
         const steps = [{ id: "read-step", kind: "file.read", input: { root: "c28-proj", path: "escaped_link/package.json" }, model: null }];

@@ -1,15 +1,11 @@
-import { createHash, randomUUID } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import assert from "node:assert/strict";
 import type { ModelCall } from "./coding-workflow.server.ts";
-import { coordinatorChannel, gateCalls, type CoordinatorChannel } from "./coordinator.ts";
-import { PersistentTaskRuntime, type Executor } from "./task-runtime.server.ts";
-import { TaskStore } from "./task-store.server.ts";
-import { HostDatabase } from "../persistence.server.ts";
-import { classifyAdaptiveTask } from "./adaptive-planner.ts";
-import { evaluateRepairEligibility, validateRevisedPlan, MAX_REPAIR_ITERATIONS, type FailureEvidence } from "./replan.server.ts";
+import { coordinatorChannel } from "./coordinator.ts";
+import { evaluateRepairEligibility, type FailureEvidence } from "./replan.server.ts";
 import type { Envelope, TaskSpec } from "./task-runtime.ts";
 import type { S2Role } from "./collaboration.ts";
 
@@ -42,7 +38,6 @@ export async function runMultiAgentReliabilitySuite(options: {
   modelDigest?: string;
 }): Promise<MultiAgentQualificationReport> {
   const model = options.model;
-  const modelDigest = options.modelDigest ?? "dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364";
   const scenarios: ScenarioResult[] = [];
 
   const tempDir = mkdtempSync(join(tmpdir(), "bunny-ma-rel-"));

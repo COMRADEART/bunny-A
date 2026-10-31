@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   FROZEN_BENCHMARK_TASKS,
-  FROZEN_BENCHMARK_VERSION,
   runLiveBenchmark,
   type BenchmarkTask,
 } from "./live-benchmark.server.ts";

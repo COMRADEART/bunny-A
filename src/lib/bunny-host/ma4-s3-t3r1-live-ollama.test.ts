@@ -2,10 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { rig, fakeModel, envelope, spec } from "./ma4-s2t2-fixtures.ts";
+import { rig, envelope, spec } from "./ma4-s2t2-fixtures.ts";
 import { localModelCall, localModelAvailable } from "./ma4/task-executors.server.ts";
-import { executeDeterministicTest } from "./ma4/test-runner.server.ts";
-import type { TaskView } from "./ma4/task-runtime.ts";
 
 const REAL_MODEL = "qwen2.5-coder:7b";
 const EVIDENCE_DIR = join(process.cwd(), "test-results", "ma4-s3-t3r1");
@@ -87,7 +85,7 @@ test("Live Ollama Scenario B: Multi-file investigation honestly reports failing 
   });
 
   try {
-    const rootPath = r.root("project-b", {
+    r.root("project-b", {
       "src/math.ts": "export function sum(a: number, b: number) { return a + b; }",
       "src/math.test.ts": `import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { sum } from './math.ts';\ntest('sum intentionally fails', () => {\n  assert.equal(sum(2, 2), 5, 'Intentional failure: expected 5 got 4');\n});`,
     });

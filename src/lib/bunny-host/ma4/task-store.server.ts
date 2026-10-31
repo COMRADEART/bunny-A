@@ -277,7 +277,7 @@ export class TaskStore {
     for (const r of rows) {
       try {
         res.push(ExecutionOutcomeRecordSchema.parse(JSON.parse(r.record)));
-      } catch {}
+      } catch { /* malformed historic rows are skipped; the queue keeps the parsable ones */ }
     }
     return res;
   }

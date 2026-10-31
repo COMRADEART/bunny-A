@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { type Envelope, type ExecutorFacts, type TaskSpec, validateTask } from "./task-runtime.ts";
 import { redactOutcomeSecrets } from "./outcome-measurement.ts";
 

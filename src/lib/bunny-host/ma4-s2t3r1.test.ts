@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { MODEL, rig } from "./ma4-s2t2-fixtures.ts";
 import { planConnectedTask, planSchema } from "./ma4/connected-workflow.server.ts";
 import type { ModelCall } from "./ma4/coding-workflow.server.ts";
-import { DAY, envelope as penvelope, HOUR, MIN, prig, schedule, T0, WS } from "./ma4-s2t3-fixtures.ts";
+import { DAY, envelope as penvelope, HOUR, prig, schedule, T0, WS } from "./ma4-s2t3-fixtures.ts";
 
 const envelope = (over: Record<string, unknown> = {}) => ({ capabilities: ["file.read", "local.generate", "local.review"], providers: ["ollama"] as ["ollama"], localOnly: true as const, models: [MODEL], projectScopes: ["p1"], sideEffects: false, background: false,
   budgets: { maxModelCalls: 5, maxWallMs: 60_000 }, expiresAt: Date.now() + 3_600_000, grants: { files: [{ root: "proj", access: "read" as const }], origins: [], services: [] }, ...over });

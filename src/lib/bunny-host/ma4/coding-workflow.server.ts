@@ -225,6 +225,7 @@ function stripFence(source: string): string {
   return (m ? m[1] : source).trim() + "\n";
 }
 const clip = (text: string, max: number) => text.length > max ? `${text.slice(0, max)}…` : text;
+// eslint-disable-next-line no-control-regex -- the sanitizer intentionally matches control and bidi-isolate bytes to strip them from model output
 const sanitize = (text: string, max = 2000) => clip(text.replace(/[\u0000-\u0008\u000b-\u001f\u007f‪-‮⁦-⁩]/g, ""), max);
 const sha256 = (text: string) => createHash("sha256").update(text).digest("hex");
 /** Fenced transport: the longest fenced block (a module, not a usage snippet); an unfenced reply is taken as the file. */

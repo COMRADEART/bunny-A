@@ -5,7 +5,6 @@ import { join } from "node:path";
 import {
   executeDeterministicTest,
   verifyTestReceipt,
-  sha256,
 } from "./ma4/test-runner.server.ts";
 
 const TEST_BASE = join(process.cwd(), ".tmp-t3r2-reports");
@@ -29,7 +28,7 @@ function createRig() {
     projectDir,
     passingScript,
     close: () => {
-      try { rmSync(dir, { recursive: true, force: true }); } catch {}
+      try { rmSync(dir, { recursive: true, force: true }); } catch { /* best-effort fixture cleanup */ }
     },
   };
 }

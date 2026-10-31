@@ -26,7 +26,7 @@ function createRig() {
     projectDir,
     safeTest,
     close: () => {
-      try { rmSync(dir, { recursive: true, force: true }); } catch {}
+      try { rmSync(dir, { recursive: true, force: true }); } catch { /* best-effort fixture cleanup */ }
     },
   };
 }

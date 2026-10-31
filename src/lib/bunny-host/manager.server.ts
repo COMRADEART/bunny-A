@@ -1,10 +1,10 @@
 import { isTrustedLocalActor } from "../bunny-missions/authorization.server.ts";
 import type { PersistentTaskRuntime } from "./ma4/task-runtime.server.ts";
 import type { ConnectedActions } from "./ma4/connected-actions.server.ts";
-import { TaskSpecSchema, EnvelopeSchema, validateTask, sha256 } from "./ma4/task-runtime.ts";
+import { TaskSpecSchema, EnvelopeSchema, validateTask } from "./ma4/task-runtime.ts";
 import { namedFiles, reviewRequested, testRequested } from "./ma4/connected-workflow.server.ts";
 import { walk, readText } from "./ma4/connectors/files.server.ts";
-import type { TaskProposal, ToolExecutionRecord, AgentExecutionRecord, TruthState } from "../orch/types.ts";
+import type { TaskProposal, ToolExecutionRecord } from "../orch/types.ts";
 import { applyRoutingMode, approvalExclusion, reliabilityCategory } from "./ma4/hybrid.ts";
 import { readOnboarding } from "./ma4/owner-product.server.ts";
 import { hostExecutionPlan, preferEligibleLocal } from "./ma4/s3t1.ts";
@@ -32,7 +32,7 @@ import { defaultAdapters } from "./adapters.server.ts";
 import type { AgentSession, AdapterHooks, HostEvent, HostSnapshot, ProviderAdapter, RunningSession, SubmitTask ,
 } from "./contracts.ts";
 import { PolicyEngine, toRecorded } from "./learning.server.ts";
-import { classifyRequirements, effortRequirement, type TaskRequirements ,
+import { effortRequirement, type TaskRequirements ,
 } from "../orch/router-requirements.ts";
 import { ADAPTER_TOOL_CONTRACTS, ROUTING_POLICY_VERSION, PROVIDER_EFFORT_CONTRACTS, buildCandidates, selectRoutingCandidate, safeDecisionRecord, preLaunchRevalidate, codexCompatibilityFresh, classifyFailure, planRecovery, exhaustionNote, STOP_WRITE_PAUSE, OUTCOME_UNCERTAIN_PAUSE, writePause, RECOVERY_BOUNDS, ROUTING_PRIORITIES, type RoutingDecisionRecord, type RoutingFailureTaxonomy, type RoutingPriority,
 } from "./routing.server.ts";
@@ -1968,7 +1968,7 @@ export class TaskManager {
           try {
             const walked = walk(r, filePath);
             if (walked.stat.isFile()) { foundRoot = r; break; }
-          } catch {}
+          } catch { /* not found in this root; the search simply continues */ }
         }
         if (!foundRoot) {
           const message = `File ${filePath} was not read: file was not found in registered folders.`;
@@ -3247,7 +3247,7 @@ export class TaskManager {
         );
 
         setTimeout(check, 300);
-      } catch {}
+      } catch { /* a transient probe failure just reschedules the next check */ }
     };
     setTimeout(check, 100);
   }

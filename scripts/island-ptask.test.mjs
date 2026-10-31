@@ -99,5 +99,6 @@ test('S2-T1 notch wiring: the strip counts the task cell and the idle status lin
   assert.match(voice, /if \(\$TaskHeadline -and \$Headline -in @\('Ready', 'Voice is off'\)\) \{ return \$TaskHeadline \}/);
   // MA4-S2-T3: every strip call site passes the Host's proactive facts.
   for (const text of [weapons, voice]) assert.equal((text.match(/Get-BunnyTaskStrip \$bunnySnapshot\.persistentTasks \(\[bool\]\$bunnyOnline\) \$bunnySnapshot\.proactive/g) ?? []).length, text === weapons ? 2 : 1);
+  // eslint-disable-next-line no-control-regex -- the assertion's subject is that the island scripts contain no non-ASCII bytes
   for (const text of [weapons, voice, readFileSync(join(root, 'install', 'Bunny-Island.Placement.ps1'), 'utf8')]) assert.equal(/[^\x00-\x7F]/.test(text), false, 'Island scripts stay ASCII for Windows PowerShell 5.1');
 });

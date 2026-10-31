@@ -1,33 +1,23 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
-import { tmpdir, totalmem, freemem } from "node:os";
+import { tmpdir, freemem } from "node:os";
 import { join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { ModelCall } from "./coding-workflow.server.ts";
 import {
-  classifyAdaptiveTask,
   validateAndOptimizePlanGraph,
-  evaluateArtifactReuse,
   type VerifiedArtifactCacheEntry,
 } from "./adaptive-planner.ts";
-import { executeWithSafeRecovery, classifyErrorToTaxonomy, DEFAULT_RECOVERY_POLICY } from "./failure-recovery.ts";
 import { VerifiedExperienceManager } from "./verified-experience.server.ts";
 import { HostDatabase } from "../persistence.server.ts";
 import { TaskStore } from "./task-store.server.ts";
 import { PersistentTaskRuntime, type Executor } from "./task-runtime.server.ts";
 import {
   createOutcomeRecord,
-  isVerifiedSuccess,
-  summarizeOutcomeRecords,
   type ExecutionOutcomeRecord,
   type EvidenceCategory,
 } from "./outcome-measurement.ts";
-import {
-  executeDeterministicTest,
-  verifyTestReceipt,
-  type DeterministicTestResult,
-} from "./test-runner.server.ts";
 import type { ComplexityClass } from "./s3t1.ts";
 import { ResourceAwareModelScheduler, reportNpuStatus } from "./resource-scheduler.ts";
 import type { Envelope, TaskSpec, ExecutorFacts } from "./task-runtime.ts";
@@ -1225,7 +1215,7 @@ async function executeHostWorkflow(input: {
   let reusedArtifacts = 0;
 
   let generatedText = "";
-  let genuineTestReceipts: string[] = [];
+  const genuineTestReceipts: string[] = [];
 
   // ── Registered Host Tool Executors ──
   const fileReadExecutor: Executor = {
@@ -1318,7 +1308,7 @@ async function executeHostWorkflow(input: {
     gpu: false,
     sideEffect: false,
     timeoutMs: 30_000,
-    async run(stepInput, ctx) {
+    async run(_stepInput, _ctx) {
       // Independent text/AST oracle validation: evaluates model output against expectations
       // Note: Oracle validation produces NO process execution receipt or exit code
       let testPassed = false;
@@ -1475,7 +1465,6 @@ async function executeHostWorkflow(input: {
   await runtime.close();
 
   // Retrieve outcome record produced by PersistentTaskRuntime
-  const finalRecord = store.get(view.id).record;
   const matchedOutcome = store.getOutcome(view.id);
 
   // Independent deterministic text oracle verification

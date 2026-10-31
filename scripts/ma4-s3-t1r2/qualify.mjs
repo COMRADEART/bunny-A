@@ -3,7 +3,7 @@
  * Host state is outside the git checkout. No cloud model is requested.
  */
 import { createHash } from "node:crypto";
-import { spawn, execFile } from "node:child_process";
+import { execFile } from "node:child_process";
 import { mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -489,7 +489,7 @@ try {
       await reader.read();
       controller.abort();
       let httpAbortMs = null;
-      try { while (!(await reader.read()).done) {} } catch { httpAbortMs = Math.round(performance.now() - httpAbortStarted); }
+      try { while (!(await reader.read()).done) { /* consume until the abort lands */ } } catch { httpAbortMs = Math.round(performance.now() - httpAbortStarted); }
       const ps = await fetch("http://127.0.0.1:11434/api/ps").then((response) => response.json()).catch(() => ({ models: [] }));
       report.contention = {
         gpuIdle,
