@@ -77,7 +77,7 @@ function launch(tag) {
 }
 const ptask = (id) => host.ptasks.view(id);
 const hostTask = (pred) => host.manager.snapshot().tasks.find(pred);
-const config = () => JSON.parse(readFileSync(configPath, "utf8").replace(/^﻿/, ""));
+const config = () => JSON.parse(readFileSync(configPath, "utf8").replace(/^\uFEFF/, ""));
 const results = { runId: RUN_ID, binary: exePath, binarySha256: sha(readFileSync(exePath)), host: { port: PORT, isolatedDataDirectory: true }, configIsolated: true, stages: {} };
 const failures = [];
 const ONLY = process.env.MA5_STAGES ? new Set(process.env.MA5_STAGES.split(",")) : null;
@@ -205,8 +205,8 @@ try {
     await ui("navigate", { ProcessId: app.child.pid, TargetId: "NavAgents" });
     await sleep(1500);
     let finalUi = [];
-    try { await ui("select_list_item", { ProcessId: app.child.pid, TargetId: "TaskHistoryList", Match: "[Mission]" }); } catch {}
-    try { await ui("select_list_item", { ProcessId: app.child.pid, TargetId: "ActiveTasksList", Match: "[Mission]" }); finalUi = await ui("read_list", { ProcessId: app.child.pid, TargetId: "MissionStepsList" }); } catch {}
+    try { await ui("select_list_item", { ProcessId: app.child.pid, TargetId: "TaskHistoryList", Match: "[Mission]" }); } catch { /* the UI list may not be open yet; the Host-side state still records it */ }
+    try { await ui("select_list_item", { ProcessId: app.child.pid, TargetId: "ActiveTasksList", Match: "[Mission]" }); finalUi = await ui("read_list", { ProcessId: app.child.pid, TargetId: "MissionStepsList" }); } catch { /* same fallback as above */ }
     await ui("navigate", { ProcessId: app.child.pid, TargetId: "NavApprovals" });
     const receipts = (await ui("read_approvals", { ProcessId: app.child.pid })).receipts;
     return {
@@ -248,7 +248,7 @@ try {
     const finished = await until("four-role Mission finishes", async () => {
       const m = view();
       let shown = null;
-      try { await ui("select_list_item", { ProcessId: app.child.pid, TargetId: "ActiveTasksList", Match: "MA5-S1 roles" }); shown = (await ui("read_list", { ProcessId: app.child.pid, TargetId: "MissionStepsList" })).map((r) => r.name.split("\n")[0]); } catch {}
+      try { await ui("select_list_item", { ProcessId: app.child.pid, TargetId: "ActiveTasksList", Match: "MA5-S1 roles" }); shown = (await ui("read_list", { ProcessId: app.child.pid, TargetId: "MissionStepsList" })).map((r) => r.name.split("\n")[0]); } catch { /* UI list may be closed between polls; the host snapshot still advances the timeline */ }
       const host = (m?.steps ?? []).map((s) => `${s.role}:${s.state}`);
       if (JSON.stringify(timeline.at(-1)?.host) !== JSON.stringify(host)) timeline.push({ at: new Date().toISOString(), mission: m?.state, host, ui: shown });
       return ["completed", "failed", "stopped"].includes(m?.state) ? m : null;
@@ -524,7 +524,7 @@ try {
   writeEvidence(join(EVIDENCE_DIR, "failure.json"), { runId: RUN_ID, failedAt: new Date().toISOString(), error: String(error?.message ?? error).slice(0, 2000), partial: results }, secrets());
   throw error;
 } finally {
-  if (app) { try { app.child.kill(); } catch {} }
+  if (app) { try { app.child.kill(); } catch { /* the app process is already gone */ } }
   await host.close();
-  for (const d of [hostDir, configDir, projectRoot]) try { rmSync(d, { recursive: true, force: true }); } catch {}
+  for (const d of [hostDir, configDir, projectRoot]) try { rmSync(d, { recursive: true, force: true }); } catch { /* best-effort cleanup */ }
 }

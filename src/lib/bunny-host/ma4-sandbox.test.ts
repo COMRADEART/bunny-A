@@ -91,7 +91,7 @@ res["ifaces"]=open("/proc/net/dev").read().count(":")
 print(json.dumps(res))`);
   assert.equal(r.exitCode, 0, r.stderr);
   const o = json(r.stdout);
-  for (const [k, v] of Object.entries(o)) if (k !== "ifaces") assert.notEqual(v, "CONNECTED", k), assert.notEqual(v, "RESOLVED", k);
+  for (const [k, v] of Object.entries(o)) if (k !== "ifaces") { assert.notEqual(v, "CONNECTED", k); assert.notEqual(v, "RESOLVED", k); }
   assert.equal(o.ifaces, 1, "only the down loopback interface exists");
   if (!networkControl) console.log("# network positive control unavailable (host offline?); isolation assertions above still hold");
 });

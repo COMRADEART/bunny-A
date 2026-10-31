@@ -123,7 +123,7 @@ try {
     const seen = await timeline(async (p) => p.status === "SPEAKING");
     const speaking = await pill();
     await press("VoiceBargeInButton");
-    seen.push(...(await timeline(async (p) => p.status === "INTERRUPTED" || p.status === "ON")).filter((s, i, a) => i > 0 || s !== seen.at(-1)));
+    seen.push(...(await timeline(async (p) => p.status === "INTERRUPTED" || p.status === "ON")).filter((s, i, _a) => i > 0 || s !== seen.at(-1)));
     const snap = await voice();
     // Each UIA read costs about a second, so a warm model's short PROCESSING phase may fall between samples; it is recorded,
     // not asserted (the PROCESSING -> THINKING mapping is a unit check in BunnyA.Tests).

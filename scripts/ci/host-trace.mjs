@@ -13,7 +13,7 @@ if (dir) {
   const log = (event, data) => {
     try {
       appendFileSync(file, `${new Date().toISOString()} ${event} ${JSON.stringify(data)}\n`);
-    } catch {}
+    } catch { /* tracing must never disturb the traced run */ }
   };
   const ids = new WeakMap();
   const live = new Map(); // server id -> accepted sockets whose 'close' has not fired yet

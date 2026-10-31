@@ -130,8 +130,6 @@ const launcher = spawn("powershell.exe", [
 let launchLog = "";
 launcher.stdout.on("data", (c) => { launchLog += c; });
 launcher.stderr.on("data", (c) => { launchLog += c; });
-const launchDone = new Promise((resolve) => launcher.on("exit", (code) => resolve(code)));
-
 let health = null;
 for (let i = 0; i < 80 && !health; i++) {
   health = await fetch(`http://127.0.0.1:${port}/health`).then((r) => r.json()).catch(() => null);
@@ -515,7 +513,7 @@ console.log("[Teardown] Stopping isolated Host process...");
 if (report.steps["1_start_application"].pid) {
   try {
     process.kill(report.steps["1_start_application"].pid);
-  } catch (err) {
+  } catch {
     // ignore
   }
 }

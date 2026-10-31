@@ -94,7 +94,7 @@ try {
     const edges = [];
     for (const expected of ["Top", "Right", "Bottom", "Left"]) {
       const t = await until(`edge ${expected}`, async () => {
-        const x = await tree(); const cfg = JSON.parse(readFileSync(configPath, "utf8").replace(/^﻿/, ""));
+        const x = await tree(); const cfg = JSON.parse(readFileSync(configPath, "utf8").replace(/^\uFEFF/, ""));
         return cfg.NotchEdge === expected ? x : null;
       }, 10_000);
       const n = t.notch, w = t.workArea, horizontal = expected === "Top" || expected === "Bottom";
@@ -117,9 +117,8 @@ try {
     // n1 left the notch on Top again after cycling; move it to Right at a non-default offset, then restart.
     writeConfig({ NotchEdge: "Right", NotchOffsetRatio: 0.3 });
     const before = await relaunch();
-    const cfgBefore = JSON.parse(readFileSync(configPath, "utf8").replace(/^﻿/, ""));
     const after = await relaunch();
-    const cfgAfter = JSON.parse(readFileSync(configPath, "utf8").replace(/^﻿/, ""));
+    const cfgAfter = JSON.parse(readFileSync(configPath, "utf8").replace(/^\uFEFF/, ""));
     assert.equal(cfgAfter.NotchEdge, "Right");
     assert.ok(Math.abs(after.notch.x - before.notch.x) <= 2 && Math.abs(after.notch.y - before.notch.y) <= 2, "same place after restart");
     assert.ok(Math.abs(after.notch.x + after.notch.width - (after.workArea.x + after.workArea.width)) <= 2, "still on the right edge");
@@ -153,7 +152,6 @@ try {
     return { monitors: list, placed, horizontalHeightRatio: ratio, note: "A ratio near 1 means both monitors run the same scale; otherwise it is their DPI ratio." };
   });
 
-  let teamEvidence = null;
   await stage("n4-live-team-states-and-approval-from-the-notch", async () => {
     const created = await cmd("agent.create", { objective: "Build an offline inventory dashboard page from data/inventory.csv.", projectId,
       team: { requirements: [{ id: "R1", text: "The page has a summary section", check: { kind: "html_id", value: "summary" } }, { id: "R2", text: "The page loads nothing from the internet", check: { kind: "no_external_resources" } }] } });
@@ -193,7 +191,6 @@ try {
     // Agreement with the Host: every final chip state equals the Host's terminal Agent state.
     const want = { COMPLETED: "Completed", FAILED: "Failed", STOPPED: "Canceled" };
     for (const chip of final) { const a = hostMembers.find((x) => chip.id === `AgentTeam-${x.id}`); assert.equal(chip.status, want[a.state], `${chip.name}`); }
-    teamEvidence = { missionId: done.id, state: done.state };
     return { reviewChips: inReview.map((c) => `${c.name.split(" · ")[0]}:${c.status}`), approvalShown: shown.operation, reviewImage, finalImage, sawWorking, maxSimultaneousWorking: maxSimultaneous,
       final: final.map((c) => c.name), missionState: done.state, requirements: done.teamView.requirementResults.map((r) => ({ id: r.id, passed: r.passed })), samples: samples.length, distinctSamples: [...new Set(samples.map((s) => s.chips.join("|")))] };
   });

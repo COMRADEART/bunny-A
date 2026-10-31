@@ -330,7 +330,7 @@ try {
   writeEvidence(join(EVIDENCE_DIR, "failure.json"), { runId: RUN_ID, failedAt: new Date().toISOString(), error: String(error?.message ?? error).slice(0, 2000), partial: results }, secrets());
   throw error;
 } finally {
-  if (app) { try { app.child.kill(); } catch {} }
+  if (app) { try { app.child.kill(); } catch { /* the app process is already gone */ } }
   await host.close();
-  for (const d of [hostDir, configDir, projectRoot]) try { rmSync(d, { recursive: true, force: true }); } catch {}
+  for (const d of [hostDir, configDir, projectRoot]) try { rmSync(d, { recursive: true, force: true }); } catch { /* best-effort cleanup */ }
 }

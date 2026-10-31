@@ -1,4 +1,4 @@
-import { FAILURE_TAXONOMY, type FailureTaxonomy, isRecoverableFailure } from "./outcome-measurement.ts";
+import { type FailureTaxonomy, isRecoverableFailure } from "./outcome-measurement.ts";
 
 export type RecoveryDecision = {
   taxonomy: FailureTaxonomy;

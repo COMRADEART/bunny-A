@@ -6,7 +6,7 @@ import type { ModelCall } from "./coding-workflow.server.ts";
 import type { ExecRequest } from "../../orch/types.ts";
 import type { Executor, RuntimeDeps } from "./task-runtime.server.ts";
 import { localReview, sourceMaterial } from "./connected-workflow.server.ts";
-import { executeDeterministicTest, type DeterministicTestResult } from "./test-runner.server.ts";
+import { executeDeterministicTest } from "./test-runner.server.ts";
 
 export const MEMORY_FLOOR_BYTES = 4 * 1024 ** 3;
 
@@ -105,7 +105,7 @@ export const localTest: Executor = {
         if (!r.ok) return { ok: false, error: r.error, dispatched: true, definite: !r.stopped };
         if (r.servedModel !== ctx.model) return { ok: false, error: "The test result came from " + (r.servedModel || "an unknown model") + ", not the pinned " + ctx.model + ".", dispatched: true, definite: true, fatal: "PIN_VIOLATION" };
         let verdict = { passed: 1, failed: 0, detail: "Model analysis completed." };
-        try { verdict = JSON.parse(r.text); } catch {}
+        try { verdict = JSON.parse(r.text); } catch { /* the default verdict above stands when the model reply is not JSON */ }
         // Semantic analysis alone CANNOT issue an execution receipt
         return {
           ok: true,

@@ -52,8 +52,8 @@ function createRig() {
     store,
     ptasks,
     close: () => {
-      try { db.close(); } catch {}
-      try { rmSync(dir, { recursive: true, force: true }); } catch {}
+      try { db.close(); } catch { /* the database may already be closed */ }
+      try { rmSync(dir, { recursive: true, force: true }); } catch { /* best-effort fixture cleanup */ }
     },
   };
 }

@@ -63,9 +63,7 @@ test("failure recovery: recoverable errors retry within finite budget and backof
     isIrreversible: false,
   };
 
-  let attemptsRun = 0;
   const op = async (attempt: number) => {
-    attemptsRun = attempt;
     if (attempt < 3) {
       throw new Error("Temporary model overload 429");
     }

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename, join } from "node:path";
 import { evidenceDir } from "../bunny-host/test-evidence.ts";
 import { HostDatabase } from "../bunny-host/persistence.server.ts";
 import { TaskManager } from "../bunny-host/manager.server.ts";

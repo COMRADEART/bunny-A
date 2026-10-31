@@ -143,7 +143,7 @@ function Flow({ kind, title, build, children, onDone }: { kind: Kind; title: str
 }
 
 function PreviewCard({ kind, view }: { kind: Kind; view: Preview }) {
-  const v = view as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const v = view as Record<string, any>;
   if (!view.ok) return (
     <div className="caption" role="alert"><p><strong>Bunny-A cannot accept this yet:</strong></p><ul>{view.problems.map(p => <li key={p}>{p}</li>)}</ul></div>
   );

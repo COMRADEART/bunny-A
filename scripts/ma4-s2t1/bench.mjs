@@ -65,7 +65,7 @@ const results = { at: new Date().toISOString(), node: process.version, platform:
 // P7 fairness, P8 model gate
 {
   const dir = mkdtempSync(join(tmpdir(), 's2t1-bench-')), events = [];
-  const { db, rt } = open(dir, { maxActive: 1, emit: (type, detail, id) => { if (type === 'ptask.changed' && / RUNNING$/.test(detail)) events.push(detail.split(':')[0]); } });
+  const { db, rt } = open(dir, { maxActive: 1, emit: (type, detail, _id) => { if (type === 'ptask.changed' && / RUNNING$/.test(detail)) events.push(detail.split(':')[0]); } });
   for (let i = 0; i < 10; i++) for (const project of ['alpha', 'beta']) rt.create({ spec: spec([{ id: 'a', kind: 'b.read', input: {} }], project, project), envelope: envelope(project) }, 'workstation');
   for (let i = 0; i < 40; i++) { await rt.tick(); await rt.idle(); }
   // A claim is the QUEUED -> RUNNING transition, read from the append-only history.

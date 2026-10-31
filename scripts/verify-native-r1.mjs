@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, readFileSync, rmSync, mkdirSync, existsSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
@@ -9,7 +9,6 @@ import { startHost } from "../src/lib/bunny-host/http.server.ts";
 import { rig, envelope, spec } from "../src/lib/bunny-host/ma4-s2t2-fixtures.ts";
 import {
   assertDeviceAction,
-  deviceRight,
   deviceApprovalRefusal,
   APPROVAL_ON_HOST,
   WorkstationRequiredError
@@ -91,7 +90,7 @@ try {
   let cfgObj = {};
   try {
     cfgObj = JSON.parse(readFileSync(cfgPath, "utf8"));
-  } catch {}
+  } catch { /* the config file may not exist yet; defaults below still apply */ }
   cfgObj.NotchEdge = "Top";
   writeFileSync(cfgPath, JSON.stringify(cfgObj, null, 2), "utf8");
 
@@ -556,7 +555,7 @@ test("config.json contains updated state", () => {
 } finally {
   console.log("\n[CLEANUP] Stopping isolated Host...");
   await host.close();
-  try { rmSync(tempHostDir, { recursive: true, force: true }); } catch {}
+  try { rmSync(tempHostDir, { recursive: true, force: true }); } catch { /* best-effort cleanup */ }
   console.log("[CLEANUP] Host stopped and temp files removed.");
 }
 

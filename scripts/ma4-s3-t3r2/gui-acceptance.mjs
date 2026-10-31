@@ -118,7 +118,7 @@ writeFileSync(
   }, null, 2)
 );
 
-let launcher = null;
+let _launcher = null;
 let health = null;
 let api = null;
 let sse = null;
@@ -126,7 +126,7 @@ let sse = null;
 try {
   // Step 1: Fresh desktop start
   console.log("[Step 1] Fresh desktop start via Start-Bunny-Release.ps1...");
-  launcher = spawn("powershell.exe", [
+  _launcher = spawn("powershell.exe", [
     "-NoProfile",
     "-ExecutionPolicy",
     "Bypass",
@@ -161,7 +161,7 @@ try {
 
   // Step 2: Verified onboarding state
   console.log("[Step 2] Verifying initial onboarding state...");
-  const onboardStateBefore = await api.command("onboarding.get", {}).catch(() => ({ status: 200, body: {} }));
+  await api.command("onboarding.get", {}).catch(() => ({ status: 200, body: {} }));
   const savedOnboarding = await api.command("onboarding.save", {
     state: { status: "done", stageIndex: 9, preferences: { selectedLocalModel: MODEL } },
   });
@@ -513,7 +513,7 @@ try {
   if (health?.pid) {
     try {
       process.kill(health.pid);
-    } catch {}
+    } catch { /* the Host process is already gone */ }
   }
   await sleep(800);
 
@@ -559,7 +559,7 @@ try {
   console.error("GUI Journey failed with error:", err);
   if (sse) sse.abort.abort();
   if (health?.pid) {
-    try { process.kill(health.pid); } catch {}
+    try { process.kill(health.pid); } catch { /* the Host process is already gone */ }
   }
   rmSync(install, { recursive: true, force: true });
   rmSync(workspace, { recursive: true, force: true });

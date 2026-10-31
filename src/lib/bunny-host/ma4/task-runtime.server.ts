@@ -112,7 +112,7 @@ export class PersistentTaskRuntime {
           const found = parsed.find(x => x.id === rootId);
           if (found?.path) rawPath = found.path;
         }
-      } catch {}
+      } catch { /* the setting is optional; absence falls through to the caller-provided fallback */ }
     }
     if (!rawPath) return null;
     try {
@@ -699,7 +699,7 @@ export class PersistentTaskRuntime {
 
   private async step(id: string, record: TaskRecord, index: number, a: Active, commit: (c: Omit<Update, "now" | "lease" | "actor">) => Updated, stop: (to: TaskState, reason: string, extra?: Partial<Omit<Update, "now" | "lease" | "actor" | "to" | "reason">>) => Updated, fault: (p: FaultPoint) => void) {
     const spec = record.spec.steps[index], state = record.steps[index], executor = this.executors.get(spec.kind)!;
-    const key = `${id}:${spec.id}`, op = this.store.operation(key), now = this.now();
+    const key = `${id}:${spec.id}`, op = this.store.operation(key);
     let role: S2Role = "Worker";
     if (spec.kind === "local.test") role = "Tester";
     else if (spec.kind === "local.review") role = "Reviewer";

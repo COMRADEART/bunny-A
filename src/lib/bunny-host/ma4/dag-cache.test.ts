@@ -3,10 +3,9 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
   evaluateArtifactReuse,
-  validateAndOptimizePlanGraph,
   type VerifiedArtifactCacheEntry,
 } from "./adaptive-planner.ts";
-import type { TaskSpec, Envelope, ExecutorFacts } from "./task-runtime.ts";
+import type { TaskSpec, Envelope } from "./task-runtime.ts";
 
 const sha256 = (text: string) => createHash("sha256").update(text).digest("hex");
 

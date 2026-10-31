@@ -1,6 +1,6 @@
 import { randomUUID, createHash } from "node:crypto";
 import { existsSync, lstatSync, realpathSync, readFileSync, statSync } from "node:fs";
-import { resolve, relative, isAbsolute, extname, join, sep } from "node:path";
+import { resolve, relative, isAbsolute, extname, join } from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import { resolveCommand } from "../../bunny-missions/capabilities/process.server.ts";
 import { trackOwnedChild } from "../owned-processes.server.ts";
@@ -205,6 +205,7 @@ export function validatePathContainment(
       return { ok: false, error: "Path traversal components ('.', '..') are forbidden in target paths." };
     }
     // Check forbidden characters
+    // eslint-disable-next-line no-control-regex -- path validation intentionally rejects control characters; the range itself is the subject
     if (/[<>:"|?*\u0000-\u001f]/.test(s)) {
       return { ok: false, error: "Path segments may not contain invalid characters (: < > \" | ? * or control characters)." };
     }
@@ -432,7 +433,7 @@ export async function executeDeterministicTest(options: TestRunnerOptions): Prom
         const rStat = statSync(validatedReportPath);
         preLaunchReportMtimeMs = rStat.mtimeMs;
         preLaunchReportSha256 = sha256(readFileSync(validatedReportPath));
-      } catch {}
+      } catch { /* the report can vanish between the existence check and the stat; the defaults above hold */ }
     }
   }
 

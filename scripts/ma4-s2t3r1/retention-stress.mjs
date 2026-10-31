@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import v8 from 'node:v8';
 import { runHostEntry } from '../../src/lib/bunny-host/entry.server.ts';
 
-if (typeof gc !== 'function') throw new Error('run with --expose-gc');
+if (typeof globalThis.gc !== 'function') throw new Error('run with --expose-gc');
 const arg = (name, fallback) => { const i = process.argv.indexOf(name); return i > 0 ? process.argv[i + 1] : fallback; };
 const ROUNDS = Number(arg('--rounds', '1500')), BLOCK = 100, SNAP = arg('--snap', null);
 const free = () => new Promise(r => { const s = createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => r(p)); }); });
@@ -25,7 +25,7 @@ const state = async () => { const t = await (await fetch(`http://127.0.0.1:${por
 const DAY = 86_400_000, envelope = () => ({ capabilities: ['file.read', 'file.stat'], providers: ['ollama'], localOnly: true, models: [], projectScopes: ['soak'], sideEffects: false, background: true,
   budgets: { maxModelCalls: 0, maxWallMs: 60_000 }, expiresAt: Date.now() + DAY, grants: { files: [{ root: 'soak', access: 'read' }] } });
 const spec = title => ({ title, projectId: 'soak', acceptance: { requiredSteps: ['read', 'stat'] }, steps: [{ id: 'read', kind: 'file.read', input: { root: 'soak', path: 'STATUS.md' } }, { id: 'stat', kind: 'file.stat', input: { root: 'soak', path: 'STATUS.md' } }] });
-const measure = round => { gc(); gc(); const m = process.memoryUsage(), h = v8.getHeapStatistics(); return { round, heapUsedMB: +(m.heapUsed / 2 ** 20).toFixed(2), rssMB: +(m.rss / 2 ** 20).toFixed(1), externalMB: +(m.external / 2 ** 20).toFixed(2), arrayBuffersMB: +(m.arrayBuffers / 2 ** 20).toFixed(2), contexts: h.number_of_native_contexts, resources: process.getActiveResourcesInfo().length, stateKB: Math.round(stateBytes / 1024) }; };
+const measure = round => { globalThis.gc(); globalThis.gc(); const m = process.memoryUsage(), h = v8.getHeapStatistics(); return { round, heapUsedMB: +(m.heapUsed / 2 ** 20).toFixed(2), rssMB: +(m.rss / 2 ** 20).toFixed(1), externalMB: +(m.external / 2 ** 20).toFixed(2), arrayBuffersMB: +(m.arrayBuffers / 2 ** 20).toFixed(2), contexts: h.number_of_native_contexts, resources: process.getActiveResourcesInfo().length, stateKB: Math.round(stateBytes / 1024) }; };
 const series = [];
 try {
   await cmd('connector.roots.set', { roots: [{ id: 'soak', label: 'Soak', path: project }] });

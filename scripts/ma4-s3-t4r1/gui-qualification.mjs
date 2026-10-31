@@ -6,7 +6,6 @@ import assert from "node:assert/strict";
 // UI Models and Core Host Contracts
 import { ptaskRows } from "../../src/components/island/ptask-model.ts";
 import { pendingApprovalItems } from "../../src/components/island/approvals-model.ts";
-import { orbState, taskJourney } from "../../src/components/island/motion-model.ts";
 import { HostDatabase } from "../../src/lib/bunny-host/persistence.server.ts";
 import { TaskStore } from "../../src/lib/bunny-host/ma4/task-store.server.ts";
 import { PersistentTaskRuntime } from "../../src/lib/bunny-host/ma4/task-runtime.server.ts";
@@ -100,18 +99,6 @@ async function main() {
     // 5. Approval Center
     {
       const start = performance.now();
-      const pendingAction = {
-        actionId: "act-42",
-        stepId: "step-deploy",
-        kind: "service.deploy",
-        connector: "system",
-        target: "Production Endpoint",
-        summary: "Deploy service to port 8080",
-        effects: ["Binds local port", "Restarts service"],
-        reversible: false,
-        payloadSha256: "b".repeat(64),
-        expiresAt: Date.now() + 60_000,
-      };
       const items = pendingApprovalItems({
         tasks: [{ id: "t-appr", state: "waiting_for_approval", provider: "ollama", title: "Approve deployment", createdAt: Date.now() }],
         missions: [],
@@ -404,7 +391,7 @@ async function main() {
   } finally {
     try {
       fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
-    } catch {}
+    } catch { /* best-effort workspace cleanup */ }
   }
 
   const allPassed = areas.every(a => a.status === "PASS");

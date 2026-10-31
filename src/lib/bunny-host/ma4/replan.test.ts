@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { evaluateRepairEligibility, validateRevisedPlan, MAX_REPAIR_ITERATIONS } from "./replan.server.ts";
+import { evaluateRepairEligibility, validateRevisedPlan } from "./replan.server.ts";
 import type { TaskSpec, Envelope, ExecutorFacts } from "./task-runtime.ts";
 
 test("safe replan: strictly enforces MAX_REPAIR_ITERATIONS = 1", () => {

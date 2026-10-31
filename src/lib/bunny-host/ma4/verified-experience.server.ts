@@ -1,10 +1,9 @@
-import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { HostDatabase } from "../persistence.server.ts";
 import { LotusStore } from "../lotus.server.ts";
 import { ExperienceMemory, type Sensitivity } from "./experience.server.ts";
 import { isVerifiedSuccess, type ExecutionOutcomeRecord } from "./outcome-measurement.ts";
-import { parseScope, type LotusMemory, type LotusScope } from "../lotus.ts";
+import { parseScope } from "../lotus.ts";
 import { looksSecret } from "../intelligence.ts";
 
 export const VERIFIED_EXPERIENCE_SETTING = "ma4_s3_t4_verified_learning_v1";
@@ -29,8 +28,6 @@ export const CandidateExperienceRecordSchema = z.object({
 }).strict();
 
 export type CandidateExperienceRecord = z.infer<typeof CandidateExperienceRecordSchema>;
-
-const sha256 = (text: string) => createHash("sha256").update(text).digest("hex");
 
 export class VerifiedExperienceManager {
   readonly host: HostDatabase;
@@ -206,7 +203,7 @@ export class VerifiedExperienceManager {
     for (const row of rows) {
       try {
         records.push(CandidateExperienceRecordSchema.parse(JSON.parse(row.record_json)));
-      } catch {}
+      } catch { /* malformed historic rows are skipped; the pool keeps the parsable ones */ }
     }
 
     if (!records.length) {

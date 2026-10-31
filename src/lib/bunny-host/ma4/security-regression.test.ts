@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { HostDatabase } from "../persistence.server.ts";
 import { TaskStore } from "./task-store.server.ts";
 import { PersistentTaskRuntime, type Executor } from "./task-runtime.server.ts";
-import { validateTask, approvalRequired, sha256, type Envelope, type ExecutorFacts, type TaskSpec } from "./task-runtime.ts";
+import { validateTask, sha256, type Envelope, type ExecutorFacts, type TaskSpec } from "./task-runtime.ts";
 import { localTest } from "./task-executors.server.ts";
 import { VerifiedExperienceManager } from "./verified-experience.server.ts";
 import { createOutcomeRecord, isVerifiedSuccess } from "./outcome-measurement.ts";

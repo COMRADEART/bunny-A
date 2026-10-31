@@ -3,7 +3,6 @@ import test from "node:test";
 import {
   createOutcomeRecord,
   isVerifiedSuccess,
-  classifyOutcomeStatus,
   redactOutcomeSecrets,
   summarizeOutcomeRecords,
   isRecoverableFailure,

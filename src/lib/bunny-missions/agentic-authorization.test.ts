@@ -18,7 +18,6 @@ import { ModelCapabilityRegistry } from "../bunny-host/model-capability.server.t
 import type { AdapterResult, ProviderAdapter } from "../bunny-host/contracts.ts";
 import type { OrchTask } from "../orch/types.ts";
 import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
 
 const step = (action: string, params: Record<string, unknown> = { path: "seed.txt" }) => ({ role: "Probe", objective: "Inspect the disposable resource", access: action === "filesystem.write" ? "write" : "read", executor: { kind: "capability", action, params } });
 async function fixture(options: { max?: number; approve?: boolean; steps?: unknown[]; adapters?: ProviderAdapter[]; git?: boolean; durationMs?: number; rootIsState?: boolean } = {}) {

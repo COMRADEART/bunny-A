@@ -123,7 +123,7 @@ test("MA4 transport contract: exact model, fail-closed stream, usage, JSON valid
   assert.equal(new Headers(calls[0].init?.headers).get("Authorization"), `Bearer ${KEY}`);
   assert.equal(JSON.parse(String(calls[0].init?.body)).model, MODEL);
   // MA4-S1R2: streaming is now implemented; a non-SSE reply (no finish_reason, no [DONE]) is an interruption, never a success.
-  await assert.rejects(async () => { for await (const _ of transport.stream(request())) {} }, /HTTP 502/);
+  await assert.rejects(async () => { for await (const _ of transport.stream(request())) { /* drain until the interruption surfaces */ } }, /HTTP 502/);
   assert.throws(() => new CompatibleProvider("http://untrusted.example/v1", async () => KEY));
   for (const response of [reply("bad", "length"), reply("bad", "error"), reply("bad", "stop", "different"), new Response('{"error":{"message":"private prompt"}}')]) {
     const p = new CompatibleProvider("https://approved.example/v1", async () => KEY, async () => response); await assert.rejects(p.generate(request()), InferenceError);
