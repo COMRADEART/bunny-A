@@ -16,6 +16,13 @@ class Worker implements VoiceWorkerPort {
   silentStop = false;
   /** When true the worker never confirms duplex.start (in-flight path). */
   refuseDuplex = false;
+  /** S3R1: as the real worker, a capture.start while a capture is still attached is refused with DEVICE_BUSY. */
+  strictDevice = false;
+  /** S3R1: when true an aborted capture keeps the device until `release()`; otherwise capture.stopped follows on a microtask. */
+  holdRelease = false;
+  /** The attached capture (started, no capture.stopped yet), and DEVICE_BUSY refusals counted. */
+  active: { turn: string; gen: number; aborted: boolean } | null = null;
+  busy = 0;
   private listeners: ((event: WorkerEvent) => void)[] = [];
   private resolveExit!: (code: number | null) => void;
   readonly exited = new Promise<number | null>((resolve) => (this.resolveExit = resolve));
@@ -27,10 +34,31 @@ class Worker implements VoiceWorkerPort {
     this.stdinBytes += Buffer.byteLength(JSON.stringify(command), "utf8") + 1;
     if (command.op === "devices") queueMicrotask(() => this.emit({ ev: "devices", inputs: [], outputs: [], defaultInput: { name: "fake", muted: false, volume: null, present: true }, defaultOutput: { name: "fake", muted: false, volume: null, present: true }, micPrivacy: "allow" }));
     if (command.op === "duplex.start" && !this.refuseDuplex) queueMicrotask(() => this.emit({ ev: "duplex.started", session: command.session, aec: "fixture:no-aec", reference: "fixture", inputId: null, outputId: null, renderDevice: -1, fixture: true }));
-    if (command.op === "capture.start") queueMicrotask(() => this.emit({ ev: "capture.started", turn: command.turn, gen: command.gen, device: { index: -2, name: "fixture" }, sampleRate: 16000, channels: 1 }));
+    if (command.op === "capture.start") {
+      if (this.strictDevice && this.active) {
+        this.busy += 1;
+        queueMicrotask(() => this.emit({ ev: "capture.error", turn: command.turn, gen: command.gen, code: "DEVICE_BUSY", message: "capture already active" }));
+      } else {
+        this.active = { turn: command.turn, gen: command.gen, aborted: false };
+        queueMicrotask(() => this.emit({ ev: "capture.started", turn: command.turn, gen: command.gen, device: { index: -2, name: "fixture" }, sampleRate: 16000, channels: 1 }));
+      }
+    }
+    if (command.op === "capture.abort" && this.active && this.active.turn === command.turn && this.active.gen === command.gen) {
+      this.active.aborted = true;
+      if (!this.holdRelease) queueMicrotask(() => this.release());
+    }
+    if (command.op === "duplex.stop") this.active = null;
     if (command.op === "duplex.stop" && !this.silentStop) queueMicrotask(() => this.emit({ ev: "duplex.stopped", session: command.session, reason: "stop" }));
   }
+  /** The aborted capture's thread exits. Its finalizer reports first (the order the real whisper path can produce), then capture.stopped. */
+  release() {
+    const capture = this.active;
+    if (!capture?.aborted) return;
+    this.emit({ ev: "stt.none", turn: capture.turn, gen: capture.gen, reason: "aborted" });
+    this.emit({ ev: "capture.stopped", turn: capture.turn, gen: capture.gen, reason: "abort", bufferedPeakBytes: 0 });
+  }
   emit(value: Record<string, unknown>) {
+    if (value.ev === "capture.stopped" && this.active?.turn === value.turn && this.active?.gen === value.gen) this.active = null;
     for (const listener of [...this.listeners]) listener({ t: 1, mono: 1, ...value } as WorkerEvent);
   }
   async close() {
@@ -1726,6 +1754,8 @@ test("T12 review r6: a three-part sentence waits again, worker exit and interrup
   await i.begin();
   await i.final("Tell me about the");
   i.session.interrupt("button");
+  // S3R1: the next input turn exists only once the aborted capture released the device.
+  await tick();
   i.advance(700);
   await i.final("dashboard");
   await tick();
@@ -1780,4 +1810,201 @@ test("MA5-S2 P3: a completion notice waits while the user speaks and never close
   assert.equal(h.worker().sent.some((c) => c.op === "duplex.stop"), false, "the notice never stops the echo-cancelled lane");
   assert.equal(h.session.snapshot().duplex?.active, true);
   assert.deepEqual(h.controls, [], "read-only: no Agent command");
+});
+
+// -----------------------------------------------------------------------------------------------------------------
+// S3R1: a hands-free interrupt re-arms only after the aborted capture released the device (the DEVICE_BUSY defect)
+// -----------------------------------------------------------------------------------------------------------------
+
+const captureStarts = (w: Worker) => w.sent.filter((c): c is Capture => c.op === "capture.start");
+
+/** Hands-free with the real worker's device rule: one attached capture, and an abort releases only on `release()`. */
+async function strictHarness() {
+  const h = await harness();
+  h.worker().strictDevice = true;
+  h.worker().holdRelease = true;
+  await h.begin();
+  return h;
+}
+
+/** One utterance as the real worker reports it: onset, the capture ends (VAD), then the final for that turn. */
+async function utter(h: Awaited<ReturnType<typeof harness>>, text: string) {
+  const turn = h.input();
+  h.emitInput({ ev: "vad", state: "speech_start" }, turn);
+  h.emitInput({ ev: "capture.stopped", reason: "vad", bufferedPeakBytes: 0 }, turn);
+  h.emitInput({ ev: "stt.final", text, confidence: 0.9 }, turn);
+  await tick();
+}
+
+test("S3R1: a stop pressed mid-reply re-arms on the aborted turn's capture.stopped, never before; the grant and the lane are kept", async () => {
+  const h = await strictHarness();
+  await utter(h, "Tell me a story");
+  h.speaking();
+  const grant = h.session.snapshot().duplex?.grantExpiresAt;
+  assert.ok(grant, "the explicit hands-free grant is live");
+  const before = h.input();
+  const armed = captureStarts(h.worker()).length;
+  h.session.interrupt("button");
+  await tick();
+  assert.equal(captureStarts(h.worker()).length, armed, "no replacement capture while the aborted one holds the device");
+  assert.ok(h.worker().sent.some((c) => c.op === "capture.abort" && c.turn === before.turn && c.gen === before.gen));
+  h.worker().release();
+  await tick();
+  assert.equal(captureStarts(h.worker()).length, armed + 1, "exactly one replacement capture after the release");
+  assert.notEqual(h.input().turn, before.turn);
+  assert.equal(h.worker().busy, 0, "the worker never refused a capture (DEVICE_BUSY)");
+  const snap = h.session.snapshot();
+  assert.equal(snap.error, null);
+  assert.equal(snap.duplex?.active, true, "continuous listening continues after the interrupt");
+  assert.equal(snap.duplex?.grantExpiresAt, grant, "the explicit grant is unchanged");
+  await utter(h, "Explain the moon");
+  assert.equal(h.admissions.length, 2, "the next utterance on the new turn is heard and routed");
+  await h.session.close();
+});
+
+test("S3R1: rapid repeated interrupts never start a second capture; each release arms exactly one turn", async () => {
+  const h = await strictHarness();
+  for (let round = 0; round < 5; round++) {
+    await utter(h, `Tell me story number ${round + 1}`);
+    h.speaking();
+    const armed = captureStarts(h.worker()).length;
+    const aborts = h.worker().sent.filter((c) => c.op === "capture.abort").length;
+    h.session.interrupt("button");
+    h.session.interrupt("hotkey");
+    h.session.interrupt("button");
+    await tick();
+    assert.equal(captureStarts(h.worker()).length, armed, `round ${round}: nothing armed while the device is releasing`);
+    assert.equal(h.worker().sent.filter((c) => c.op === "capture.abort").length, aborts + 1, `round ${round}: one abort for the one armed turn`);
+    h.worker().release();
+    await tick();
+    assert.equal(captureStarts(h.worker()).length, armed + 1, `round ${round}: one turn armed after the release`);
+  }
+  assert.equal(h.worker().busy, 0, "no DEVICE_BUSY in five rounds");
+  assert.equal(h.session.snapshot().duplex?.active, true);
+  assert.equal(h.session.snapshot().error, null);
+  await h.session.close();
+});
+
+test("S3R1: a stale or mismatched capture.stopped never re-arms; only the aborted turn's own turn and gen do", async () => {
+  const h = await strictHarness();
+  const aborted = h.input();
+  h.session.interrupt("button");
+  await tick();
+  const armed = captureStarts(h.worker()).length;
+  h.worker().emit({ ev: "capture.stopped", turn: aborted.turn, gen: aborted.gen + 1, reason: "abort", bufferedPeakBytes: 0 });
+  h.worker().emit({ ev: "capture.stopped", turn: "input-0-stale", gen: aborted.gen, reason: "abort", bufferedPeakBytes: 0 });
+  await tick();
+  assert.equal(captureStarts(h.worker()).length, armed, "a mismatched acknowledgment re-arms nothing");
+  h.worker().release();
+  await tick();
+  assert.equal(captureStarts(h.worker()).length, armed + 1);
+  h.worker().emit({ ev: "capture.stopped", turn: aborted.turn, gen: aborted.gen, reason: "abort", bufferedPeakBytes: 0 });
+  h.worker().emit({ ev: "stt.final", turn: aborted.turn, gen: aborted.gen, text: "pause the agent", confidence: 1 });
+  await tick();
+  assert.equal(captureStarts(h.worker()).length, armed + 1, "a duplicate acknowledgment arms nothing");
+  assert.equal(h.controls.length + h.admissions.length, 0, "an aborted turn's late words are never routed");
+  assert.equal(h.worker().busy, 0);
+  await h.session.close();
+});
+
+test("S3R1: mute during a pending re-arm cancels it; the release and an unmute reopen nothing", async () => {
+  const h = await strictHarness();
+  const aborted = h.input();
+  h.session.interrupt("button");
+  await tick();
+  const armed = captureStarts(h.worker()).length;
+  h.session.mute(true);
+  await tick();
+  h.worker().emit({ ev: "capture.stopped", turn: aborted.turn, gen: aborted.gen, reason: "abort", bufferedPeakBytes: 0 });
+  await tick();
+  h.session.mute(false);
+  await tick();
+  h.advance(10_000);
+  await tick();
+  assert.equal(captureStarts(h.worker()).length, armed, "no capture after mute, the late release or unmute");
+  assert.equal(h.session.snapshot().duplex?.active, false);
+  assert.equal(h.session.snapshot().duplex?.grantExpiresAt, null, "mute revokes the grant");
+  assert.equal(h.worker().busy, 0);
+  await h.session.close();
+});
+
+test("S3R1: close, or a push-to-talk press, during a pending re-arm cancels it; a late release opens no hands-free capture", async () => {
+  const c = await strictHarness();
+  const closedTurn = c.input();
+  c.session.interrupt("button");
+  await tick();
+  const armed = captureStarts(c.worker()).length;
+  await c.session.close();
+  c.worker().emit({ ev: "capture.stopped", turn: closedTurn.turn, gen: closedTurn.gen, reason: "abort", bufferedPeakBytes: 0 });
+  await tick();
+  assert.equal(captureStarts(c.worker()).length, armed, "nothing armed after close");
+  assert.equal(c.worker().closed, true);
+
+  const p = await strictHarness();
+  const pressed = p.input();
+  p.session.interrupt("button");
+  await tick();
+  const handsFree = () => captureStarts(p.worker()).filter((cmd) => cmd.duplex === true).length;
+  const before = handsFree();
+  await p.session.listenStart("push_to_talk");
+  await tick();
+  p.worker().emit({ ev: "capture.stopped", turn: pressed.turn, gen: pressed.gen, reason: "abort", bufferedPeakBytes: 0 });
+  await tick();
+  assert.equal(handsFree(), before, "no hands-free capture after the user's push-to-talk press");
+  assert.equal(p.worker().busy, 0);
+  await p.session.close();
+});
+
+test("S3R1: a worker exit during a pending re-arm ends the lane; a capture that never releases closes the owned worker", async () => {
+  const e = await strictHarness();
+  e.session.interrupt("button");
+  await tick();
+  const armed = captureStarts(e.worker()).length;
+  e.worker().exit(1);
+  await tick();
+  await tick();
+  e.worker().release();
+  await tick();
+  assert.equal(captureStarts(e.worker()).length, armed);
+  assert.equal(e.session.snapshot().error?.code, "WORKER_EXITED");
+  assert.equal(e.session.snapshot().duplex?.grantExpiresAt, null);
+  await e.session.close();
+
+  const t = await strictHarness();
+  t.session.interrupt("button");
+  await tick();
+  const tArmed = captureStarts(t.worker()).length;
+  t.advance(2_001);
+  await tick();
+  await tick();
+  assert.equal(captureStarts(t.worker()).length, tArmed, "no capture while the old one never released");
+  assert.equal(t.worker().closed, true, "the owned worker is closed");
+  assert.equal(t.session.snapshot().open, false);
+  assert.equal(t.session.snapshot().error?.code, "AEC_UNAVAILABLE");
+});
+
+test("S3R1: after a worker restart, a late release or final from the old worker arms nothing and routes nothing", async () => {
+  const h = await strictHarness();
+  const aborted = h.input();
+  h.session.interrupt("button");
+  await tick();
+  const old = h.worker();
+  old.exit(1);
+  await tick();
+  await tick();
+  await h.session.close();
+  await h.session.open("hands_free");
+  h.worker().strictDevice = true;
+  h.worker().holdRelease = true;
+  await h.begin();
+  assert.notEqual(h.worker(), old, "a fresh worker");
+  assert.equal(captureStarts(h.worker()).length, 1);
+  old.emit({ ev: "capture.stopped", turn: aborted.turn, gen: aborted.gen, reason: "abort", bufferedPeakBytes: 0 });
+  old.emit({ ev: "stt.final", turn: aborted.turn, gen: aborted.gen, text: "pause the agent", confidence: 1 });
+  await tick();
+  assert.equal(captureStarts(h.worker()).length, 1, "the old worker's acknowledgment arms nothing on the new one");
+  assert.equal(h.controls.length + h.admissions.length, 0);
+  assert.equal(h.worker().busy, 0);
+  assert.equal(h.session.snapshot().duplex?.active, true);
+  await h.session.close();
 });
