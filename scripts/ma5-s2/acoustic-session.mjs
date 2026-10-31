@@ -18,12 +18,14 @@
 // Every metric is labelled: "acoustic" (involves the real microphone, room or speaker), "software" (a receipt that would
 // be the same with fixtures) or "simulated" (--fixture). A software cancel acknowledgment is never reported as speaker
 // silence, and the "still thinking" status line is never reported as the model's answer.
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { lstatSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 
-export const SCRIPT_ID = "p4-v1";
+/** p4-v2 (S3R1): 6 trials per recognition phrase (48 utterances, 222 reference words) to meet the A18 sample minimum. */
+export const SCRIPT_ID = "p4-v2";
 /** Scripted, nonpersonal phrases. `trials` per phrase gives the counts the rates are computed from. */
 export const PHRASES = {
   stt: ["what are my agents working on", "what failed", "pause the current mission", "tell me when this task is completed", "how many agents are working", "open the approvals", "what is the status of my last mission", "goodbye bunny"],
@@ -32,7 +34,7 @@ export const PHRASES = {
   /** Said with a deliberate one-second pause at the bar. */
   pause: ["what are my agents | working on", "tell me when this task | is completed"],
 };
-export const TRIALS = { stt: 3, interrupt: 5, backchannel: 5, pause: 3, echo: 10, latency: 10, load: 5 };
+export const TRIALS = { stt: 6, interrupt: 5, backchannel: 5, pause: 3, echo: 10, latency: 10, load: 5 };
 export const SECTIONS = {
   1: "real microphone capture and recognition (push-to-talk, scripted phrases)",
   2: "simultaneous capture and playback (hands-free; Bunny speaks, owner silent)",
@@ -272,6 +274,90 @@ function stats(values) {
   return { n: v.length, p50: at(50), p95: at(95), max: v.at(-1) };
 }
 const since = (t, field) => (t?.[field] && t?.speechEndAt ? t[field] - t.speechEndAt : null);
+/** Every response stage from the end of speech, separately (P4-2): the status line is never counted as the answer. */
+export function latencyRow(t) {
+  return { transcriptMs: since(t, "finalAt"), firstModelTokenMs: since(t, "firstTokenAt"), statusAckAudibleMs: since(t, "delayAckPlaybackAt"), firstAudibleAnswerMs: since(t, "firstPlaybackAt"), completedMs: since(t, "completedAt"), delayAck: !!t?.delayAckAt };
+}
+export const latencyStats = (rows) => Object.fromEntries(["transcriptMs", "firstModelTokenMs", "statusAckAudibleMs", "firstAudibleAnswerMs", "completedMs"].map((k) => [k, stats(rows.map((r) => r[k]))]));
+/**
+ * A push-to-talk turn is over once its answer completed, or it ended with no recognition. The transcript alone is not
+ * enough: it arrives before any playback (attended S1, 2026-10-30: 24/24 answer-audio timings were empty when read then).
+ */
+export const answerSettled = (v, beforeTurnId) => v.turnId !== beforeTurnId && !v.capturing && (v.timing?.completedAt != null || (v.state === "IDLE" && v.finalTranscript == null));
+
+/** S3R1: sections that measure recognition only. They run on a Host that routes nothing (voice recognitionOnly). */
+export const RECOGNITION_SECTIONS = [1, 8];
+/** Recognition and action sections never share a run: a scripted "goodbye bunny" must not end a transcription trial. */
+export function planSections(sections) {
+  const recognition = sections.filter((s) => RECOGNITION_SECTIONS.includes(s));
+  if (recognition.length && recognition.length !== sections.length) throw new Error(`Refused: run the recognition sections (${RECOGNITION_SECTIONS.join(",")}) separately from the others, e.g. --sections 1,8. Nothing was opened.`);
+  return { sections, recognitionOnly: recognition.length > 0 };
+}
+
+/** A18, recorded prospectively in S3R1 for the final qualification run. Earlier measurements (S1) are not re-scored. */
+export const A18 = { maxWer: 0.15, maxNoResultRate: 0.05, maxUnauthorizedActions: 0, minUtterances: 48, minRefWords: 200 };
+/** A missing transcript counts as a deletion of every reference word. `actionsTriggered`: Tasks created by speech. */
+export function a18Verdict(trials, actionsTriggered) {
+  const refWords = trials.reduce((s, t) => s + t.refWords, 0);
+  const wordErrors = trials.reduce((s, t) => s + (t.wordErrors ?? t.refWords), 0);
+  const noResult = trials.filter((t) => t.wordErrors == null).length;
+  const werValue = refWords ? Math.round((wordErrors / refWords) * 1000) / 1000 : null;
+  const noResultRate = rate(noResult, trials.length);
+  const checks = {
+    wer: werValue != null && werValue <= A18.maxWer,
+    noResultRate: noResultRate != null && noResultRate <= A18.maxNoResultRate,
+    unauthorizedActions: actionsTriggered === A18.maxUnauthorizedActions,
+    sample: trials.length >= A18.minUtterances && refWords >= A18.minRefWords,
+  };
+  return { criteria: A18, utterances: trials.length, refWords, wordErrorsWithDeletions: wordErrors, wer: werValue, noResultRate, actionsTriggered, checks, pass: Object.values(checks).every(Boolean) };
+}
+
+/** S3R1: the disposable Host directory. Recovery deletes only directories that carry this marker naming themselves. */
+export const TEMP_PREFIX = "bunny-p4-acoustic-";
+const OWNER_MARKER = ".bunny-acoustic-owner.json";
+const OWNER_SCHEMA = "bunny-acoustic-temp/1";
+export function createOwnedTempDir(root = tmpdir()) {
+  const dir = mkdtempSync(join(root, TEMP_PREFIX));
+  writeFileSync(join(dir, OWNER_MARKER), JSON.stringify({ schema: OWNER_SCHEMA, name: basename(dir), pid: process.pid, createdAt: new Date().toISOString() }));
+  return dir;
+}
+export const pidAlive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === "EPERM"; } };
+/**
+ * Removes directories left by sessions that ended without cleanup (a forced termination runs no handler). Only a positively
+ * identified one goes: the exact mkdtemp name, a real directory (no link or junction), a marker file of this schema naming
+ * that directory, and an owner process that is gone. Anything else is left untouched and only counted.
+ */
+export function recoverInterruptedSessions({ root = tmpdir(), alive = pidAlive } = {}) {
+  const removed = [], kept = [];
+  for (const name of readdirSync(root)) {
+    if (!name.startsWith(TEMP_PREFIX)) continue;
+    const dir = join(root, name);
+    let owner = null;
+    try {
+      const marker = join(dir, OWNER_MARKER);
+      const st = lstatSync(dir);
+      if (/^bunny-p4-acoustic-[A-Za-z0-9]{6}$/.test(name) && st.isDirectory() && !st.isSymbolicLink() && lstatSync(marker).isFile()) owner = JSON.parse(readFileSync(marker, "utf8"));
+    } catch { owner = null; }
+    if (owner?.schema !== OWNER_SCHEMA || owner.name !== name || !Number.isInteger(owner.pid)) kept.push({ name, reason: "unidentified" });
+    else if (alive(owner.pid)) kept.push({ name, reason: "owner-running" });
+    else { rmSync(dir, { recursive: true, force: true }); removed.push(name); }
+  }
+  return { removed, kept };
+}
+
+/** Best-effort removal on any exit; a forced termination skips it, which recoverInterruptedSessions covers next run. */
+export function installExitCleanup(dir, onSignal, signals = ["SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"]) {
+  const clean = () => { try { rmSync(dir, { recursive: true, force: true }); } catch { /* recovery covers it */ } };
+  process.once("exit", clean);
+  for (const s of signals) process.on(s, () => onSignal(s));
+  return clean;
+}
+
+/** The owner can end the session at any moment: q + Enter between prompts (not only at one), or Ctrl+C. */
+export function wireOwnerStop(rl, guard) {
+  rl.on("line", (line) => { if (line.trim().toLowerCase() === "q") guard.stop("ENDED_BY_OWNER"); });
+  rl.on("SIGINT", () => guard.stop("ENDED_BY_OWNER", "Ctrl+C"));
+}
 
 async function main() {
   const argv = process.argv.slice(2);
@@ -282,24 +368,24 @@ async function main() {
   const auth = FIXTURE ? { ...authorizationTemplate(), maxMinutes: 30, maxPlaybackVolumePercent: 100, authorizedAt: new Date().toISOString() } : JSON.parse(readFileSync(authPath, "utf8"));
   const problems = FIXTURE ? [] : validateAuthorization(auth);
   if (problems.length) throw new Error(`Refused: the authorization is not valid (${problems.join("; ")}). Nothing was opened.`);
-  const sections = argv.includes("--sections") ? argv[argv.indexOf("--sections") + 1].split(",").map(Number) : Object.keys(SECTIONS).map(Number);
-  if (argv.includes("--check")) { console.log(JSON.stringify({ valid: true, budgetMinutes: Math.floor(sessionBudgetMs(auth) / 60_000), sections: sections.map((s) => `${s}: ${SECTIONS[s]}`), trials: TRIALS, phrases: PHRASES }, null, 2)); return; }
+  const { sections, recognitionOnly } = planSections(argv.includes("--sections") ? argv[argv.indexOf("--sections") + 1].split(",").map(Number) : Object.keys(SECTIONS).map(Number));
+  if (argv.includes("--check")) { console.log(JSON.stringify({ valid: true, budgetMinutes: Math.floor(sessionBudgetMs(auth) / 60_000), recognitionOnly, sections: sections.map((s) => `${s}: ${SECTIONS[s]}`), trials: TRIALS, phrases: PHRASES }, null, 2)); return; }
 
   // Imported only here: --check and --print-template load no Host code.
   const { spawnSync } = await import("node:child_process");
-  const { mkdtempSync, rmSync, mkdirSync } = await import("node:fs");
-  const { tmpdir } = await import("node:os");
-  const { join } = await import("node:path");
+  const { mkdirSync } = await import("node:fs");
   const readline = await import("node:readline/promises");
   const { startHost } = await import("../../src/lib/bunny-host/http.server.ts");
   const { defaultAdapters } = await import("../../src/lib/bunny-host/adapters.server.ts");
   const { writeEvidence } = await import("../evidence-guard.mjs");
   const rl = FIXTURE ? null : readline.createInterface({ input: process.stdin, output: process.stdout });
   const PORT = Number(process.env.BUNNY_E2E_PORT ?? 43216);
-  const dataDirectory = mkdtempSync(join(tmpdir(), "bunny-p4-acoustic-"));
+  // S3R1: directories of earlier sessions that were force-terminated are removed first, only when positively identified.
+  const recovered = recoverInterruptedSessions();
+  const dataDirectory = createOwnedTempDir();
   const deviceNames = FIXTURE ? [] : [auth.microphone, auth.speakers];
   const cls = (c) => (FIXTURE ? "simulated" : c);
-  const out = { evidenceClass: FIXTURE ? "simulated: synthesized input and null sink; nothing here is acoustic evidence" : "attended session: acoustic and software receipts, labelled per section", schema: "ma5-s2-p4r1.acoustic/1", script: SCRIPT_ID, at: new Date().toISOString(), authorization: { maxMinutes: auth.maxMinutes, maxPlaybackVolumePercent: auth.maxPlaybackVolumePercent }, privacy: "no audio saved or uploaded; recognitions stored as phrase id + word-error count; no device names", sections: {} };
+  const out = { evidenceClass: FIXTURE ? "simulated: synthesized input and null sink; nothing here is acoustic evidence" : "attended session: acoustic and software receipts, labelled per section", schema: "ma5-s2-p4r1.acoustic/1", script: SCRIPT_ID, at: new Date().toISOString(), authorization: { maxMinutes: auth.maxMinutes, maxPlaybackVolumePercent: auth.maxPlaybackVolumePercent }, privacy: "no audio saved or uploaded; recognitions stored as phrase id + word-error count; no device names; Host database in memory", recognitionOnly, recovery: { removed: recovered.removed.length, keptUnidentified: recovered.kept.filter((k) => k.reason === "unidentified").length, keptRunning: recovered.kept.filter((k) => k.reason === "owner-running").length }, sections: {} };
   let host = null;
   let hostStarting = null;
   let recovering = false;
@@ -318,7 +404,10 @@ async function main() {
   // --fixture-budget-ms: self-check of a real expiry against the real Host and worker (simulated runs only).
   const budgetMs = FIXTURE && argv.includes("--fixture-budget-ms") ? Number(argv[argv.indexOf("--fixture-budget-ms") + 1]) : sessionBudgetMs(auth);
   const guard = createSessionGuard({ budgetMs, onStop: (reason) => { if (reason.code !== "COMPLETED") console.error(`\nStopping: ${reason.code}`); void shutdown(); } });
-  const ops = sessionPrimitives({ guard, send: post, ask: rl ? (text, signal) => rl.question(`\n${text}\n  [Enter] go  ·  s + Enter skip  ·  q + Enter end the session > `, { signal }) : null });
+  // A closed console (SIGHUP) leaves about 10 s on Windows: stop at once, and exit before that if shutdown is slower.
+  installExitCleanup(dataDirectory, (signal) => { guard.stop("TERMINATED", signal); setTimeout(() => process.exit(2), 8_000).unref(); });
+  if (rl) wireOwnerStop(rl, guard);
+  const ops = sessionPrimitives({ guard, send: post, ask: rl ? (text, signal) => rl.question(`\n${text}\n  [Enter] go  ·  s + Enter skip  ·  q + Enter (any time) or Ctrl+C end the session > `, { signal }) : null });
   const { sleep, cmd, voice, until, prompt } = ops;
   if (FIXTURE) console.log("[fixture] prompts are auto-answered");
   const say = async (text) => { const a = await prompt(`Say clearly: "${text.replace(/\|/g, "… (pause one second) …")}"`); if (a === "q") guard.stop("ENDED_BY_OWNER"); guard.check(); return a !== "s"; };
@@ -326,7 +415,7 @@ async function main() {
   let watcher = null;
   try {
     if (workerPids().length !== 0) throw new SessionStop("WORKER_ALREADY_RUNNING", "close every running bunny-voice-worker.exe first");
-    hostStarting = startHost({ port: PORT, dataDirectory, adapters: defaultAdapters().filter((a) => a.id === "ollama"), ...(FIXTURE ? { voice: { workerExtraArgs: ["--input-synth", "what failed", "--output", "null"] } } : {}) });
+    hostStarting = startHost({ port: PORT, dataDirectory, ephemeral: true, adapters: defaultAdapters().filter((a) => a.id === "ollama"), voice: { recognitionOnly, ...(FIXTURE ? { workerExtraArgs: ["--input-synth", "what failed", "--output", "null"] } : {}) } });
     host = await guard.race(hostStarting);
     await guard.race(host.manager.discover());
 
@@ -346,74 +435,96 @@ async function main() {
     }
 
     const lastTurn = async (before, ms = 30_000) => until(async () => { const s = await voice(); return s.turnId !== before && (s.finalTranscript != null || s.state === "IDLE") && !s.capturing ? s : null; }, ms);
-    const pushToTalk = async (phraseId, phrase) => {
+    // `waitAnswer`: also wait for the spoken answer to complete, so the turn's timing holds every stage.
+    const pushToTalk = async (phraseId, phrase, waitAnswer = false) => {
       const before = (await voice()).turnId;
       await cmd("voice.listen.start", { source: "button" });
       if (!(await say(phrase))) { await cmd("voice.listen.end", {}); return null; }
-      const s = await lastTurn(before, 20_000);
-      return { ...scoreTurn(phraseId, phrase, s?.finalTranscript ?? null), speechEndToFirstAudioMs: since(s?.timing, "firstPlaybackAt") };
+      const s = waitAnswer ? await until(async () => { const v = await voice(); return answerSettled(v, before) ? v : null; }, 60_000) : await lastTurn(before, 20_000);
+      return { ...scoreTurn(phraseId, phrase, s?.finalTranscript ?? null), ...(waitAnswer ? latencyRow(s?.timing) : {}) };
     };
     const want = (n) => sections.includes(n);
 
     if (want(1) || want(8)) {
       const rows = [];
+      const tasksBefore = host.manager.db.tasks().length;
       for (const [i, p] of PHRASES.stt.entries()) for (let k = 0; k < TRIALS.stt; k++) { const r = await pushToTalk(`stt-${i}`, p); if (r) rows.push(r); await sleep(1_500); }
       const scored = rows.filter((r) => r.wordErrors != null);
-      out.sections.stt = { class: cls("acoustic"), engine: out.devices.stt, trials: rows, exactRate: rate(rows.filter((r) => r.outcome === "exact").length, rows.length), wordErrors: scored.reduce((s, r) => s + r.wordErrors, 0), refWords: scored.reduce((s, r) => s + r.refWords, 0) };
+      out.sections.stt = { class: cls("acoustic"), engine: out.devices.stt, trials: rows, exactRate: rate(rows.filter((r) => r.outcome === "exact").length, rows.length), wordErrors: scored.reduce((s, r) => s + r.wordErrors, 0), refWords: scored.reduce((s, r) => s + r.refWords, 0), a18: a18Verdict(rows, host.manager.db.tasks().length - tasksBefore) };
     }
     if (want(7)) {
       const rows = [];
-      for (let i = 0; i < TRIALS.latency; i++) { const r = await pushToTalk(`stt-${i % 2}`, PHRASES.stt[i % 2]); if (r) rows.push(r.speechEndToFirstAudioMs); await sleep(3_000); }
-      out.sections.latency = { class: cls("software receipt with real capture"), boundary: "Host speechEndAt (VAD speech_end after 900 ms endpoint silence) to the worker's playback.started of the answer; speaker output latency not included", speechEndToFirstAnswerAudioMs: stats(rows) };
+      for (let i = 0; i < TRIALS.latency; i++) { const r = await pushToTalk(`stt-${i % 2}`, PHRASES.stt[i % 2], true); if (r) rows.push(r); await sleep(3_000); }
+      out.sections.latency = { class: cls("software receipt with real capture"), boundary: "Host speechEndAt (VAD speech_end after 900 ms endpoint silence) to each stage; audible = the worker's playback.started, speaker output latency not included", trials: rows, ...latencyStats(rows) };
     }
 
     // Hands-free: Bunny speaks a long answer; each trial is one reply.
     const speakLong = async () => { await cmd("voice.text", { text: "Tell me a six sentence story about a careful rabbit who plans a garden." }); return until(async () => { const s = await voice(); return s.playing ? s : null; }, 120_000); };
     const settle = () => until(async () => { const s = await voice(); return !s.playing && ["IDLE", "INTERRUPTED", "LISTENING"].includes(s.state) ? s : null; }, 120_000);
+    // T12-PRIV-01: opening hands-free mode never opens the microphone; only an explicit Start hands-free does (attended
+    // S3, 2026-10-30, ran without it: 0/12 interruptions and an empty echo result).
+    const startDuplex = async () => { await cmd("voice.listen.start", { source: "hands_free" }); return until(async () => (await voice()).duplex?.active, 15_000); };
+    // Without a live duplex lane the microphone is closed while Bunny speaks, so echo and barge-in trials would be vacuous.
+    // The lane can end mid-section (fixture check, 2026-10-30: DEVICE_BUSY "capture already active" after an interrupted
+    // reply). Each loss is evidence; the start is repeated, and a lane that does not come back stops the session.
+    const duplexLosses = (out.duplexLosses = []);
+    const requireDuplex = async () => {
+      const v = await voice();
+      if (v.duplex?.active) return;
+      duplexLosses.push({ reason: v.duplex?.stopped?.reason ?? null, errorCode: v.error?.code ?? null, state: v.state ?? null });
+      if (!(await startDuplex())) throw new SessionStop("DUPLEX_NOT_ACTIVE", "the hands-free microphone is not listening during playback");
+    };
     const bargeTrial = async (phraseId, phrase) => {
+      await requireDuplex();
       const before = (await voice()).lastBargeIn?.inputTurnId ?? null;
       const playing = await speakLong();
       if (!playing) return null;
-      if (phrase && !(await say(phrase))) { await cmd("voice.interrupt", { source: "button" }); await settle(); return null; }
-      if (!phrase) await sleep(8_000);
+      // Replies end on their own, never by the stop button, so a trial measures only the spoken path. (The button's
+      // DEVICE_BUSY lane loss, fixture check 2026-10-30 4/4, is fixed in S3R1: the re-arm waits for capture.stopped.)
+      // A silent trial so listens through the whole reply.
+      if (phrase && !(await say(phrase))) { await settle(); return null; }
+      if (!phrase) await settle();
       const s = await until(async () => { const v = await voice(); return v.lastBargeIn && v.lastBargeIn.inputTurnId !== before && v.lastBargeIn.outcome !== "pending" ? v : null; }, phrase ? 15_000 : 1_000);
       const r = s?.lastBargeIn ?? null;
-      if ((await voice()).playing) await cmd("voice.interrupt", { source: "button" });
       await settle();
       return { phraseId, outcome: r?.outcome ?? "none", onsetToSilenceMs: r?.onsetToSilenceMs ?? null, detectionToSilenceMs: r?.detectionToSilenceMs ?? null, wasAudible: r?.wasAudible ?? null, echoRejected: r?.echoRejected ?? 0, reason: r?.reason ?? null };
     };
     if ([2, 3, 4, 5, 6, 9].some(want)) {
       await cmd("voice.session.open", { mode: "hands_free" });
-      await until(async () => (await voice()).duplex?.active, 15_000);
+      if (!(await startDuplex())) throw new SessionStop("DUPLEX_NOT_ACTIVE", "the hands-free microphone did not start");
       if (want(2) || want(3)) {
         await prompt(`Stay silent while Bunny speaks (${TRIALS.echo} replies). Normal room noise is fine.`);
-        const rows = [];
-        for (let i = 0; i < TRIALS.echo; i++) rows.push(await bargeTrial("silent", null));
-        const r = rows.filter(Boolean);
-        out.sections.echo = { class: cls("acoustic"), trials: r, falseInterruptRate: rate(r.filter((x) => x.outcome === "interrupted").length, r.length), echoTranscriptsRejected: r.reduce((s, x) => s + x.echoRejected, 0) };
+        const r = [];
+        out.sections.echo = { class: cls("acoustic"), trials: r };
+        for (let i = 0; i < TRIALS.echo; i++) { const x = await bargeTrial("silent", null); if (x) r.push(x); }
+        Object.assign(out.sections.echo, { falseInterruptRate: rate(r.filter((x) => x.outcome === "interrupted").length, r.length), echoTranscriptsRejected: r.reduce((s, x) => s + x.echoRejected, 0) });
       }
       if (want(4)) {
         const rows = [];
+        out.sections.interrupt = { class: cls("acoustic"), trials: rows };
         for (const [i, p] of PHRASES.interrupt.entries()) for (let k = 0; k < Math.ceil(TRIALS.interrupt / 2); k++) { const r = await bargeTrial(`interrupt-${i}`, p); if (r) rows.push(r); }
         const ok = rows.filter((x) => x.outcome === "interrupted");
-        out.sections.interrupt = { class: cls("acoustic"), boundary: "worker-monotonic speech onset to render-meter silence (onsetToSilenceMs); capture delay before the worker sees a frame is not included", target: `P95 <= ${BARGE_IN_TARGET_MS} ms where applicable`, trials: rows, interruptRate: rate(ok.length, rows.length), onsetToSilenceMs: stats(ok.map((x) => x.onsetToSilenceMs)), detectionToSilenceMs: stats(ok.map((x) => x.detectionToSilenceMs)) };
+        Object.assign(out.sections.interrupt, { boundary: "worker-monotonic speech onset to render-meter silence (onsetToSilenceMs); capture delay before the worker sees a frame is not included", target: `P95 <= ${BARGE_IN_TARGET_MS} ms where applicable`, trials: rows, interruptRate: rate(ok.length, rows.length), onsetToSilenceMs: stats(ok.map((x) => x.onsetToSilenceMs)), detectionToSilenceMs: stats(ok.map((x) => x.detectionToSilenceMs)) });
       }
       if (want(5)) {
         const rows = [];
+        out.sections.backchannel = { class: cls("acoustic"), trials: rows };
         for (const [i, p] of PHRASES.backchannel.entries()) for (let k = 0; k < Math.ceil(TRIALS.backchannel / 2); k++) { const r = await bargeTrial(`backchannel-${i}`, p); if (r) rows.push(r); }
-        out.sections.backchannel = { class: cls("acoustic"), trials: rows, resumedRate: rate(rows.filter((x) => x.outcome === "resumed" || x.outcome === "none").length, rows.length), falseInterruptRate: rate(rows.filter((x) => x.outcome === "interrupted").length, rows.length) };
+        Object.assign(out.sections.backchannel, { resumedRate: rate(rows.filter((x) => x.outcome === "resumed" || x.outcome === "none").length, rows.length), falseInterruptRate: rate(rows.filter((x) => x.outcome === "interrupted").length, rows.length) });
       }
       if (want(6)) {
         const rows = [];
+        out.sections.pauses = { class: cls("acoustic"), trials: rows };
         for (const [i, p] of PHRASES.pause.entries()) for (let k = 0; k < TRIALS.pause; k++) {
           const before = (await voice()).turnId;
+          await requireDuplex();
           if (!(await say(p))) continue;
           const s = await until(async () => { const v = await voice(); return v.turnId !== before && v.finalTranscript ? v : null; }, 20_000);
           const score = scoreTurn(`pause-${i}`, p, s?.finalTranscript ?? null);
           rows.push({ ...score, splitIntoTwoTurns: score.wordErrors == null ? null : score.wordErrors / score.refWords > 0.4 });
           await settle();
         }
-        out.sections.pauses = { class: cls("acoustic"), trials: rows, wholeUtteranceRate: rate(rows.filter((r) => r.splitIntoTwoTurns === false).length, rows.length) };
+        out.sections.pauses.wholeUtteranceRate = rate(rows.filter((r) => r.splitIntoTwoTurns === false).length, rows.length);
       }
       if (want(9)) {
         let stop = false; let done = 0; let failed = 0;
@@ -432,16 +543,15 @@ async function main() {
         try {
           for (let i = 0; i < TRIALS.load; i++) {
             const before = (await voice()).turnId;
+            await requireDuplex();
             if (!(await say("in one short sentence what does a rabbit eat"))) continue;
             const s = await until(async () => { const v = await voice(); return v.turnId !== before && v.timing?.completedAt ? v : null; }, 120_000);
-            const t = s?.timing;
-            // Reported separately (P4-2): the status line is never counted as the answer.
-            rows.push({ statusAckAudibleMs: since(t, "delayAckPlaybackAt"), firstModelTokenMs: since(t, "firstTokenAt"), firstAudibleAnswerMs: since(t, "firstPlaybackAt"), completedMs: since(t, "completedAt"), delayAck: !!t?.delayAckAt });
+            rows.push(latencyRow(s?.timing));
           }
         } finally { stop = true; }
         await guard.race(Promise.all(lanes));
         const minutes = (performance.now() - t0) / 60_000;
-        out.sections.concurrency = { class: cls("acoustic capture + software receipts"), trials: rows, statusAckAudibleMs: stats(rows.map((r) => r.statusAckAudibleMs)), firstModelTokenMs: stats(rows.map((r) => r.firstModelTokenMs)), firstAudibleAnswerMs: stats(rows.map((r) => r.firstAudibleAnswerMs)), completedMs: stats(rows.map((r) => r.completedMs)), background: { completed: done, notCompleted: failed, completedPerMinute: minutes ? Math.round((done / minutes) * 100) / 100 : null } };
+        out.sections.concurrency = { class: cls("acoustic capture + software receipts"), trials: rows, ...latencyStats(rows), background: { completed: done, notCompleted: failed, completedPerMinute: minutes ? Math.round((done / minutes) * 100) / 100 : null } };
       }
     }
     if (want(10)) {

@@ -322,7 +322,12 @@ type HostOptions = {
     adapters?: ProviderAdapter[];
     sample?: () => Promise<HostSample>;
     /** M-A-3 T10 test-only voice worker flags (fixture input, null output). Never reachable from HTTP. */
-    voice?: { workerExtraArgs?: string[] };
+    voice?: { workerExtraArgs?: string[]; recognitionOnly?: boolean };
+    /**
+     * MA5-S2 S3R1 test-only (attended acoustic harness): the Host database lives in memory and provider session logs are
+     * not written, so no transcript or answer reaches the disposable data directory. Never reachable from HTTP.
+     */
+    ephemeral?: boolean;
     /** M-A-3 T13.1 test-only intelligence seams (fake transport/protector). Never reachable from HTTP. */
     intelligence?: ManagerOptions["intelligence"];
     connections?: ManagerOptions["connections"];
@@ -400,7 +405,8 @@ async function openHost(
     });
   containment.options.secrets = [...(containment.options.secrets ?? []), token];
   registerDiagnosticSecret(token);
-  const db = new HostDatabase(paths.database);
+  if (options.ephemeral && paths.installed) throw new Error("An ephemeral Host cannot use installed Bunny state.");
+  const db = new HostDatabase(options.ephemeral ? ":memory:" : paths.database);
   undo.push(() => db.close());
   // M-A-3 T9: additive device tables exist before the state marker is reconciled below; never on a request path.
   ensureDeviceSchema(db.db);
@@ -422,7 +428,7 @@ async function openHost(
   if (!workspaceRoot) throw new Error("Configured Bunny workspace root is required.");
   if (!paths.installed && !options.workspaceRoot) mkdirSync(workspaceRoot, { recursive: true });
   const manager = new TaskManager(db, options.root ?? process.cwd(), options.adapters, {
-    sessionDirectory: paths.sessions,
+    sessionDirectory: options.ephemeral ? null : paths.sessions,
     dataDirectory,
     containment,
     workspaceRoot,
@@ -951,6 +957,7 @@ async function openHost(
     dataDirectory,
     launch: launchVoiceWorker,
     workerExtraArgs: options.voice?.workerExtraArgs,
+    recognitionOnly: options.voice?.recognitionOnly,
     persona: () => {
       const speaker = currentSpeaker();
       const preferences = voicePreferences.preferences();
