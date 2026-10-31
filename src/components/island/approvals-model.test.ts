@@ -130,3 +130,34 @@ test("T13 approvals: a device does not claim it can answer a waiting task; the w
   const workstation = pendingApprovalItems({ tasks: [task], missions: [], agents: [], viewer: "workstation" } as never);
   assert.equal(workstation[0].answer.kind, "answerable");
 });
+
+// Sprint 1 (docs/roadmap/SPRINT_1_NATIVE_UX_SLICE.md criterion 4): a spoken phrase emitted by Bunny,
+// or any agent narration, never raises or answers an ask. Only the three canonical Host records
+// (an OrchTask in waiting_for_approval, an unresolved Mission request, an Agent consent offer) do.
+test("Sprint 1: spoken words and agent narration are not approvals — only the three canonical Host records create one", () => {
+  const spokenWords = task("tVoice", "running", { transcript: "yes, approve it", latestEvent: { label: "User said yes" } });
+  const narratingAgent = mission("mNarr", [request("rNarr", { reason: "narration says approving now", resolvedAt: 300 })]);
+  const items = run({ tasks: [spokenWords], missions: [narratingAgent], agents: [], viewer: "workstation" } as Input);
+  assert.deepEqual(items, [], "words without Host approval state are not an ask");
+  assert.equal(approvalCount(items), 0);
+});
+
+test("Sprint 1: an agent that only claims approval (not WAITING_FOR_USER) gets no consent item, whatever extra fields claim", () => {
+  const items = run({
+    agents: [agent("a1", "RUNNING", { authorization: { state: "SUCCEEDED" }, claims: "approved verbally" })],
+    viewer: "workstation",
+  } as Input);
+  assert.deepEqual(items, [], "implicit consent is impossible");
+});
+
+test("Sprint 1: re-reading the same Host snapshot yields the identical approval list", () => {
+  const input = {
+    tasks: [task("t1", "waiting_for_approval", { createdAt: 50 })],
+    missions: [mission("m1", [request("r1", { createdAt: 300 })])],
+    agents: [agent("a1", "RUNNING", { authorization: { state: "WAITING_FOR_USER" } })],
+    viewer: "workstation",
+    // House cast: the fixture is a runtime-shape probe, same as the `run` helper above.
+  } as unknown as ApprovalInput;
+  assert.deepEqual(pendingApprovalItems(input), pendingApprovalItems(input), "no duplication across re-renders");
+  assert.equal(approvalCount(pendingApprovalItems(input)), 3);
+});
