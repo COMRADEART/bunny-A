@@ -6,7 +6,7 @@
 // <soakDir>/samples.jsonl, <soakDir>/host.log. Analyse at any time with soak-report.mjs. No external account, send,
 // purchase, publication or model call is involved.
 import { spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const arg = (name, fallback) => { const i = process.argv.indexOf(name); return i > 0 ? process.argv[i + 1] : fallback; };

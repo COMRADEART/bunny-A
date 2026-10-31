@@ -6,6 +6,7 @@ const out = 'docs/ma4-s1r/evidence'; mkdirSync(out, { recursive: true });
 const regressionOnly = process.argv.includes('--regression-only');
 const finalBuilds = process.argv.includes('--final-builds');
 const checks = [];
+// eslint-disable-next-line no-control-regex -- the scrub intentionally matches ANSI escape sequences (ESC + CSI) to strip them
 const scrub = text => text.replace(/\x1b\[[0-9;]*m/g, '').replaceAll(process.cwd(), '<workspace>').replaceAll(process.cwd().replaceAll('\\', '/'), '<workspace>')
   .replace(/C:[\\/]Users[\\/][^\s\n"'<>]+/gi, '<user-path>').replace(/Bearer\s+[A-Za-z0-9_.-]+/g, 'Bearer <redacted>');
 async function run(id, script, env = {}) {

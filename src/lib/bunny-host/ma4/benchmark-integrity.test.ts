@@ -6,7 +6,6 @@ import { tmpdir } from "node:os";
 import {
   runLiveBenchmark,
   sampleGpuTelemetry,
-  getOllamaModelDigest,
   lookupOllamaModelDigest,
   BENCHMARK_MODEL,
   BENCHMARK_MODEL_DIGEST,
@@ -321,7 +320,6 @@ test("negative test 9: test report references another artifact (hash mismatch)",
 test("negative test 10: required assertions are absent (0 passed assertions in report)", async () => {
   const tempDir = mkdtempSync(join(tmpdir(), "bunny-test-runner-zero-"));
   const testFile = join(tempDir, "zero.test.js");
-  const reportFile = join(tempDir, "report.json");
   // Test writes report with 0 passed assertions
   fsWriteFileSync(testFile, `import fs from "node:fs"; import test from "node:test"; test("write empty report", () => { fs.writeFileSync("report.json", JSON.stringify({ passed: 0, failed: 0 })); });`, "utf8");
 

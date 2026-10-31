@@ -11,7 +11,7 @@ if (dir) {
   const log = (event, data) => {
     try {
       appendFileSync(file, `${new Date().toISOString()} ${event} ${JSON.stringify(data)}\n`);
-    } catch {}
+    } catch { /* tracing must never disturb the traced run */ }
   };
   diagnostics.subscribe("undici:client:connected", ({ socket }) => {
     const local = socket.localPort;

@@ -50,6 +50,7 @@ export const ollamaChat = (endpoint = "http://127.0.0.1:11434"): Chat => async (
 export function sanitizeToolOutput(value: unknown, maxChars = 4000): string {
   let text: string;
   try { text = typeof value === "string" ? value : JSON.stringify(value) ?? "null"; } catch { text = "[unserializable]"; }
+  // eslint-disable-next-line no-control-regex -- tool output is data: control and bidi-isolate bytes are matched on purpose so they can be stripped
   text = redactOutput(text.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f‪-‮⁦-⁩]/g, ""), []);
   return text.length > maxChars ? `${text.slice(0, maxChars)}…[truncated]` : text;
 }

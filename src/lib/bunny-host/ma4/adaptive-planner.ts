@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
-import { z } from "zod";
-import type { ComplexityClass, ExecutionRole, TaskClassification } from "./s3t1.ts";
-import { classifyTask as baselineClassifyTask, hostExecutionPlan as baselineHostExecutionPlan } from "./s3t1.ts";
+import type { ComplexityClass, ExecutionRole } from "./s3t1.ts";
+import { classifyTask as baselineClassifyTask } from "./s3t1.ts";
 import { type Envelope, type ExecutorFacts, type TaskSpec } from "./task-runtime.ts";
 import { reviewRequested, testRequested } from "./connected-workflow.server.ts";
 

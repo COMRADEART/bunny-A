@@ -3,6 +3,7 @@ import { join, relative } from 'node:path';
 import { createHash } from 'node:crypto';
 const root = 'docs/ma4-s1r/evidence';
 const scrub = value => value.replaceAll(process.cwd(), '<workspace>').replaceAll(process.cwd().replaceAll('\\','/'), '<workspace>')
+  // eslint-disable-next-line no-control-regex -- the scrub intentionally matches ANSI escape sequences to strip them
   .replace(/C:(?:\\+|\/+)[Uu]sers(?:\\+|\/+)[^\s"'<>]+/g, '<user-path>').replace(/\x1b\[[0-9;]*m/g, '');
 function visit(path) {
   for (const e of readdirSync(path, { withFileTypes: true })) {

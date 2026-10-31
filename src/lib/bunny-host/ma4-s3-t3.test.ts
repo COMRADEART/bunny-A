@@ -3,14 +3,11 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { fakeModel, rig, MODEL, envelope, spec } from "./ma4-s2t2-fixtures.ts";
-import { localTest } from "./ma4/task-executors.server.ts";
 import { providerBase } from "./adapters.server.ts";
 import type { ProviderAdapter } from "./contracts.ts";
 import { TaskManager } from "./manager.server.ts";
 import { coordinatorChannel } from "./ma4/coordinator.ts";
-import { admitHandoff, HANDOFF_VERSION } from "./ma4/collaboration.ts";
 import { truthStateOf } from "./ma4/task-runtime.ts";
-import type { TaskRecord } from "./ma4/task-runtime.ts";
 import { SimulatedCrash } from "./ma4/task-runtime.server.ts";
 
 test("Workflow A: File inspection executes real file.read, grounds Worker in fenced data, records receipts, leaves file unchanged", async () => {
@@ -357,7 +354,7 @@ test("Cancellation: Stop propagates cleanly through the established Host path", 
 });
 
 test("Pin Enforcement: Substituting pinned model causes PIN_VIOLATION and halts execution", async () => {
-  const badModel = fakeModel({}, (pinned) => "unauthorized-different-model:latest");
+  const badModel = fakeModel({}, (_pinned) => "unauthorized-different-model:latest");
   const r = await rig({ model: badModel });
   try {
     const steps = [
@@ -418,7 +415,7 @@ test("Restart Recovery: Interrupted irreversible operation recovers to UNCERTAIN
   };
 
   const r = await rig({
-    faults: (point, taskId) => {
+    faults: (point, _taskId) => {
       if (point === "after-operation-start" && !faultTriggered) {
         faultTriggered = true;
         throw new SimulatedCrash(point);

@@ -14,7 +14,7 @@ test("P4-6 the F04 temp cleanup proves ownership and keeps anything that is not 
       const d = join(base, name);
       mkdirSync(d);
       writeFileSync(join(d, "provider.cjs"), providerSource);
-      copyFileSync(join(process.env.SystemRoot ?? "C:\Windows", "System32", "whoami.exe"), join(d, "f04-fixture.exe"));
+      copyFileSync(join(process.env.SystemRoot ?? "C:\\Windows", "System32", "whoami.exe"), join(d, "f04-fixture.exe"));
       change?.(d);
       return verdict(d, name);
     };

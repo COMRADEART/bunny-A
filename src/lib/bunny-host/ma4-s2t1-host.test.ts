@@ -18,7 +18,7 @@ let release: (() => void) | null = null;
 const slow: Executor = { kind: "local.read", category: "read_only", gpu: false, sideEffect: false, timeoutMs: 30_000,
   async run(input, ctx) { runs.push(`${ctx.taskId}:${ctx.stepId}`); if (input.wait) await new Promise<void>(r => { release = r; ctx.signal.addEventListener("abort", () => r(), { once: true }); }); return ctx.signal.aborted ? { ok: false, error: "stopped", dispatched: true, definite: false } : { ok: true, output: `secret-output-${ctx.stepId}` }; } };
 const failing: Executor = { kind: "local.fail", category: "read_only", gpu: false, sideEffect: false, timeoutMs: 30_000,
-  async run() { return { ok: false, error: "C:\Users\owner\secret-folder\report.txt could not be read", dispatched: false, fatal: "STEP_FAILED" }; } };
+  async run() { return { ok: false, error: "C:\\Users\\owner\\secret-folder\\report.txt could not be read", dispatched: false, fatal: "STEP_FAILED" }; } };
 const envelope = (background: boolean) => ({ capabilities: ["local.read", "local.fail"], providers: ["ollama"], localOnly: true, models: [], projectScopes: ["p1"], sideEffects: false, background, budgets: { maxModelCalls: 0, maxWallMs: 3_600_000 }, expiresAt: Date.now() + 86_400_000 });
 // Fixture telemetry: startup then takes the same few milliseconds after listen() here as on a clean hosted runner, where
 // no hardware probe runs. With the PC's real probes (~600 ms) the restart race below was hidden locally (MA4-S2-T1-CI1).

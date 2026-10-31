@@ -60,7 +60,7 @@ function launch() {
   return { child, exited: new Promise((resolve) => child.on("exit", (code) => resolve({ code }))) };
 }
 async function until(what, fn, ms = 20_000) { const s = Date.now(); for (;;) { const v = await fn(); if (v) return v; if (Date.now() - s > ms) throw new Error(`Timed out: ${what}`); await sleep(250); } }
-const edge = () => JSON.parse(readFileSync(join(configDir, "config.json"), "utf8").replace(/^﻿/, "")).NotchEdge;
+const edge = () => JSON.parse(readFileSync(join(configDir, "config.json"), "utf8").replace(/^\uFEFF/, "")).NotchEdge;
 const out = { runId: RUN_ID, package: { path: pkg, sha256: sha(readFileSync(pkg)) } };
 
 let app;
@@ -126,7 +126,7 @@ try {
   process.exitCode = 1;
   log("FAILED", out.error);
 } finally {
-  if (app) try { app.child.kill(); } catch {}
+  if (app) try { app.child.kill(); } catch { /* the app process is already gone */ }
   writeEvidence(join(EVIDENCE_DIR, "candidate-lifecycle.json"), out, [host.token]);
   await host.close();
   rmSync(base, { recursive: true, force: true });

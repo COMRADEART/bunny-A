@@ -109,7 +109,8 @@ try {
     const start = await read("StartTeamButton");
     const review = await read("RunWithAgentsButton");
     assert.match(team ?? "", /Coordinator .* not started/);
-    assert.doesNotMatch(team ?? "", /working/, `nothing is shown as working before the owner starts it: ${team}`);
+        // eslint-disable-next-line no-control-regex -- the automation capture delimits the "working" field with literal backspaces; the check must keep matching them
+assert.doesNotMatch(team ?? "", /working/, `nothing is shown as working before the owner starts it: ${team}`);
     assert.match(team ?? "", /planner\s+idle/, "the Host's PLANNING role phase with a pending step is shown as idle");
     assert.equal(start.enabled, true);
     assert.equal(review.enabled, false, "no plan to review yet");

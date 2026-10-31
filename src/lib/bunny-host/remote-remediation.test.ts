@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { evidenceDir } from "./test-evidence.ts";
 import { startHost } from "./http.server.ts";
 import { FilesystemCapability } from "../bunny-missions/capabilities/local.server.ts";

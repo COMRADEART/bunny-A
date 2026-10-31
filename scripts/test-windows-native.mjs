@@ -87,7 +87,7 @@ server = createServer((req, res) => {
       try {
         const parsed = JSON.parse(body);
         commandsReceived.push(parsed);
-      } catch {}
+      } catch { /* a malformed command is ignored; the mock still answers */ }
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ ok: true, snapshot: mockSnapshot }));
     });
@@ -152,6 +152,6 @@ console.log("[PASS] W7: Single-Instance Mutex enforcement verified.");
 // Cleanup
 app.kill();
 server.close();
-try { rmSync(dir, { recursive: true, force: true }); } catch {}
+try { rmSync(dir, { recursive: true, force: true }); } catch { /* best-effort cleanup */ }
 
 console.log("=== All Windows Native Client Acceptance Checks Passed! ===");
