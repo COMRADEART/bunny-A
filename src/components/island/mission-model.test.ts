@@ -153,3 +153,21 @@ test("M-A-3 T14: the autonomy caption never calls unverified work verified", () 
   assert.equal(autonomyLabel({ phase: "RECONCILIATION_REQUIRED", basis: "", verified: null }), "Outcome uncertain — reconciliation required");
   assert.equal(autonomyLabel({ phase: "REPAIR", basis: "", verified: null }), "Repairing a failed check");
 });
+
+// Sprint 1 (docs/roadmap/SPRINT_1_NATIVE_UX_SLICE.md criteria 1-2): the Bar renders only what the
+// Host snapshot states. It invents no rows, no steps, no completion claims and no progress of its own.
+test("Sprint 1: the Bar shows only what the Host snapshot states — nothing is invented", () => {
+  const idle = mission("e", "running", []);
+  assert.deepEqual(agentRows(idle, [], 3), { rows: [], more: 0 });
+  assert.equal(agentDetail(idle, "does-not-exist", []), null);
+  assert.equal(focusMission(snapshot([])), null, "an empty snapshot sits the Bar down");
+  assert.equal(focusMission(snapshot([mission("d", "completed", [])])), null, "ended missions do not hold the Bar");
+  assert.equal(justFinished(snapshot([mission("z", "completed", [])]), 10_000), null, "no finishedAt, no completion state");
+});
+
+test("Sprint 1: a completed step is worded by its own verification result, never upgraded", () => {
+  const unverified = mission("a", "completed", [step("1", "Code", "completed")]);
+  assert.deepEqual(agentRows(unverified, [], 3).rows.map((r) => r.activity), ["Step completed · not independently verified"]);
+  const verified = mission("b", "completed", [step("1", "Code", "completed", { result: { summary: "Code step done, its own checks green", artifactIds: [], verified: true, verification: ["self-checks passed"] } })]);
+  assert.deepEqual(agentRows(verified, [], 3).rows.map((r) => r.activity), ["Step completed · verified by Bunny"]);
+});
