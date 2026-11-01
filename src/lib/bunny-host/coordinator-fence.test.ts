@@ -109,6 +109,22 @@ test("applyOnce runs a duplicate delivery exactly once", () => {
   assert.equal(replay.result, "did-once");
 });
 
+test("after a takeover, the old holder's expired-lease credentials are dead everywhere", () => {
+  // The epoch-fencing core: A lets its lease lapse, B (or the crash-recovery path)
+  // takes over; A's (epoch, fenceToken) pair must no longer admit A anywhere.
+  const state = createLeaseState();
+  const a = acquireLease(state, { resourceRef: "task/t-9", holderDeviceId: "d-windows", ttlMs: 1_000, heartbeatMs: 500, nowMs: BASE });
+  assert.equal(a.granted, true);
+  const b = takeoverLease(state, { resourceRef: "task/t-9", newHolderDeviceId: "d-relay", ttlMs: 60_000, heartbeatMs: 15_000, nowMs: BASE + 5_000 });
+  assert.equal(b.takeover, true);
+  const aStaleTakeover = takeoverLease(state, { resourceRef: "task/t-9", newHolderDeviceId: "d-windows", ttlMs: 60_000, heartbeatMs: 15_000, nowMs: BASE + 5_100, epoch: a.granted ? a.lease.epoch : 1, fenceToken: a.granted ? a.lease.fenceToken : "f-0001" });
+  assert.deepEqual(aStaleTakeover, { takeover: false, reason: "wrong_credentials" });
+  const aStaleAction = guardAction(state, { resourceRef: "task/t-9", epoch: 1, fenceToken: "f-0001", holderDeviceId: "d-windows", actionKey: "a-side-effect" }, BASE + 5_200);
+  assert.deepEqual(aStaleAction, { allowed: false, reason: "stale_epoch" });
+  const aStaleRenew = renewLease(state, { resourceRef: "task/t-9", holderDeviceId: "d-windows", epoch: 1, fenceToken: "f-0001", ttlMs: 60_000, nowMs: BASE + 5_300 });
+  assert.deepEqual(aStaleRenew, { renewed: false, reason: "stale_epoch" });
+});
+
 test("pickCoordinator prefers the healthy server, falls back to Windows, and reports none", () => {
   const serverUp = { deviceId: "d-relay", platform: "server" as const, roles: ["coordinator"], health: "healthy" as const };
   const windows = { deviceId: "d-windows", platform: "windows" as const, roles: ["coordinator", "worker"], health: "healthy" as const };

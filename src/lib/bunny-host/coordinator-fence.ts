@@ -106,9 +106,11 @@ export function renewLease(state: LeaseState, input: { resourceRef: string; hold
   const lease = state[input.resourceRef];
   if (!lease) return { renewed: false, reason: "no_lease" };
   if (input.nowMs >= lease.expiresAtMs) return { renewed: false, reason: "expired_lease" };
-  if (input.holderDeviceId !== lease.holderDeviceId) return { renewed: false, reason: "holder_mismatch" };
+  // Epoch/token fences are checked before the holder so a fenced-out coordinator
+  // always learns "stale_epoch", not a holder detail (same order as guardAction).
   if (input.epoch !== lease.epoch) return { renewed: false, reason: "stale_epoch" };
   if (input.fenceToken !== lease.fenceToken) return { renewed: false, reason: "wrong_fence_token" };
+  if (input.holderDeviceId !== lease.holderDeviceId) return { renewed: false, reason: "holder_mismatch" };
   lease.expiresAtMs = input.nowMs + input.ttlMs;
   return { renewed: true, lease };
 }
