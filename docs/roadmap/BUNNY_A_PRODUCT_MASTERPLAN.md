@@ -42,6 +42,14 @@ repository evidence; nothing is asserted from memory or desire.
 > dev-toolchain eslint/minimatch chain (GHSA-g3hv-75wg-m249, moderate, dev-only; the CI security
 > gate runs production-only at high+ and passes), queued as lane
 > `sec/minimatch-toolchain-override`.
+>
+> **2026-11-01 update (post security cycle, verified live):** main = `8685c59`. Merged since
+> the snapshot above: PR #69 (M2 Sprint 1 - Native UX slice, island truthfulness locks),
+> PR #70 (lint hygiene: errors 58 -> 0, warnings 127 -> 20), PR #71 (M2 Sprint 2 - native
+> notch persistence, receipts 132/132), PR #72 (`sec/minimatch-toolchain-override` merged -
+> full `npm audit` now reports **0 findings** of any severity), PR #73 (the lane-status
+> correction above). The `1.1` table rows and the `MA5 S2` row in `1.3` predate these
+> events; current status lives here, in the Track tables, and in `Section 5` below.
 
 ### 1.3 Milestone history (implemented, evidence-traced)
 
@@ -58,6 +66,10 @@ repository evidence; nothing is asserted from memory or desire.
 | MA4 S2R1 | Memory relevance | branch `ma4-s2r1-memory-relevance` |
 | MA5 S1 | Native application productization | branch `ma5-s1-native-application-productization`; untracked installer test pending ownership |
 | MA5 S2 | Native agents + voice: phase 2 glass notch, phase 3 realtime voice, phase 4 voice qualification → PR #65/#66 (Phase 4R1); S3 owner-attended qualification started (S1 recognition done; S3 paused) → PR #67 draft | branch tree `ma5-s2-*`; main history |
+| MA5 S2 Sprint 1 (PR #69) | Native UX slice: Mission Control view truthfulness regression locks + acceptance report | commit `dce827c` |
+| MA5 S2 hygiene (PR #70) | Lint debt: errors 58 -> 0, warnings 127 -> 20 | commit `85855f9` |
+| MA5 S2 Sprint 2 (PR #71) | Native notch persistence: dock + cold-restart receipts 132/132 + restore-rules unit locks | commit `425ffb1` |
+| MA5 S2 security+docs cycle (PRs #72/#73; earlier lane PRs #54/#62 verified) | Dev-toolchain advisories cleared - full `npm audit` 0 findings of any severity; stale lane records corrected | commits `2611b5a`, `8685c59` |
 
 ### 1.4 Stack facts that constrain the plan
 
@@ -160,14 +172,14 @@ Statuses: **IMPLEMENTED** (evidence in main/merged PR), **PARTIAL** (some accept
 | Under-load answer latency 3 s target | PARTIAL — ≈6.5 s P50 under load reported at 4R1; S3 paused pending A18 | owner session note (2026-10) |
 | A18 prospective criteria (WER ≤15% missing-as-deletion, no-result ≤5%, 0 unauthorized, ≥48 utterances / ≥200 ref words) | RATIFIED in repo, unmeasured | `f3e7ca9` (PR #67 docs) |
 | Local multilingual recognition, wake-word (OFF by default) | MISSING | planned M4 |
-| Voice commands for Mission status / safe interactions | MISSING | planned M2 sprint 2 |
+| Voice commands for Mission status / safe interactions | MISSING | planned later M2 sprint (sprint 2 was notch persistence) |
 
 ### Track B — Native UI/UX
 
 | Capability | Status | Evidence / anchor |
 |---|---|---|
 | Floating glass notch island (compact/expanded/focus) | IMPLEMENTED | `src/components/island/*` (island.tsx, floating.tsx, glass.css), `docs/ma4-s2-t5/NOTCH_VOICE_UX.md` |
-| Edge placement + drag + persistent position (all edges) | PARTIAL | B1 acceptance not yet evidenced for L/R/top/bottom across DPI/monitors |
+| Edge placement + drag + persistent position (all edges) | IMPLEMENTED (agent-side) — PR #69 web edge locks; PR #71 native drag/keyboard/cold-restart receipts 132/132 | owner Round 4 (physical hand) is the remaining confirmation |
 | Voice visualization states + truthful mic state | PARTIAL — designed; device-disconnected + muted truthfulness checks to test | `NOTCH_VOICE_UX.md`, UIA `notch_tree` fix `d396f65` |
 | Agent compact identities (Gada/Spear/Chakra/Sword + provider marks) | PARTIAL — character system exists, animated-from-events contract pending verification | `src/components/island/characters.tsx`, `character-styles.css`, `docs/t13-3/CHARACTER_STYLE_SYSTEM.md` |
 | Mission Control product panel | IMPLEMENTED in island code | `mission.tsx`+`mission-model.ts`(+test), `ptasks.tsx`, `approvals.tsx`, `activity.tsx`, `workers.tsx` |
@@ -282,8 +294,8 @@ Ranked by product impact to "it actually feels like a perfect product":
 
 ## 5. Execution plan mapped to owner milestones
 
-- **M1 — Phase 4 closure + outcome (S3)**: land PR #67 after review; then owner-attended A18/A19 acoustic session for physical qualification (must be *fresh* device-specific authorization; refuse otherwise) — measure A16–A20, Narrator acceptance.
-- **M2 — Native UX Mastery**: Sprint 1 (below) + edge placement/persistence + agent-visual truthfulness lock + re-run `test:ui`, browser smoke, UIA notch tree.
+- **M1 — Phase 4 closure + outcome (S3)**: PR #67 merged (`0628dc1`, 2026-10-31). Remaining: owner-attended A18/A19 acoustic session for physical qualification (must be *fresh* device-specific authorization; refuse otherwise) — measure A16–A20, Narrator acceptance.
+- **M2 — Native UX Mastery**: edge placement/persistence + notch truthfulness DONE (Sprints 1–2: PR #69 locks; PR #71 native drag/keyboard/restart receipts 132/132; PR #70 lint debt closed). NEXT: agent-visual truthfulness lock (Sprint 3, in flight as `ma5-s3-sprint1-agent-visuals`) + re-run `test:ui`, browser smoke, UIA notch tree.
 - **M3 — Android continuity**: physical pairing/approval sessions (owner hardware) + staleness/offline duplicate-approval protections as implemented models check out live.
 - **M4 — Agent intelligence & memory**: replay UX + result verification + model-budget UX + multi-model routing explanations.
 - **M5 — Contextual assistance & skills**: visual/skills expansions behind existing connector-broker and `APPROVAL` gates.

@@ -70,3 +70,27 @@ This round covers what only a real hand can prove:
 **Evidence home for all rounds:** `screenshots/owner-round-*.png` + a per-round result line
 in the sprint PR (✅ or ❌ + one sentence). A ❌ in any step opens a follow-up item instead of
 a re-run of the round.
+
+---
+
+## Report kit (updated 2026-11-01, baseline main `8685c59`)
+
+The native save/restore paths behind Rounds 2–4 are already machine-locked
+(PRs #69/#71: web edge locks + 132/132 native drag/keyboard/cold-restart receipts), so these
+rounds are the human-confirmation layer, not re-testing of known code.
+
+Copy one line when a round finishes and paste it to me (I fold it into the masterplan +
+acceptance docs):
+
+```
+owner-round-1: PASS - one Mission showed only true Host state, start to finish.
+owner-round-2: PASS - full keyboard flow; Narrator named every state walked.
+owner-round-3: PASS - exactly one approval event for the session; no repeat-click effect.
+owner-round-4: PASS - all 4 edges dragged + restart-persisted; sub-threshold drag canceled; chords docked instantly; second monitor handled.
+```
+
+Use `PARTIAL`/`FAIL` the same way, then name the failing step number; for a native-side ❌
+also drop the screenshot pair (before/after restart) so I can trace it against the
+`test-results/sprint2-notch-persist-receipts.json` cases. A round is controllable by me only
+for the software items - your ❌ findings always open a follow-up item, never get re-run
+silently.
