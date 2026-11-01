@@ -19,7 +19,7 @@ repository evidence; nothing is asserted from memory or desire.
 | main HEAD | `f29ab04` — Merge PR #66 (MA5-S2 Phase 4R1 voice qualification) | `git log bunny-a/main` |
 | Latest merged milestone PR | #66 — whisper shim pin `45f64172` adopted (owner-authorized), hard acoustic-session deadline, verified playback volume, UIA notch-tree JSON fix, 4R1 correction + regression evidence | main history `99b1930..6e4b553` |
 | Latest draft PR | **#67 — OPEN/DRAFT**, head `ma5-s2-p4-attended-latency-fix`, base `main`, updated 2026-10-30: attended-harness fixes (hands-free start answered end-to-end, no stop mid-reply, interrupt re-arms only after aborted capture released the device, zero on-disk transcripts, survives abnormal termination) + A18 criteria + resumed-S3 matrix | `gh pr view 67` |
-| Security lines | `sec/resolve-better-auth-advisory` (better-auth → 1.7.14, GHSA-q84f-53jg-9ppm; local HEAD `68951b5`), `sec/seroval-1.7.3` | local branches; `68951b5` commit |
+| Security lines | `sec/resolve-better-auth-advisory` (better-auth → 1.7.14, GHSA-q84f-53jg-9ppm; local HEAD `68951b5`), `sec/seroval-1.7.3` | **MERGED** into main (PR #54 2026-10-27; PR #62 2026-10-29) - see 1.2 update note
 | MA4-S2 beta verdict | **CONDITIONAL GO** (2026-10-24): 6/10 gates unconditional PASS (CI, typecheck, UIA, local-model quality, Narrator, security: 0 npm-audit vulns / 478 deps); soaks Soak A 19.2 h + Soak B 0 crashes; 3 gates conditional on signing certs / Android hardware / soak duration; 0 code defects | `docs/ma4-s2-final-fix/MASTER_GATE_TABLE.md`, `BETA_GO_NO_GO_FINAL.md` |
 | Physical gates | **BLOCKED**, no authorized physical session run (see §5 Track A/J) | `docs/ma4-s3-t5/T5R1_PHYSICAL_GATE_STATUS.md` |
 
@@ -33,6 +33,15 @@ repository evidence; nothing is asserted from memory or desire.
 | `bun-router-sec-seroval` | `sec/seroval-1.7.3` @ `0e49c7b` | security remediation |
 | `bun-sec-main` | `agent/bunny-a/sec-mainline-deps` @ `bc0fbf0` | **locked** — do not use |
 | `bun-router-masterplan` | `docs/bunny-a-masterplan` @ main | this document's worktree |
+
+> **2026-10-31 update (security-lane reconciliation):** the two security-lane branches above
+> were merged into main before the master program's Sprint 1 - PR #54 (better-auth -> 1.7.14,
+> GHSA-q84f-53jg-9ppm, merge commit `eeaac56`, 2026-10-27) and PR #62 (seroval ->
+> 1.7.3, merge commit `4fd7975`, 2026-10-29). The worktrees remain only as archived
+> checkouts. The only remaining `npm audit` finding on the current baseline is the
+> dev-toolchain eslint/minimatch chain (GHSA-g3hv-75wg-m249, moderate, dev-only; the CI security
+> gate runs production-only at high+ and passes), queued as lane
+> `sec/minimatch-toolchain-override`.
 
 ### 1.3 Milestone history (implemented, evidence-traced)
 

@@ -105,8 +105,13 @@ npm run typecheck                             # clean
    adds a fourth — the physical drag round (press-drag-release on all four edges, real
    Ctrl+Alt+Arrow chords, and drag-with-no-move canceling). All four are queued step-by-step
    in `docs/roadmap/OWNER_LIVE_ROUNDS.md`; none was executed by the agent.
-3. **Security lanes, still unmerged (carry-over from Sprint 1 §5.3):** `sec/resolve-better-auth-advisory`
-   and `sec/seroval-1.7.3` — flagged, not patched ad hoc here.
+3. 3. **Security lanes - status CORRECTED 2026-10-31 (carry-over bullet was stale):** the two
+   lanes carried from Sprint 1 5.3 are already MERGED into main - PR #54 (better-auth ->
+   1.7.14, commit `68951b5`) and PR #62 (seroval -> 1.7.3, commit `0e49c7b`);
+   both advisories no longer appear in `npm audit` on main `b58611b`. The
+   residual audit findings are dev-toolchain-only (eslint/minimatch chain) and are queued
+   as lane `sec/minimatch-toolchain-override`. No ad hoc patching happened in
+   this sprint.
 4. **Masterplan §5:** after the owner reviews and merges this PR, the M2 wording can be
    bumped to record drag/keyboard/restart persistence as locked + evidenced; left to the owner.
 
