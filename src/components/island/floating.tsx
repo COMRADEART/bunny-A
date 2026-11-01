@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { activeTasks, liveProviders, useIsland } from "@/store/use-island";
+import { PILL_TONE_BACKGROUND, activeAgentPills, agentRowLayout, type NativeDockPosition } from "./agent-pill-model";
 import { Approval, Composer, openTask, Routing } from "./task";
 import { HostHealthWarning, NAMES, ProviderMark, TaskActivity, TaskBadge } from "./ui";
 import { elapsed, isActive, verifiedFile, TERMINAL } from "./ui-model";
@@ -49,6 +50,8 @@ export function FloatingIsland({ now }: { now: number }) {
   const store = useIsland();
   const providers = liveProviders(store);
   const active = activeTasks(store.tasks);
+  const pillRow = activeAgentPills(active);
+  const rowLayout = agentRowLayout(store.appearance.position as NativeDockPosition);
   const [view, setView] = useState<View>("idle");
   const [focused, setFocused] = useState<string | null>(null);
   const voiceLive = voiceListening(store.voice, store.voiceReceivedAt, now);
@@ -260,32 +263,47 @@ export function FloatingIsland({ now }: { now: number }) {
           <span className="island-divider" />
         {active.length > 0 ? (
           <div
-            className={`island-active-agents ${store.appearance.position === "left" ? "notch-vertical-top" : "notch-horizontal-left"}`}
-            aria-label="Active agents"
+            className={`island-active-agents ${rowLayout.axisClass}`}
+            aria-label={`Active tasks: ${pillRow.total}`}
             style={{
               display: "flex",
-              flexDirection: store.appearance.position === "left" ? "column" : "row",
+              flexDirection: rowLayout.direction,
               gap: "4px",
               padding: "2px 6px",
               alignItems: "center"
             }}
           >
-            {active.slice(0, 3).map((t) => (
+            {pillRow.pills.map((pill) => (
               <span
-                key={t.id}
+                key={pill.id}
                 className="agent-indicator-pill"
-                title={`${t.title}: ${t.truthState ?? t.state}`}
+                title={pill.detail}
                 style={{
                   fontSize: "11px",
                   padding: "2px 6px",
                   borderRadius: "4px",
-                  background: t.truthState === "Testing" ? "rgba(79, 140, 255, 0.2)" : t.truthState === "Reviewing" ? "rgba(147, 83, 211, 0.2)" : "rgba(255, 255, 255, 0.1)",
+                  background: PILL_TONE_BACKGROUND[pill.tone],
                   color: "inherit"
                 }}
               >
-                {t.truthState ?? "Working"}
+                {pill.label}
               </span>
             ))}
+            {pillRow.overflow > 0 ? (
+              <span
+                className="agent-indicator-pill agent-indicator-overflow"
+                title={`${pillRow.overflow} more active tasks in the tasks view`}
+                style={{
+                  fontSize: "11px",
+                  padding: "2px 6px",
+                  borderRadius: "4px",
+                  background: "rgba(255, 255, 255, 0.1)",
+                  color: "inherit"
+                }}
+              >
+                +{pillRow.overflow}
+              </span>
+            ) : null}
           </div>
         ) : null}
 
