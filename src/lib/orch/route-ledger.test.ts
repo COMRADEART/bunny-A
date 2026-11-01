@@ -117,6 +117,46 @@ test("ineligible candidates carry the exclusion reason", () => {
   assert.ok(decision?.alternatives.find((a) => a.candidateId === "block-1")?.note.includes("ineligible: device offline"));
 });
 
+test("NaN quality and unknown quality fail the floor, never pass it", () => {
+  const decision = decideRoute({
+    candidates: [
+      candidate({ id: "nan-1", qualityScore: Number.NaN }),
+      candidate({ id: "ok-3" }),
+    ],
+    qualityFloor: 0.5,
+    nowMs: NOW,
+  });
+  assert.equal(decision?.chosenCandidateId, "ok-3");
+  const nan = decision?.alternatives.find((a) => a.candidateId === "nan-1");
+  assert.equal(nan?.status, "rejected");
+  assert.equal(nan?.note, "quality below floor");
+});
+
+test("NaN latency cannot corrupt the tie-break (survivor ordering stays lawful)", () => {
+  const decision = decideRoute({
+    candidates: [
+      candidate({ id: "lag-a", costBasis: "unknown", estimatedCostUsd: null, latencyP50Ms: Number.NaN }),
+      candidate({ id: "lag-b", costBasis: "unknown", estimatedCostUsd: null, latencyP50Ms: 1_000 }),
+    ],
+    qualityFloor: 0.5,
+    nowMs: NOW,
+  });
+  // Both unknown-cost; finite latency wins the tie-break deterministically.
+  assert.equal(decision?.chosenCandidateId, "lag-b");
+});
+
+test("duplicate candidate ids are rejected outright", () => {
+  assert.throws(
+    () =>
+      decideRoute({
+        candidates: [candidate({ id: "twice" }), candidate({ id: "twice" })],
+        qualityFloor: 0.5,
+        nowMs: NOW,
+      }),
+    /duplicate candidate id/,
+  );
+});
+
 test("decideRoute returns null when nobody survives", () => {
   const decision = decideRoute({
     candidates: [candidate({ id: "dead-1", qualityScore: 0.1 })],

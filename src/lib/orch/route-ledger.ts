@@ -72,8 +72,12 @@ export function decideRoute(input: { candidates: RouteCandidate[]; qualityFloor:
   const survivors: RouteCandidate[] = [];
 
   const ordered = [...candidates].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  if (new Set(candidates.map((c) => c.id)).size !== candidates.length) {
+    throw new Error("duplicate candidate id — an id is the candidate's identity");
+  }
   for (const candidate of ordered) {
-    if (candidate.qualityScore < qualityFloor) {
+    // NaN quality must fail the floor: unknown quality is not quality.
+    if (!(candidate.qualityScore >= qualityFloor)) {
       entries.push({ candidateId: candidate.id, status: "rejected", note: "quality below floor" });
       continue;
     }
@@ -92,11 +96,16 @@ export function decideRoute(input: { candidates: RouteCandidate[]; qualityFloor:
   if (survivors.length === 0) return null;
 
   survivors.sort((a, b) => {
-    const costDelta = effectiveCostRank(a) - effectiveCostRank(b);
-    if (costDelta !== 0) return costDelta;
-    const latA = a.latencyP50Ms ?? Number.POSITIVE_INFINITY;
-    const latB = b.latencyP50Ms ?? Number.POSITIVE_INFINITY;
-    if (latA !== latB) return latA - latB;
+    const rankA = effectiveCostRank(a);
+    const rankB = effectiveCostRank(b);
+    // Compare with < / >: rank subtraction yields NaN for Infinity - Infinity
+    // (two unknown-cost candidates), which would make the ordering unlawful.
+    if (rankA < rankB) return -1;
+    if (rankA > rankB) return 1;
+    const latA = a.latencyP50Ms !== null && Number.isFinite(a.latencyP50Ms) ? a.latencyP50Ms : Number.POSITIVE_INFINITY;
+    const latB = b.latencyP50Ms !== null && Number.isFinite(b.latencyP50Ms) ? b.latencyP50Ms : Number.POSITIVE_INFINITY;
+    if (latA < latB) return -1;
+    if (latA > latB) return 1;
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   });
 
@@ -126,6 +135,8 @@ export function decideRoute(input: { candidates: RouteCandidate[]; qualityFloor:
     reason = `lowest effective cost ${fmt(winnerRank)} vs ${fmt(effectiveCostRank(runnerUp))}${premium}; alternatives ${alternatives.length}`;
   }
 
+  // decisionId is a content address: candidates + floor only. nowMs is excluded on
+  // purpose so the same decision made at two moments shares its id (replay-friendly).
   const fingerprint = fnv1aHex(JSON.stringify({ candidates, qualityFloor }));
   return {
     decisionId: `rd-${winner.id}-${fingerprint}`,
