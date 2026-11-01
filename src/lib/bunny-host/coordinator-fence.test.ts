@@ -9,12 +9,13 @@ import {
   pickCoordinator,
   renewLease,
   takeoverLease,
+  type CoordinatorLease,
   type LeaseState,
 } from "./coordinator-fence.ts";
 
 const BASE = 1_793_491_200_000;
 
-function freshLease(state: LeaseState = createLeaseState()): { state: LeaseState; lease: ReturnType<typeof acquireLease> extends { granted: true; lease: infer L } ? L : never } {
+function freshLease(state: LeaseState = createLeaseState()): { state: LeaseState; lease: CoordinatorLease } {
   const grant = acquireLease(state, { resourceRef: "task/t-1", holderDeviceId: "d-windows", ttlMs: 60_000, heartbeatMs: 15_000, nowMs: BASE });
   assert.equal(grant.granted, true);
   if (!grant.granted) throw new Error("unreachable");
