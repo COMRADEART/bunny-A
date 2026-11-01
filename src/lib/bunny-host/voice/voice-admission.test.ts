@@ -13,50 +13,29 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { HostDatabase } from "../../bunny-host/persistence.server.ts";
-import { TaskManager } from "../../bunny-host/manager.server.ts";
-import { HostContainment } from "../../bunny-host/failure.server.ts";
+import { HostDatabase } from "../persistence.server.ts";
+import { TaskManager } from "../manager.server.ts";
+import { HostContainment } from "../failure.server.ts";
+import { providerBase } from "../adapters.server.ts";
 import { VOICE_ACTIONS } from "./voice-protocol.ts";
 import { MISSION_ACTIONS } from "../../bunny-missions/commands.server.ts";
-import type { ProviderAdapter } from "../../orch/types.ts";
+import type { AdapterResult, ProviderAdapter } from "../contracts.ts";
 
 const VOICE_CONSTRAINTS = { localOnly: true, offlineOnly: true } as const;
 
 function localOllamaAdapter(): ProviderAdapter {
   return {
     id: "ollama",
-    detect: async () => ({
-      id: "ollama",
-      installed: true,
-      authenticated: true,
-      authenticatedState: "not_required",
-      availability: "ready",
-      capabilities: ["text"] as string[],
-      models: ["qwen2.5-coder:7b"],
-      current_model: "qwen2.5-coder:7b",
-      local_or_cloud: "local",
-      remoteModels: [],
-    } as never),
-    launch: () => ({ done: new Promise(() => {}).then() as never, stop: async () => ({ ok: false, output: "", stopped: true }) as never }),
+    detect: async () => ({ ...providerBase("ollama"), installed: true, authenticated: true, authenticatedState: "not_required", availability: "ready", capabilities: ["text"], models: ["qwen2.5-coder:7b"], current_model: "qwen2.5-coder:7b", local_or_cloud: "local", remoteModels: [] }),
+    launch: () => ({ done: new Promise<AdapterResult>(() => {}), stop: async () => {} }),
   };
 }
 
 function cloudOllamaAdapter(): ProviderAdapter {
   return {
     id: "ollama",
-    detect: async () => ({
-      id: "ollama",
-      installed: true,
-      authenticated: true,
-      authenticatedState: "not_required",
-      availability: "ready",
-      capabilities: ["text"] as string[],
-      models: ["deepseek-v4.1-flash:cloud"],
-      current_model: "deepseek-v4.1-flash:cloud",
-      local_or_cloud: "cloud",
-      remoteModels: ["deepseek-v4.1-flash:cloud"],
-    } as never),
-    launch: () => ({ done: undefined as never, stop: async () => ({ ok: false, output: "", stopped: true }) as never }),
+    detect: async () => ({ ...providerBase("ollama"), installed: true, authenticated: true, authenticatedState: "not_required", availability: "ready", capabilities: ["text"], models: ["deepseek-v4.1-flash:cloud"], current_model: "deepseek-v4.1-flash:cloud", local_or_cloud: "cloud", remoteModels: ["deepseek-v4.1-flash:cloud"] }),
+    launch: () => ({ done: new Promise<AdapterResult>(() => {}), stop: async () => {} }),
   };
 }
 
@@ -72,7 +51,7 @@ async function voiceStack(adapter: ProviderAdapter) {
   const tasks = new TaskManager(db, join(dir, "workspace"), [adapter], { containment });
   containment.options.persist = (type, detail, owner) => tasks.emit(db.event(type, owner.taskId ?? null, detail, owner.missionId ?? null));
   await tasks.discover();
-  return { dir, db, tasks, cleanup: () => { try { tasks.close?.(); } catch { /* noop */ } db.close(); rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); } };
+  return { dir, db, tasks, cleanup: () => { db.close(); rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); } };
 }
 
 test("A spoken question admits only a local, probed, tool-free model (approval.voice_tool_free)", async () => {
