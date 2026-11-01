@@ -1,0 +1,153 @@
+{
+  "contractsVersion": "uof.v1",
+  "tasks": [
+    {
+      "taskId": "t-goal-1",
+      "goal": "Research the three candidate APIs, then implement the selected one behind the existing connector seam",
+      "traceId": "trace-9f2e",
+      "createdAtMs": 1793491200000,
+      "priority": "normal",
+      "state": "running"
+    }
+  ],
+  "subtasks": [
+    {
+      "subtaskId": "s-route",
+      "taskId": "t-goal-1",
+      "kind": "research",
+      "dependsOn": [],
+      "risk": "low",
+      "qualityTarget": 0.7,
+      "acceptanceCriteria": ["summary cites 3 sources", "every API documented with its auth flow"],
+      "state": "done",
+      "assignHint": { "provider": "codex" }
+    },
+    {
+      "subtaskId": "s-apply",
+      "taskId": "t-goal-1",
+      "kind": "coding",
+      "dependsOn": ["s-route"],
+      "risk": "medium",
+      "qualityTarget": 0.8,
+      "acceptanceCriteria": ["existing tests stay green", "new adapter reports supported/limited/unavailable"],
+      "state": "running"
+    }
+  ],
+  "dependencies": [
+    { "dependencyId": "d-1", "fromSubtaskId": "s-route", "toSubtaskId": "s-apply", "kind": "finish_to_start" }
+  ],
+  "plans": [
+    {
+      "planId": "p-goal-1",
+      "taskId": "t-goal-1",
+      "revision": 1,
+      "createdAtMs": 1793491200500,
+      "dryRun": false,
+      "subtasks": [
+        { "subtaskId": "s-route", "taskId": "t-goal-1", "kind": "research", "dependsOn": [], "risk": "low", "qualityTarget": 0.7, "acceptanceCriteria": ["summary cites 3 sources"], "state": "running" },
+        { "subtaskId": "s-apply", "taskId": "t-goal-1", "kind": "coding", "dependsOn": ["s-route"], "risk": "medium", "qualityTarget": 0.8, "acceptanceCriteria": ["existing tests stay green"], "state": "pending" }
+      ],
+      "dependencies": [
+        { "dependencyId": "d-1", "fromSubtaskId": "s-route", "toSubtaskId": "s-apply", "kind": "finish_to_start" }
+      ]
+    }
+  ],
+  "events": [
+    { "eventId": "ev-1", "taskId": "t-goal-1", "seq": 1, "atMs": 1793491200010, "kind": "task_created", "note": "goal received", "correlationId": "trace-9f2e" },
+    { "eventId": "ev-2", "taskId": "t-goal-1", "seq": 2, "atMs": 1793491200020, "kind": "subtask_created", "note": "decomposed into s-route, s-apply" },
+    { "eventId": "ev-3", "taskId": "t-goal-1", "seq": 3, "atMs": 1793491200030, "kind": "route_selected", "note": "s-route -> adapter/a-codex; alternatives considered: ollama (quality < target), claude (quota exhausted in window)", "attemptId": "att-1" }
+  ],
+  "adapters": [
+    { "adapterId": "a-codex", "provider": "codex", "version": "uof.v1", "availability": "ready" }
+  ],
+  "connectors": [
+    {
+      "connectorId": "c-codex",
+      "provider": "codex",
+      "accountRef": "acct-codex-home",
+      "authMethod": "oauth_pkce",
+      "scopes": ["openai:codex"],
+      "status": "ready",
+      "entitlementNote": "plan connection grants CLI use; it is not a standalone API entitlement"
+    }
+  ],
+  "entitlements": [
+    {
+      "entitlementId": "e-codex",
+      "accountRef": "acct-codex-home",
+      "plan": "ChatGPT Plus (Codex CLI)",
+      "source": "provider_reported",
+      "limitations": ["usage windows reset on schedule", "no image synthesis"],
+      "verified": true,
+      "verifiedAtMs": 1793491190000
+    }
+  ],
+  "capabilities": [
+    {
+      "capabilityId": "cap-codex-code",
+      "adapterId": "a-codex",
+      "connectorId": "c-codex",
+      "deviceId": null,
+      "modelId": null,
+      "modality": "code",
+      "status": "verified",
+      "toolUse": true,
+      "evidenceNote": "codex.cli.probe.run: real harness execution of s-route",
+      "lastProbeAtMs": 1793491195000
+    }
+  ],
+  "harnesses": [
+    { "harnessId": "h-sandbox-1", "kind": "sandbox", "deviceId": null, "containmentPolicyRef": "policy/ma4-sandbox", "maxRuntimeMs": 1800000, "maxAttempts": 3 }
+  ],
+  "devices": [
+    { "deviceId": "d-windows", "platform": "windows", "roles": ["coordinator", "worker"], "health": "healthy", "powerPolicy": "unrestricted", "lastSeenAtMs": 1793491201000 },
+    { "deviceId": "d-android", "platform": "android", "roles": ["worker"], "health": "healthy", "powerPolicy": "battery_aware", "lastSeenAtMs": 1793491201500 },
+    { "deviceId": "d-relay", "platform": "server", "roles": ["worker"], "health": "degraded", "powerPolicy": "unrestricted", "lastSeenAtMs": 1793491180000 }
+  ],
+  "modelArtifacts": [
+    {
+      "modelId": "m-gemma4e2b",
+      "publisher": "Google DeepMind",
+      "displayName": "Gemma 4 E2B (LiteRT-LM)",
+      "bytes": 2580000000,
+      "sha256": "7f3b1d6a2c9e0f4b5a8d7c6e5f4a3b2c1d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a",
+      "source": "official_publisher",
+      "licenseId": "gemma-terms-of-use",
+      "downloadedAtMs": null
+    }
+  ],
+  "quotaSignals": [
+    { "quotaSignalId": "q-codex-1", "accountRef": "acct-codex-home", "deviceId": null, "windowLabel": "Codex 5h window", "usedPercent": 62, "resetsAtMs": null, "source": "provider_api", "observedAtMs": 1793491198000 }
+  ],
+  "usageEstimates": [
+    { "estimateId": "u-1", "subtaskId": null, "cost": { "amountUsd": 0.012, "basis": "estimated" }, "latencyP50Ms": 6200 }
+  ],
+  "policyDecisions": [
+    { "policyDecisionId": "pd-1", "subjectRef": "task/t-goal-1/tool/post_to_weblog", "decision": "approval_required", "reason": "external posting is high-risk; approval required", "policySetRef": "policy/default-home", "atMs": 1793491200000 }
+  ],
+  "approvals": [
+    {
+      "approvalId": "ap-1",
+      "taskId": "t-goal-1",
+      "subtaskId": null,
+      "request": "Publish the summary to the user's weblog",
+      "riskLevel": "high",
+      "state": "pending",
+      "spokenPhraseNeverCounts": true,
+      "requestedAtMs": 1793491200400,
+      "resolvedAtMs": null
+    }
+  ],
+  "resultArtifacts": [
+    { "artifactId": "r-1", "subtaskId": "s-route", "kind": "report", "path": "bunny://artifacts/t-goal-1/report.md", "sha256": "3c1a8f2b9d4e7a6b5c8d1e9f2a7b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b", "producedBy": "adapter/a-codex", "createdAtMs": 1793491199000 }
+  ],
+  "verificationEvidence": [
+    { "verificationId": "v-1", "artifactId": "r-1", "method": "automated_check", "criteria": ["summary cites 3 sources"], "passed": true, "verifierRef": "verifier/criteria-checker", "atMs": 1793491199500 }
+  ],
+  "leases": [
+    { "leaseId": "l-1", "resourceRef": "task/t-goal-1", "holderDeviceId": "d-windows", "epoch": 3, "expiresAtMs": 1793494800000, "heartbeatMs": 15000 }
+  ],
+  "coordinatorEpochs": [
+    { "epoch": 3, "coordinatorDeviceId": "d-windows", "startedAtMs": 1793223000000, "fenceToken": "f-0003" }
+  ]
+}
