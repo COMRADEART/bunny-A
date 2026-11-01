@@ -203,7 +203,8 @@ export const QuotaSignalSchema = z.object({
   accountRef: OpaqueId.nullable(),
   deviceId: OpaqueId.nullable(),
   windowLabel: z.string().min(1),
-  usedPercent: z.number().min(0).max(100),
+  /** Nullable: a 429 without a provider-reported window has honestly no fill number. */
+  usedPercent: z.number().min(0).max(100).nullable(),
   resetsAtMs: EpochMsOrNull,
   source: z.enum(["provider_api", "http_429", "local_observed"]),
   observedAtMs: EpochMs,
