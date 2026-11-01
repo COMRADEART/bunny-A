@@ -34,7 +34,16 @@ test("CI watchdog: a hung command and its child become a named timeout, and noth
     assert.deepEqual(report.survivedForced, []);
     assert.match(readFileSync(join(out, "hang.log"), "utf8"), /started/);
     const left = new Set(report.tree.map((row) => row.pid));
-    assert.deepEqual(snapshot().filter((row) => left.has(row.pid)), [], "no process of the tree is still running");
+    // GitHub runners can enumerate just-killed processes for a moment after force-kill (seen
+    // 2026-11-01 on run 41262252759: tree PIDs still listed after a clean kill). Give the OS
+    // a bounded 2 s settle window before declaring a leak; a genuine survivor still fails.
+    const deadline = Date.now() + 2000;
+    let leftOver = snapshot().filter((row) => left.has(row.pid));
+    while (leftOver.length > 0 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      leftOver = snapshot().filter((row) => left.has(row.pid));
+    }
+    assert.deepEqual(leftOver, [], "no process of the tree is still running (after 2 s settle)");
   } finally {
     rmSync(out, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
