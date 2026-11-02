@@ -9,6 +9,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using BunnyA.Models;
 using BunnyA.Services;
@@ -493,16 +494,16 @@ public partial class MainWindow : Window
 
     private void ApplyAgents(JsonElement root)
     {
-        var chips = new (TextBlock text, Border chip, TextBlock detail)[]
+        var chips = new (TextBlock text, Border chip, TextBlock detail, Image art)[]
         {
-            (GadaStatusText, GadaStatusChip, GadaDetailText), (SpearStatusText, SpearStatusChip, SpearDetailText),
-            (ChakraStatusText, ChakraStatusChip, ChakraDetailText), (SwordStatusText, SwordStatusChip, SwordDetailText),
+            (GadaStatusText, GadaStatusChip, GadaDetailText, GadaArt), (SpearStatusText, SpearStatusChip, SpearDetailText, SpearArt),
+            (ChakraStatusText, ChakraStatusChip, ChakraDetailText, ChakraArt), (SwordStatusText, SwordStatusChip, SwordDetailText, SwordArt),
         };
         foreach (var s in root.JsonObj("personalAgents").JsonArr("slots"))
         {
             var slot = (int)s.JsonLong("slot");
             if (slot is < 1 or > 4) continue;
-            var (text, chip, detail) = chips[slot - 1];
+            var (text, chip, detail, art) = chips[slot - 1];
             var presentation = s.JsonObj("presentation");
             var state = presentation.Json("state") ?? "UNKNOWN";
             var agent = s.JsonObj("agent");
@@ -514,6 +515,16 @@ public partial class MainWindow : Window
             detail.Text = agent.ValueKind == JsonValueKind.Object
                 ? $"{presentation.Json("label")}{(agent.Json("missionTitle") is { Length: > 0 } m ? $" · {m}" : "")}"
                 : "No Agent bound to this slot";
+            // E2b: the card shows the slot's live pose — the board tile its presentation state names (a verified outcome
+            // draws the hero tile for chakra and sword, which have no fifth pose). The compact art stays for a slot with
+            // no pose change, so a card never blinks at every snapshot.
+            var weapon = NotchModel.Weapons.Contains(s.Json("weapon")) ? s.Json("weapon")! : NotchModel.Weapons[slot - 1];
+            var id = CharacterArt.WeaponArtId(weapon, state, "pose");
+            if (id != null && (art.Tag as string) != id)
+            {
+                art.Tag = id;
+                art.Source = new BitmapImage(new Uri($"pack://application:,,,/Assets/characters/{id}.png"));
+            }
         }
     }
 
