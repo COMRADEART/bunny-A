@@ -121,7 +121,8 @@ test("MA1/T13.2: Codex mission and direct write argv retain workspace authority 
 const until = async (check: () => boolean, label: string, detail?: () => unknown) => {
   const start = Date.now();
   while (!check()) {
-    if (Date.now() - start > 8000) throw new Error(`Timed out waiting for ${label}${detail ? `: ${JSON.stringify(detail())}` : ""}`);
+    // CI runners under load have shown single mission waits at 40s+; keep proportional headroom (CI 2026-11-02 run 41499534639).
+    if (Date.now() - start > 30000) throw new Error(`Timed out waiting for ${label}${detail ? `: ${JSON.stringify(detail())}` : ""}`);
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 };
