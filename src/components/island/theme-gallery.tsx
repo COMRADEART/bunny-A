@@ -1,11 +1,11 @@
-import { memo, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { memo, useEffect, useMemo, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Check, Eye, RotateCcw } from "lucide-react";
 import { FONT_SCALES, useIsland, type Appearance } from "@/store/use-island";
 import {
   DENSITIES, TRANSPARENCIES, UI_THEMES, UI_THEME_IDS, accentUsable, notchTheme, resolveTheme,
   type ThemeManifest, type UiThemeId, type UiThemePreference, type VariantChoice,
 } from "@/lib/bunny-host/ui-theme";
-import { previewOf, withLegacyVariant } from "./theme-model";
+import { previewOf, withLegacyVariant, glassLimitedNote } from "./theme-model";
 import { scopeFor, usePrefersDark, useShownTheme } from "./theme";
 import "./theme-gallery.css";
 
@@ -90,6 +90,31 @@ export function ThemeGallery() {
   const previewing = store.themePreview !== null;
   const canSave = device || (store.host === "online" && store.uiTheme !== null);
 
+  // Glass Intensity (E1): dragging previews live through the same channel as theme previews; commit saves once.
+  const [glassDraft, setGlassDraft] = useState<number | null>(null);
+  useEffect(() => setGlassDraft(null), [saved]);
+  const shownGlass = glassDraft ?? shown.glassIntensity;
+  const onGlassInput = (value: number) => {
+    setGlassDraft(value);
+    store.setThemePreview(previewing && store.themePreview ? { ...store.themePreview!, glassIntensity: value } : { ...saved, glassIntensity: value });
+  };
+  const commitGlass = () => {
+    if (glassDraft === null) return;
+    const wasPreview = store.themePreview !== null;
+    const value = glassDraft;
+    setGlassDraft(null);
+    if (!canSave || busy) return; // keep the live preview; it is visibly labelled as unsaved
+    void save(wasPreview && store.themePreview ? store.themePreview : { glassIntensity: value });
+  };
+  const setGlassStep = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    // Shift + arrow jumps 10; the input's own arrow handling is suppressed so the step is exact.
+    if (!event.shiftKey || (event.key !== "ArrowRight" && event.key !== "ArrowLeft")) return;
+    event.preventDefault();
+    if (event.key === "ArrowRight") event.currentTarget.value = String(Math.min(100, Number(event.currentTarget.value) + 10));
+    else event.currentTarget.value = String(Math.max(0, Number(event.currentTarget.value) - 10));
+    onGlassInput(Number(event.currentTarget.value));
+  };
+
   useEffect(() => {
     if (!previewing) return;
     const onKey = (event: KeyboardEvent) => {
@@ -161,6 +186,32 @@ export function ThemeGallery() {
         <legend className="sr-only">Customize the theme</legend>
         <div className="setting-row">
           <div>
+            <strong>Theme</strong>
+            <p>Two built-in Liquid Glass defaults. The full catalogue stays under Explore Themes below.</p>
+          </div>
+          <div className="tg-presets">
+            {([["light", "Silver Liquid Glass"], ["dark", "Graphite Liquid Glass"]] as const).map(([variant, name]) => {
+              const currentGlass = saved.theme === "glass" && saved.variant === variant;
+              return (
+                <button
+                  key={variant}
+                  className="tg-preset"
+                  type="button"
+                  data-variant={variant}
+                  aria-pressed={currentGlass}
+                  disabled={busy || (!device && !canSave)}
+                  onClick={() => void save({ theme: "glass", variant })}
+                >
+                  <span className="tg-preset-well" aria-hidden="true" />
+                  <span>{name}</span>
+                  {currentGlass && <small className="tg-tag">In use</small>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="setting-row">
+          <div>
             <strong>Appearance</strong>
             <p>
               {UI_THEMES[shown.theme].variants.length > 1
@@ -186,6 +237,59 @@ export function ThemeGallery() {
               );
             })}
           </div>
+        </div>
+        <div className="setting-row">
+          <div>
+            <strong>Glass Intensity</strong>
+            <p id="tg-glass-help">
+              0–100 rim, sheen, refraction and depth — not a blur control; blur follows Transparency. Window glass now
+              follows Glass Intensity.
+            </p>
+          </div>
+          <span className="tg-glass">
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              aria-label="Glass intensity"
+              aria-describedby="tg-glass-help"
+              value={shownGlass}
+              onChange={(event) => onGlassInput(Number(event.currentTarget.value))}
+              onKeyDown={(event) => setGlassStep(event)}
+              onPointerUp={commitGlass}
+              onKeyUp={commitGlass}
+              onBlur={commitGlass}
+            />
+            <output aria-hidden="true">{shownGlass}%</output>
+          </span>
+        </div>
+        {glassLimitedNote(shown) && (
+          <small className="tg-glass-note" role="note">
+            {glassLimitedNote(shown)}
+          </small>
+        )}
+        <div className="setting-row">
+          <div>
+            <strong>Transparency</strong>
+            <p>Opaque surfaces are easier to read over busy backgrounds.</p>
+          </div>
+          <select aria-label="Transparency" value={shown.transparency} onChange={(event) => tune({ transparency: event.target.value as UiThemePreference["transparency"] })}>
+            {TRANSPARENCIES.map((value) => (
+              <option key={value} value={value}>
+                {TRANSPARENCY_LABEL[value]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="setting-row">
+          <div>
+            <strong>High contrast</strong>
+            <p>Solid surfaces, full-strength outlines and text, and no decorative layers.</p>
+          </div>
+          <button className="switch" type="button" role="switch" aria-checked={shown.highContrast} aria-label="High contrast" onClick={() => tune({ highContrast: !shown.highContrast })}>
+            <span />
+          </button>
         </div>
         <div className="setting-row">
           <div>
@@ -221,28 +325,6 @@ export function ThemeGallery() {
               </option>
             ))}
           </select>
-        </div>
-        <div className="setting-row">
-          <div>
-            <strong>Transparency</strong>
-            <p>Opaque surfaces are easier to read over busy backgrounds.</p>
-          </div>
-          <select aria-label="Transparency" value={shown.transparency} onChange={(event) => tune({ transparency: event.target.value as UiThemePreference["transparency"] })}>
-            {TRANSPARENCIES.map((value) => (
-              <option key={value} value={value}>
-                {TRANSPARENCY_LABEL[value]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="setting-row">
-          <div>
-            <strong>High contrast</strong>
-            <p>Solid surfaces, full-strength outlines and text, and no decorative layers.</p>
-          </div>
-          <button className="switch" type="button" role="switch" aria-checked={shown.highContrast} aria-label="High contrast" onClick={() => tune({ highContrast: !shown.highContrast })}>
-            <span />
-          </button>
         </div>
       </fieldset>
       <fieldset className="tg-tuning">
@@ -287,16 +369,28 @@ export function ThemeGallery() {
           </div>
           <span className="caption">Set on the Notch</span>
         </div>
+        <div className="setting-row">
+          <div>
+            <strong>Sync preference</strong>
+            <p>The workstation shows the Host's theme; a phone follows it or keeps its own look on the device.</p>
+          </div>
+          {device ? (
+            store.deviceTheme ? (
+              <button className="btn quiet" type="button" onClick={() => store.followWorkstationTheme()}>
+                Follow the workstation
+              </button>
+            ) : (
+              <span className="caption">This device follows the workstation</span>
+            )
+          ) : (
+            <span className="caption">Saved on the workstation</span>
+          )}
+        </div>
       </fieldset>
 
       <div className="section-heading">
-        <h3 id="tg-heading">All 22 themes</h3>
+        <h3 id="tg-heading">Explore Themes</h3>
         <span className="tg-reset">
-          {device && store.deviceTheme && (
-            <button className="btn quiet" type="button" onClick={() => store.followWorkstationTheme()}>
-              Follow the workstation
-            </button>
-          )}
           <button className="btn quiet" type="button" disabled={busy || (!device && !canSave)} onClick={async () => {
             setRefusal(null);
             setBusy(true);
