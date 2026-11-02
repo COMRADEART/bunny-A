@@ -95,3 +95,8 @@ export function fabricProfiles<T extends { provider: string; taskType: string; c
 ): T[] {
   return (performance ?? []).slice(0, limit);
 }
+
+/** The router's stored decision ledger, as served (bounded here too). No host = no rows, never invented ones. */
+export function fabricLedgerRows(ledger: import("../../lib/bunny-host/routing-store.server.ts").RoutingLedgerView | null | undefined, limit = 10) {
+  return (ledger?.decisions ?? []).slice(0, limit);
+}

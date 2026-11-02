@@ -451,6 +451,8 @@ export function deviceSnapshot(snapshot: HostSnapshot, principal: DevicePrincipa
     // M-A-3 T13.1: credential state, provider limits and usage are workstation-owner settings.
     intelligence: undefined,
     modelIntelligence: undefined,
+    // M-E4R1: the router's decision ledger is a workstation surface; devices keep their supervised views.
+    routingLedger: undefined,
     connections: undefined,
     deviceConnections: snapshot.connections?.accounts.map(connectionDeviceView),
   };

@@ -68,6 +68,8 @@ export type HostSnapshot = {
   /** M-A-3 T13.3 Gate F: routing priority and Personal Agent fairness. Workstation only. */
   scheduler?: import("./fairness.ts").SchedulerView;
   routingLearning?: import("./routing-feedback.ts").RoutingLearningView;
+  /** M-E4R1: the T3 router's stored decision ledger (read-only, workstation-only; additive, older clients ignore it). */
+  routingLedger?: import("./routing-store.server.ts").RoutingLedgerView;
   voicePersonalization?: import("./voice/voice-personalization.ts").VoicePersonalizationView;
   /** M-A-3 T13.3 Gate H: per-slot character style. Presentation only; paired devices receive it to draw the same look. */
   characterAppearance?: import("./character-style.ts").CharacterAppearanceView;

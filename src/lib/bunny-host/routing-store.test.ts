@@ -8,7 +8,7 @@ import { classifyRequirements } from "../orch/router-requirements.ts";
 import { buildCandidates, ROUTING_POLICY_VERSION, safeDecisionRecord, selectRoutingCandidate, type RoutingDecisionRecord } from "./routing.server.ts";
 import type { ModelRoutingProfile } from "./routing.server.ts";
 import { HostDatabase } from "./persistence.server.ts";
-import { RoutingDecisionStore } from "./routing-store.server.ts";
+import { RoutingDecisionStore, routingLedgerView } from "./routing-store.server.ts";
 import type { ProviderId, ProviderLive } from "../orch/types.ts";
 
 const now = 1_700_000_000_000;
@@ -122,6 +122,39 @@ test("T3 §35: a foreign policy_version or corrupt row fails closed to null — 
     db.db.prepare("UPDATE routing_decisions SET decision='{broken' WHERE id='decision-3'").run();
     assert.equal(store.decision("decision-3") ?? null, null, "corrupt JSON is never fabricated into a decision");
     assert.equal(store.latestForTask("task-1") ?? null, null, "a corrupt newest row fails closed to null — never fabricated, never silently substituted");
+  } finally { db.close(); rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("E4R1: the read-only ledger serves bounded, newest-first decisions with their attempts; corrupt and foreign-policy rows are skipped", () => {
+  const directory = mkdtempSync(join(tmpdir(), "bunny-e4r1-ledger-"));
+  const db = new HostDatabase(join(directory, "host.sqlite"));
+  try {
+    const store = new RoutingDecisionStore(db);
+    store.saveDecision(recordFixture("decision-a", "task-1", now - 3000));
+    store.saveDecision(recordFixture("decision-b", "task-2", now - 2000, { reroutes: 1 }));
+    store.saveDecision(recordFixture("decision-c", "task-3", now - 1000, { policy_version: "routing-policy-v999" }));
+    store.saveDecision(recordFixture("decision-d", "task-4", now));
+    db.db.prepare("UPDATE routing_decisions SET decision='{broken' WHERE id='decision-d'").run();
+    store.saveAttempt({ id: "attempt-1", decisionId: "decision-a", taskId: "task-1", attemptIndex: 0, provider: "ollama", model: "qwen3:8b", effort: null, taxonomy: "MODEL_UNAVAILABLE", detail: "unavailable", createdAt: now });
+    store.saveAttempt({ id: "attempt-2", decisionId: "decision-b", taskId: "task-2", attemptIndex: 0, provider: "codex", model: null, effort: null, taxonomy: "TRANSIENT_TRANSPORT", detail: "", createdAt: now });
+    const view = routingLedgerView(store, 10);
+    assert.equal(view.schema, "bunny-a.routing-ledger.v1");
+    assert.deepEqual(view.decisions.map((row) => row.id), ["decision-b", "decision-a"], "newest first among readable records; foreign-policy and corrupt rows are skipped");
+    const newer = view.decisions[0]!;
+    assert.equal(newer.reroutes, 1);
+    assert.equal(newer.candidates >= 1, true, "the fixture record carries its candidates");
+    assert.ok(newer.selected, "the fixture selects a candidate");
+    assert.ok(newer.selected!.reason.length > 0, "the selection reason travels");
+    assert.deepEqual(newer.mode, "auto");
+    assert.ok(typeof newer.taskClass === "string" && newer.taskClass.length > 0);
+    assert.deepEqual(newer.attempts.map((attempt) => [attempt.index, attempt.provider, attempt.taxonomy]), [[0, "codex", "TRANSIENT_TRANSPORT"]], "attempts stay scoped to their decision");
+    assert.deepEqual(view.decisions[1].attempts.map((attempt) => attempt.index), [0]);
+    // Boundable, and empty-safe.
+    assert.deepEqual(routingLedgerView(store, 1).decisions.map((row) => row.id), ["decision-b"]);
+    const another = new HostDatabase(join(mkdtempSync(join(tmpdir(), "bunny-e4r1-empty-")), "host.sqlite"));
+    try { assert.deepEqual(routingLedgerView(new RoutingDecisionStore(another)).decisions, []); } finally { another.close(); }
+    // The ledger never carries prompt text out of the store (§18 continues to hold in the view).
+    assert.ok(!JSON.stringify(view).includes("Summarize the tradeoffs"));
   } finally { db.close(); rmSync(directory, { recursive: true, force: true }); }
 });
 

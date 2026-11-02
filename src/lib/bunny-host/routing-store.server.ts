@@ -93,4 +93,62 @@ export class RoutingDecisionStore {
       return { provenance: row.provenance as RoutingProfileProvenance, profile: parsed, updatedAt: Number(row.updated_at) };
     } catch { return null; } // Corrupt rows fall back to policy defaults.
   }
+
+  attemptsForDecision(decisionId: string): StoredAttempt[] {
+    const rows = this.db.db.prepare("SELECT id, decision_id, task_id, attempt_index, provider, model, effort, taxonomy, detail, created_at FROM routing_attempts WHERE decision_id=? ORDER BY attempt_index ASC").all(decisionId) as Record<string, unknown>[];
+    return rows.map((row) => ({
+      id: String(row.id), decisionId: String(row.decision_id), taskId: String(row.task_id), attemptIndex: Number(row.attempt_index),
+      provider: row.provider as ProviderId, model: (row.model as string) ?? null, effort: (row.effort as string) ?? null,
+      taxonomy: row.taxonomy as RoutingFailureTaxonomy, detail: (row.detail as string) ?? "", createdAt: Number(row.created_at),
+    }));
+  }
+
+  /** Newest READABLE stored decisions: the SQL window reads a bounded page (3x) so corrupt/foreign rows never eat one
+   *  of the ledger's slots; the view's bound applies to what it actually shows. */
+  recentDecisions(limit = 12): RoutingDecisionRecord[] {
+    const rows = this.db.db.prepare("SELECT decision FROM routing_decisions ORDER BY created_at DESC, id DESC LIMIT ?").all(limit * 3 + 3) as { decision: string }[];
+    return rows.map((row) => this.parse(row.decision)).filter((parsed): parsed is RoutingDecisionRecord => parsed !== null).slice(0, limit);
+  }
+}
+/** E4R1: the read-only decision ledger Server Control shows - the SAFE stored records only, bounded, newest first.
+ *  Rows whose stored policy version is not this build's policy are skipped (never shown as a guess); attempts come
+ *  from the same store's decision_id rows. Nothing here adds a score, a percentage or a capability fact. */
+export const ROUTING_LEDGER_SCHEMA = "bunny-a.routing-ledger.v1";
+export type RoutingLedgerAttempt = { index: number; provider: string; model: string | null; taxonomy: string; detail: string; createdAt: number };
+export type RoutingLedgerDecision = {
+  id: string;
+  taskId: string;
+  missionId: string | null;
+  createdAt: number;
+  policyVersion: string;
+  mode: "auto" | "manual";
+  taskClass: string;
+  selected: { provider: string; model: string | null; kind: string; reason: string } | null;
+  candidates: number;
+  reroutes: number;
+  attempts: RoutingLedgerAttempt[];
+};
+export type RoutingLedgerView = { schema: typeof ROUTING_LEDGER_SCHEMA; decisions: RoutingLedgerDecision[] };
+
+export function routingLedgerView(store: RoutingDecisionStore, limit = 12): RoutingLedgerView {
+  const decisions: RoutingLedgerDecision[] = [];
+  for (const record of store.recentDecisions(limit)) {
+    const attempts = store.attemptsForDecision(record.routing_decision_id);
+    decisions.push({
+      id: record.routing_decision_id,
+      taskId: record.task_id,
+      missionId: record.mission_id,
+      createdAt: record.created_at,
+      policyVersion: record.policy_version,
+      mode: record.routing_mode,
+      taskClass: record.classification.task_class,
+      selected: record.selected
+        ? { provider: record.selected.provider_id, model: record.selected.model_id, kind: record.selected.candidate_kind, reason: record.selected.reason }
+        : null,
+      candidates: record.candidates_considered.length,
+      reroutes: record.reroutes,
+      attempts: attempts.map((attempt) => ({ index: attempt.attemptIndex, provider: attempt.provider, model: attempt.model, taxonomy: attempt.taxonomy, detail: attempt.detail, createdAt: attempt.createdAt })),
+    });
+  }
+  return { schema: ROUTING_LEDGER_SCHEMA, decisions };
 }

@@ -46,6 +46,7 @@ import { CONNECTION_CATALOG } from "./connections.ts";
 import { freemem, totalmem } from "node:os";
 import { FAIRNESS_SETTING, ROUTING_PRIORITIES, admitStep, readFairness, validateFairness, type FairnessSettings, type RoutingPriority } from "./fairness.ts";
 import { sessionLedgerView } from "./session-ledger.ts";
+import { ROUTING_LEDGER_SCHEMA, routingLedgerView } from "./routing-store.server.ts";
 import {
   BUILTIN_ABILITIES,
   OPEN_STATES,
@@ -874,6 +875,7 @@ async function openHost(
         memoryUsedPercent: Math.round(memoryUsedPercent()),
       },
       routingLearning: manager.policy.view(),
+      routingLedger: routingLedgerView(manager.routingStore, 12),
       voicePersonalization: personalizationView(),
       characterAppearance: appearanceStore.view(),
       uiTheme: uiThemeStore.view(),
@@ -1118,7 +1120,7 @@ async function openHost(
     };
     // Voice is workstation-only: a device projection never carries it.
     if (principal.kind === "device") {
-      const { personalAgentContext: _private, harnesses: _harnesses, sessionLedger: _ledger, scheduler: _scheduler, routingLearning: _learning, voicePersonalization: _voicePreferences, ...shared } = withVerdicts;
+      const { personalAgentContext: _private, harnesses: _harnesses, sessionLedger: _ledger, scheduler: _scheduler, routingLearning: _learning, routingLedger: _routingLedger, voicePersonalization: _voicePreferences, ...shared } = withVerdicts;
       const device = dashboardSnapshot(deviceSnapshot(shared, principal, presence));
       // M-A-3 T13: a device reads its slots only. The bindable list is a workstation Studio concern and reaches
       // beyond the Agents a device is shown (finished Agents are trimmed for devices), so it never leaves the workstation.
