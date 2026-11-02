@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  COORDINATION_NOT_CONFIGURED, fabricDeviceRows, fabricEvents, fabricOverview, fabricProfiles, fabricUsageRows,
+  COORDINATION_NOT_CONFIGURED, fabricDeviceRows, fabricEvents, fabricLedgerRows, fabricOverview, fabricProfiles, fabricUsageRows,
 } from "./fabric-model.ts";
 import type { HostSnapshot } from "../../lib/bunny-host/contracts.ts";
 
@@ -88,4 +88,18 @@ test("the event and profile windows are bounded; profiles pass through unchanged
   const performance = [{ provider: "ollama", taskType: "coding", count: 3, completed: 3, verified: 3, durationMs: 1200, sufficient: true }] as HostSnapshot["performance"];
   assert.deepEqual(fabricProfiles(performance), performance);
   assert.deepEqual(fabricProfiles(undefined), []);
+});
+
+test("the routing ledger rows are bounded and absent when the Host does not serve them", () => {
+  const decision: import("../../lib/bunny-host/routing-store.server.ts").RoutingLedgerDecision = {
+    id: "decision-x", taskId: "task-x", missionId: null, createdAt: now, policyVersion: "routing-policy-ma4-s1-v1",
+    mode: "auto", taskClass: "general",
+    selected: { provider: "ollama", model: "qwen3:8b", kind: "DISCOVERED_MODEL", reason: "verified local" },
+    candidates: 2, reroutes: 0, attempts: [{ index: 0, provider: "codex", model: null, taxonomy: "TRANSIENT_TRANSPORT", detail: "", createdAt: now }],
+  };
+  const many = Array.from({ length: 40 }, () => decision);
+  const bounded = fabricLedgerRows({ schema: "bunny-a.routing-ledger.v1", decisions: many });
+  assert.equal(bounded.length, 10, "the fabric shows a bounded window");
+  assert.deepEqual(bounded[0], decision, "rows pass through unchanged");
+  assert.deepEqual(fabricLedgerRows(null), [], "no host, no rows, no invention");
 });

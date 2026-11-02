@@ -264,6 +264,8 @@ type Island = Preferences & {
   proactive: NonNullable<HostSnapshot["proactive"]> | null;
   /** M-A-3 T13.3 Gate G: routing-improvement evidence and policy lifecycle (workstation only; null on devices). */
   routingLearning: RoutingLearningView | null;
+  /** M-E4R1: the router's stored decision ledger (read-only, workstation only; null on devices and older Hosts). */
+  routingLedger: NonNullable<HostSnapshot["routingLedger"]> | null;
   /** One `routing.learning.*` command; the Host's answer or null when refused. */
   routingLearningCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<HostCommandOk | null>;
   /** M-A-3 T13.3 Gate G: voice preferences, answer ratings and advice (workstation only; null on devices). */
@@ -858,6 +860,7 @@ export const useIsland = create<Island>((set, get) => {
       sessionLedger: snapshot.sessionLedger ?? null,
       scheduler: snapshot.scheduler ?? null,
       routingLearning: snapshot.routingLearning ?? null,
+      routingLedger: snapshot.routingLedger ?? null,
       voicePersonalization: snapshot.voicePersonalization ?? null,
       characterAppearance: snapshot.characterAppearance ?? null,
       uiTheme: hostView(snapshot.uiTheme) ?? state.uiTheme,
@@ -928,6 +931,7 @@ export const useIsland = create<Island>((set, get) => {
       harnesses: null,
       sessionLedger: null,
       scheduler: null,
+      routingLedger: null,
       widgets: null,
       routingLearning: null,
       voicePersonalization: null,
@@ -1360,6 +1364,7 @@ export const useIsland = create<Island>((set, get) => {
     scheduler: null,
     schedulerCommand: (action, data, onRefused) => command(action, data, "scheduler", onRefused),
     routingLearning: null,
+    routingLedger: null,
     routingLearningCommand: (action, data, onRefused) => command(action, data, "routing-learning", onRefused),
     voicePersonalization: null,
     characterAppearance: null,

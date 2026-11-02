@@ -4,7 +4,7 @@ import { Telemetry } from "./telemetry";
 import { Proactive } from "./proactive";
 import { shortId } from "./remote-view-model";
 import {
-  COORDINATION_NOT_CONFIGURED, fabricDeviceRows, fabricEvents, fabricOverview, fabricProfiles, fabricUsageRows,
+  COORDINATION_NOT_CONFIGURED, fabricDeviceRows, fabricEvents, fabricLedgerRows, fabricOverview, fabricProfiles, fabricUsageRows,
 } from "./fabric-model";
 import "./fabric.css";
 
@@ -38,6 +38,7 @@ export function FabricWorkspace({ now, freshness }: { now: number; freshness: st
   const events = fabricEvents(store.events);
   const usage = fabricUsageRows(store.sessionLedger);
   const profiles = fabricProfiles(store.performance);
+  const ledger = fabricLedgerRows(store.routingLedger);
 
   return (
     <div className="fabric">
@@ -119,6 +120,37 @@ export function FabricWorkspace({ now, freshness }: { now: number; freshness: st
 
       <section className="t8-surface" aria-labelledby="fabric-routing">
         <h3 id="fabric-routing">Routing &amp; Providers</h3>
+        <h4>Routing decisions (this session)</h4>
+        {ledger.length === 0 ? (
+          <p className="fabric-empty">No routing decisions recorded yet. The ledger shows what the router actually chose; no scores or quotas are invented.</p>
+        ) : (
+          <table className="fabric-table">
+            <thead>
+              <tr>
+                <th scope="col">Task</th>
+                <th scope="col">Mode</th>
+                <th scope="col">Class</th>
+                <th scope="col">Selected</th>
+                <th scope="col">Candidates</th>
+                <th scope="col">Reroutes</th>
+                <th scope="col">Attempts</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ledger.map((entry) => (
+                <tr key={entry.id}>
+                  <td className="mono">{short(entry.taskId)}</td>
+                  <td>{entry.mode}</td>
+                  <td>{entry.taskClass}</td>
+                  <td>{entry.selected ? `${entry.selected.provider}${entry.selected.model ? ` · ${entry.selected.model}` : " · provider default"}` : "not selected"}</td>
+                  <td>{entry.candidates}</td>
+                  <td>{entry.reroutes}</td>
+                  <td>{entry.attempts.length ? `${entry.attempts.length} (${entry.attempts.map((attempt) => attempt.taxonomy).join(", ")})` : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
         {profiles.length === 0 ? (
           <Empty title="No performance profiles yet." detail="Profiles appear as real tasks complete." />
         ) : (
