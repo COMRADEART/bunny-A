@@ -170,5 +170,58 @@ Eq("full scale clamps", 1.0, NotchVoice.LevelOf(J($$$"""{"rms":2,"at":{{{Now}}} 
 foreach (var s in new[] { "OFF", "ON", "ARMING", "LISTENING", "RECOGNIZING", "THINKING", "SPEAKING", "INTERRUPTING", "INTERRUPTED", "MUTED", "DEVICE_UNAVAILABLE", "ERROR" })
     Check($"announcement {s}", NotchVoice.Announcement(new VoiceView(s, "x", "", "idle", null, null)).StartsWith("Voice: "));
 
+// ── E2b: the Host's validated notch theme tokens — the same rules the island enforces (Bunny-Island.Theme.ps1) ──
+const string Palette = "\"light\":{\"fill\":\"#101018\",\"fillEnd\":\"#1a1a24\",\"stroke\":\"#f8f8f0\",\"ink\":\"#f8f8f0\",\"muted\":\"#c8c8e0\",\"accent\":\"#f8d030\",\"accentInk\":\"#181820\",\"glow\":\"#fcee0a\"},\"dark\":{\"fill\":\"#22307a\",\"fillEnd\":\"#2b3a8c\",\"stroke\":\"#f8f8f0\",\"ink\":\"#f8f8f0\",\"muted\":\"#c8c8e0\",\"accent\":\"#f8d030\",\"accentInk\":\"#181820\",\"glow\":\"#e05080\"}";
+JsonElement TokenView(string extra = "", string variant = "dark", long revision = 7, string schema = "bunny-a.ui-theme.v1") => J(
+    "{\"revision\":" + revision + ",\"uiTheme\":{\"notch\":{\"schema\":\"" + schema + "\",\"theme\":\"pixel\",\"name\":\"Pixel Art\",\"shape\":\"frame\",\"radius\":6,\"border\":2,\"glow\":true,\"font\":\"Lucida Console\",\"highContrast\":false,\"variant\":\"" + variant + "\"," + Palette + (extra.Length == 0 ? "" : "," + extra) + "}}}");
+var tokens = NotchTokens.From(TokenView());
+Check("E2b valid tokens parse", tokens is not null);
+Eq("E2b theme id", "pixel", tokens!.Theme);
+Eq("E2b shape", "frame", tokens.Shape);
+Eq("E2b font", "Lucida Console", tokens.Font);
+Eq("E2b radius", 6, tokens.Radius);
+Eq("E2b border", 2, tokens.Border);
+Eq("E2b revision", 7, tokens.Revision);
+Eq("E2b dark fill upper-cased", "#22307A", tokens.Color(false, "fill"));
+Eq("E2b light ink", "#F8F8F0", tokens.Color(true, "ink"));
+Eq("E2b no glass block parses to none", null, tokens.Glass);
+Check("E2b the restyle key is stable", tokens.Key == tokens.Key);
+Eq("E2b a saved dark variant wins over both preferences", false, tokens.Light("Light", true));
+var systemView = NotchTokens.From(TokenView(variant: "system"));
+Check("E2b a system variant parses", systemView is not null);
+Eq("E2b system defers to the notch's own light choice", true, systemView!.Light("Light", false));
+Eq("E2b system keeps the notch's own dark choice", false, systemView.Light("Dark", false));
+Eq("E2b system otherwise follows Windows", false, systemView.Light("System", false));
+Eq("E2b system follows Windows when it says light", true, systemView.Light("System", true));
+var unsavedView = NotchTokens.From(TokenView(revision: 0));
+Eq("E2b revision 0 keeps the notch's own dark choice", false, unsavedView!.Light("Dark", true));
+Eq("E2b revision 0 keeps the notch's own light choice", true, unsavedView.Light("Light", false));
+foreach (var (name, broken) in new[] {
+    ("foreign schema", TokenView(schema: "bunny-a.ui-theme.v9")),
+    ("unknown shape", J("""{"revision":7,"uiTheme":{"notch":{"schema":"bunny-a.ui-theme.v1","theme":"pixel","name":"x","shape":"star","radius":6,"border":2,"glow":true,"font":"Consolas","highContrast":false,"variant":"dark","light":{},"dark":{}}}}""")),
+    ("unknown font", J("""{"revision":7,"uiTheme":{"notch":{"schema":"bunny-a.ui-theme.v1","theme":"pixel","name":"x","shape":"plate","radius":6,"border":2,"glow":true,"font":"Comic Sans MS","highContrast":false,"variant":"dark","light":{},"dark":{}}}}""")),
+    ("injected font", J("""{"revision":7,"uiTheme":{"notch":{"schema":"bunny-a.ui-theme.v1","theme":"pixel","name":"x","shape":"plate","radius":6,"border":2,"glow":true,"font":"$(calc.exe)","highContrast":false,"variant":"dark","light":{},"dark":{}}}}""")),
+})
+    Check($"E2b hostile: {name} falls back", NotchTokens.From(broken) is null, $"{name} must keep the local theme");
+var hostileRadiusView = J("""{"revision":7,"uiTheme":{"notch":{"schema":"bunny-a.ui-theme.v1","theme":"pixel","name":"x","shape":"plate","radius":99,"border":2,"glow":true,"font":"Consolas","highContrast":false,"variant":"dark","light":{},"dark":{}}}}""");
+Check("E2b hostile: radius 99 falls back", NotchTokens.From(hostileRadiusView) is null);
+var borderView = J("""{"revision":7,"uiTheme":{"notch":{"schema":"bunny-a.ui-theme.v1","theme":"pixel","name":"x","shape":"plate","radius":6,"border":-1,"glow":true,"font":"Consolas","highContrast":false,"variant":"dark","light":{},"dark":{}}}}""");
+Check("E2b hostile: border -1 falls back", NotchTokens.From(borderView) is null);
+Check("E2b absent uiTheme falls back", NotchTokens.From(J("""{"hostIdentity":{"hostId":"x","epoch":"y"}}""")) is null);
+// The E1 glass block rides additively; malformed decoration drops only the block, never the theme.
+var glassView = NotchTokens.From(TokenView(extra: "\"glass\":{\"intensity\":85,\"rimAlpha\":0.895,\"sheenAlpha\":0.707}"));
+Eq("E2b glass intensity", 85, glassView!.Glass!.Intensity);
+Eq("E2b glass rim", 0.895, glassView.Glass.RimAlpha);
+Eq("E2b glass sheen", 0.707, glassView.Glass.SheenAlpha);
+Check("E2b the glass values change the restyle key", glassView.Key != tokens.Key);
+var badGlass = NotchTokens.From(TokenView(extra: "\"glass\":{\"intensity\":101,\"rimAlpha\":0.5,\"sheenAlpha\":0.5}"));
+Check("E2b a malformed glass block keeps the theme", badGlass is not null);
+Eq("E2b the malformed block is dropped", null, badGlass!.Glass);
+Check("E2b the malformed block keeps the plain key", badGlass.Key == tokens.Key);
+var badHex = NotchTokens.From(J(TokenView().GetRawText().Replace("#fcee0a", "#12345g")));
+Check("E2b a bad hex color falls back", badHex is null);
+var missingPalette = NotchTokens.From(J("""{"revision":7,"uiTheme":{"notch":{"schema":"bunny-a.ui-theme.v1","theme":"pixel","name":"x","shape":"plate","radius":6,"border":2,"glow":true,"font":"Consolas","highContrast":false,"variant":"dark","dark":{"fill":"#000000","fillEnd":"#000000","stroke":"#000000","ink":"#000000","muted":"#000000","accent":"#000000","accentInk":"#000000","glow":"#000000"}}}}"""));
+Check("E2b a missing light palette falls back", missingPalette is null);
+
 Console.WriteLine(failures == 0 ? "ALL PASSED" : $"{failures} FAILED");
 return failures;
