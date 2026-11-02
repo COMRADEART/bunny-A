@@ -43,8 +43,9 @@ test("T13 nav: advanced destinations keep every previous capability off the ever
 });
 
 test("T13 nav: every canonical view resolves to a surface, and the design preview is never a main destination", () => {
-  assert.equal(NAV_VIEWS.length, 17);
+  assert.equal(NAV_VIEWS.length, 18, "E4 added Server Control as a deep-linkable view");
   for (const view of NAV_VIEWS) assert.ok(sheetForView(view), `${view} resolves`);
+  assert.equal(sheetForView("server"), "fabric", "Server Control resolves to the fabric surface");
   assert.equal(isMainNavSheet("design-preview"), false, "the design preview is deep-link only");
   assert.equal(sheetForView("studio"), "studio");
   assert.equal(sheetForView("agents"), "agents", "Agents is the overview; Studio has its own view");
@@ -64,7 +65,8 @@ test("T13 nav: every legacy ?view value keeps working", () => {
   assert.equal(sheetForView("system"), "system");
   assert.equal(sheetForView("compose"), "compose");
   assert.equal(sheetForView("constellation"), "constellation");
-  assert.equal(Object.keys(VIEW_ALIASES).length, 26);
+  assert.equal(sheetForView("server"), "fabric", "Server Control (E4) keeps its ?view= link");
+  assert.equal(Object.keys(VIEW_ALIASES).length, 27);
 });
 
 test("T13 nav: unknown or missing views resolve to nothing so the caller keeps its surface", () => {
