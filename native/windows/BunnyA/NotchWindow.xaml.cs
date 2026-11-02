@@ -292,6 +292,12 @@ public partial class NotchWindow : Window
                     (activeTitle, activeState, activeId, activeKind) = (t.Json("title") ?? "Task running", state, t.Json("id"), "ptask");
             }
 
+            // E2b: per-slot skins ride the same snapshot, but are committed here with the chips they render (the reads
+            // above can throw on a malformed part), so a rejected snapshot keeps its last good look — skins included.
+            // The stamp joins RenderChips' signature, so a skin change re-renders the chips even when states did not move.
+            var nextAppearances = CharacterArt.Appearances(root);
+            appearanceSlots = nextAppearances;
+            appearancesStamp = string.Join(";", nextAppearances.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}={kv.Value.Style ?? "-"}/{kv.Value.Intensity}/{(kv.Value.HighContrast ? 1 : 0)}"));
             var next = NotchModel.Agents(root, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
             RenderChips(next);
             var working = next.Count(c => NotchModel.IsActive(c.State));
@@ -336,6 +342,9 @@ public partial class NotchWindow : Window
     // E2b: the Host's validated notch tokens; null = this notch keeps its local config theme (the fallback, unchanged).
     private NotchTokens? tokens;
     private string? tokenKey;
+    // E2b: per-slot character skins from snapshot.characterAppearance; a slot absent here keeps its weapon's signature.
+    private IReadOnlyDictionary<int, SlotAppearance> appearanceSlots = new Dictionary<int, SlotAppearance>();
+    private string appearancesStamp = "";
 
     /// <summary>Phase 3: a voice-only update (the measured level while capture is confirmed); agent chips are untouched.</summary>
     public void UpdateVoice(JsonElement voice)
@@ -392,7 +401,7 @@ public partial class NotchWindow : Window
     private void RenderChips(List<NotchAgent> next)
     {
         var shown = (expanded ? next : next.Where(c => NotchModel.IsActive(c.State) || NotchModel.NeedsAttention(c.State) || c.State is NotchState.Failed)).ToList();
-        var signature = $"{expanded}|{currentEdge}|{ReducedMotion}|" + string.Join(";", shown.Select(c => $"{c.Key}={c.State}|{c.AccessibleName}"));
+        var signature = $"{expanded}|{currentEdge}|{ReducedMotion}|{appearancesStamp}|" + string.Join(";", shown.Select(c => $"{c.Key}={c.State}|{c.AccessibleName}"));
         chips = next;
         if (signature == chipSignature) return;
         chipSignature = signature;
@@ -442,9 +451,58 @@ public partial class NotchWindow : Window
         });
     }
 
+    /// <summary>
+    /// The canonical compact art for a weapon identity, rendered with its slot's skin (the PS island's
+    /// Get-BunnyCharacterSkin: signature style when the Host sent none, pixel decoded to the grid and drawn crisp,
+    /// per-slot or system high contrast plain). Returns null when the pack lacks the art, and the caller keeps the
+    /// vector glyph — a chip is never blank.
+    /// </summary>
+    private Image? IdentityArt(NotchAgent a)
+    {
+        if (CharacterArt.WeaponArtId(a.Identity, "ACTIVE", "compact") is not { } id) return null;
+        var appearance = a.Key.StartsWith("slot:") && int.TryParse(a.Key["slot:".Length..], out var slot)
+            ? appearanceSlots.GetValueOrDefault(slot)
+            : null;
+        try
+        {
+            var bitmap = new BitmapImage();
+            var pixel = appearance?.Style == "pixel";
+            bitmap.BeginInit();
+            bitmap.UriSource = new Uri($"pack://application:,,,/Assets/characters/{id}.png");
+            if (pixel)
+            {
+                // The 24-cell grid rides the long side (Get-BunnyPixelDecodeWidth / pixelSprite), and decoding
+                // never upsamples: measure the art, decode the long side down to the grid, keep the other axis.
+                var probe = new BitmapImage();
+                probe.BeginInit(); probe.UriSource = bitmap.UriSource; probe.EndInit(); probe.Freeze();
+                if (Math.Max(probe.PixelWidth, probe.PixelHeight) > 24)
+                {
+                    if (probe.PixelWidth >= probe.PixelHeight) bitmap.DecodePixelWidth = 24; else bitmap.DecodePixelHeight = 24;
+                }
+            }
+            bitmap.EndInit();
+            bitmap.Freeze();
+            var image = new Image
+            {
+                Source = bitmap, Stretch = Stretch.Uniform, Width = 20, Height = 20,
+                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+                RenderTransformOrigin = new Point(0.5, 0.5),
+                RenderTransform = new TransformGroup { Children = { new ScaleTransform(), new RotateTransform(), new TranslateTransform() } },
+            };
+            if (appearance?.Style == "pixel") RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.NearestNeighbor);
+            var style = appearance?.Style ?? CharacterArt.Signature(a.Identity);
+            // A style is material only (the island's rule): the same art with an effect; system or per-slot contrast drops it for plain art.
+            if (appearance?.HighContrast != true && !HighContrast && CharacterArt.StyleEffect(style) is { } spec)
+                image.Effect = new DropShadowEffect { Color = (Color)ColorConverter.ConvertFromString(spec.Color), BlurRadius = spec.Blur, ShadowDepth = spec.Depth, Opacity = spec.Opacity };
+            return image;
+        }
+        catch { return null; }
+    }
+
     private Button BuildChip(NotchAgent a, string prefix, NotchState before)
     {
-        var glyph = new System.Windows.Shapes.Path
+        var art = IdentityArt(a);
+        FrameworkElement identity = art ?? (FrameworkElement)new System.Windows.Shapes.Path
         {
             Data = (Geometry)FindResource(a.Identity switch { "gada" => "GlyphGada", "spear" => "GlyphSpear", "chakra" => "GlyphChakra", "sword" => "GlyphSword", _ => "GlyphTask" }),
             StrokeThickness = 1.7, StrokeLineJoin = PenLineJoin.Round, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
@@ -452,7 +510,7 @@ public partial class NotchWindow : Window
             RenderTransform = new TransformGroup { Children = { new ScaleTransform(), new RotateTransform(), new TranslateTransform() } },
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
         };
-        glyph.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, "NotchText");
+        if (identity is System.Windows.Shapes.Path glyphOnly) glyphOnly.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, "NotchText");
         var stateKey = a.State switch
         {
             _ when NotchModel.NeedsAttention(a.State) => "NotchAttention",
@@ -472,7 +530,7 @@ public partial class NotchWindow : Window
         badge.SetResourceReference(Border.BackgroundProperty, stateKey);
         ((TextBlock)badge.Child).SetResourceReference(TextBlock.ForegroundProperty, HighContrast ? "NotchChip" : "NotchText");
         var grid = new Grid { Width = 28, Height = 28 };
-        grid.Children.Add(glyph);
+        grid.Children.Add(identity);
         grid.Children.Add(badge);
         var chip = new Button { Style = (Style)FindResource("AgentChip"), Content = grid, Tag = a, ToolTip = a.AccessibleName.Replace(" · ", "\n") };
         chip.SetResourceReference(BorderBrushProperty, stateKey);
@@ -482,7 +540,7 @@ public partial class NotchWindow : Window
         System.Windows.Automation.AutomationProperties.SetItemStatus(chip, NotchModel.Label(a.State));
         System.Windows.Automation.AutomationProperties.SetHelpText(chip, a.Kind != null ? "Opens this item in Bunny A" : "Opens the Agent Dashboard");
         chip.Click += Chip_Click;
-        if (!ReducedMotion && !offline) Animate(a, before, glyph, badge, chip);
+        if (!ReducedMotion && !offline) Animate(a, before, identity, badge, chip);
         return chip;
     }
 
@@ -491,63 +549,92 @@ public partial class NotchWindow : Window
     /// forward thrust, Vishnu Chakra a turning ring, Sword a light sweep along the blade. Attention pulses its badge;
     /// a fresh Completed or Failed plays once. Nothing moves while idle, waiting, hidden or under reduced motion.
     /// </summary>
-    private void Animate(NotchAgent a, NotchState before, System.Windows.Shapes.Path glyph, Border badge, Button chip)
+    private void Animate(NotchAgent a, NotchState before, FrameworkElement art, Border badge, Button chip)
     {
-        var group = (TransformGroup)glyph.RenderTransform;
+        var group = (TransformGroup)art.RenderTransform;
         var scale = (ScaleTransform)group.Children[0];
         var rotate = (RotateTransform)group.Children[1];
         var move = (TranslateTransform)group.Children[2];
+        // The slot's skin paces the motion (the PS island's Get-BunnyCharacterSkin): subtle = half the reach at 1.6x the
+        // period, off = the character and its badge hold still (badge visible, no pulse — the peers' stillness).
+        var appearance = a.Key.StartsWith("slot:") && int.TryParse(a.Key["slot:".Length..], out var skinSlot)
+            ? appearanceSlots.GetValueOrDefault(skinSlot)
+            : null;
+        var amp = appearance?.Amplitude ?? 1.0;
+        var period = appearance?.PeriodScale ?? 1.0;
+        var animates = appearance?.Animate ?? true;
         // Ambient loops on an 18 px glyph look the same at 30 fps and cost half the frames in a layered window.
-        DoubleAnimation Loop(double from, double to, double seconds, IEasingFunction? ease = null, bool reverse = true)
+        AnimationTimeline Loop(double from, double to, double seconds, IEasingFunction? ease = null, bool reverse = true)
         {
+            if (appearance?.Style == "pixel")
+            {
+                // The pixel skin jumps through exactly four frames per loop (web steps(4,end); island DiscreteDoubleKeyFrames).
+                var pixels = new DoubleAnimationUsingKeyFrames { RepeatBehavior = RepeatBehavior.Forever, AutoReverse = reverse };
+                for (var step = 1; step <= 4; step++)
+                    pixels.KeyFrames.Add(new DiscreteDoubleKeyFrame(from + (to - from) * step / 4, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(seconds * step / 4))));
+                Timeline.SetDesiredFrameRate(pixels, 30);
+                return pixels;
+            }
             var loop = new DoubleAnimation(from, to, TimeSpan.FromSeconds(seconds)) { AutoReverse = reverse, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = ease };
             Timeline.SetDesiredFrameRate(loop, 30);
             return loop;
         }
-        if (NotchModel.IsActive(a.State))
+        if (NotchModel.IsActive(a.State) && animates)
         {
             var horizontal = currentEdge is "Top" or "Bottom";
             switch (a.Identity)
             {
                 case "gada":
-                    var impact = Loop(1, 1.14, 0.55, new BackEase { Amplitude = 0.6, EasingMode = EasingMode.EaseIn });
+                    var impact = Loop(1, 1 + 0.14 * amp, 0.55 * period, new BackEase { Amplitude = 0.6, EasingMode = EasingMode.EaseIn });
                     scale.BeginAnimation(ScaleTransform.ScaleXProperty, impact);
                     scale.BeginAnimation(ScaleTransform.ScaleYProperty, impact);
                     break;
                 case "spear":
-                    move.BeginAnimation(horizontal ? TranslateTransform.XProperty : TranslateTransform.YProperty, Loop(0, horizontal ? 2.5 : -2.5, 0.45, new SineEase()));
+                    move.BeginAnimation(horizontal ? TranslateTransform.XProperty : TranslateTransform.YProperty, Loop(0, (horizontal ? 2.5 : -2.5) * amp, 0.45 * period, new SineEase()));
                     break;
                 case "chakra":
-                    rotate.BeginAnimation(RotateTransform.AngleProperty, Loop(0, 360, 2.4, reverse: false));
+                    rotate.BeginAnimation(RotateTransform.AngleProperty, Loop(0, 360, 2.4 * period, reverse: false));
                     break;
                 case "sword":
-                    var sweep = new LinearGradientBrush { StartPoint = new Point(0, 1), EndPoint = new Point(1, 0) };
-                    var baseColor = ((SolidColorBrush)FindResource("NotchText")).Color;
-                    var glint = new GradientStop(((SolidColorBrush)FindResource("NotchFocus")).Color, 0);
-                    sweep.GradientStops.Add(new GradientStop(baseColor, 0));
-                    sweep.GradientStops.Add(glint);
-                    sweep.GradientStops.Add(new GradientStop(baseColor, 1));
-                    glyph.Stroke = sweep;
-                    glint.BeginAnimation(GradientStop.OffsetProperty, Loop(0, 1, 1.1, new SineEase(), reverse: false));
+                    // The vector glyph sweeps a glint along the blade; canonical art pulses a uniform sheen instead.
+                    if (art is System.Windows.Shapes.Path path)
+                    {
+                        var sweep = new LinearGradientBrush { StartPoint = new Point(0, 1), EndPoint = new Point(1, 0) };
+                        var baseColor = ((SolidColorBrush)FindResource("NotchText")).Color;
+                        var glint = new GradientStop(((SolidColorBrush)FindResource("NotchFocus")).Color, 0);
+                        sweep.GradientStops.Add(new GradientStop(baseColor, 0));
+                        sweep.GradientStops.Add(glint);
+                        sweep.GradientStops.Add(new GradientStop(baseColor, 1));
+                        path.Stroke = sweep;
+                        glint.BeginAnimation(GradientStop.OffsetProperty, Loop(0, 1, 1.1, new SineEase(), reverse: false));
+                    }
+                    else
+                    {
+                        art.BeginAnimation(OpacityProperty, Loop(1, 1 - 0.3 * amp, 1.1 * period, new SineEase()));
+                    }
                     break;
                 default:
-                    glyph.BeginAnimation(OpacityProperty, Loop(1, 0.55, 0.9, new SineEase()));
+                    art.BeginAnimation(OpacityProperty, Loop(1, 1 - 0.45 * amp, 0.9 * period, new SineEase()));
                     break;
             }
             FrameMeter.Track(chip);
         }
         else if (NotchModel.NeedsAttention(a.State))
         {
-            badge.BeginAnimation(OpacityProperty, Loop(1, 0.35, 0.7, new SineEase()));
-            FrameMeter.Track(chip);
+            // The amber pulse is motion; a skin at intensity off keeps the badge signaling by holding it visible.
+            if (animates)
+            {
+                badge.BeginAnimation(OpacityProperty, Loop(1, 0.35, 0.7, new SineEase()));
+                FrameMeter.Track(chip);
+            }
         }
-        else if (before != a.State && a.State == NotchState.Completed)
+        else if (animates && before != a.State && a.State == NotchState.Completed)
         {
             var pop = new DoubleAnimation(1.25, 1, TimeSpan.FromMilliseconds(420)) { EasingFunction = new ElasticEase { Oscillations = 1, Springiness = 5 } };
             scale.BeginAnimation(ScaleTransform.ScaleXProperty, pop);
             scale.BeginAnimation(ScaleTransform.ScaleYProperty, pop);
         }
-        else if (before != a.State && a.State == NotchState.Failed)
+        else if (animates && before != a.State && a.State == NotchState.Failed)
         {
             move.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(-2.5, 0, TimeSpan.FromMilliseconds(360)) { EasingFunction = new ElasticEase { Oscillations = 3, Springiness = 2 } });
         }

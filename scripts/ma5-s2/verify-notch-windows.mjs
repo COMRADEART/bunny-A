@@ -238,11 +238,13 @@ try {
   await stage("n7-appearance-fallbacks", async () => {
     const modes = [];
     for (const [name, cfg, expect] of [
-      ["dark", { NotchTheme: "Dark" }, "theme=dark;opaque=false;reducedMotion=false"],
-      ["light", { NotchTheme: "Light" }, "theme=light;opaque=false;reducedMotion=false"],
-      ["high-contrast", { NotchTheme: "HighContrast" }, "theme=high-contrast;opaque=true;reducedMotion=false"],
-      ["reduced-transparency", { NotchTheme: "Dark", ReducedTransparency: true }, "theme=dark;opaque=true;reducedMotion=false"],
-      ["reduced-motion", { NotchTheme: "Dark", ReducedMotion: true }, "theme=dark;opaque=false;reducedMotion=true"],
+      // The E2b themed-token channel adds ";tokens=host" when a themed Host snapshot wins; the config-only
+      // scenarios below run against a Host with no saved theme, so the local look keeps the literal "local".
+      ["dark", { NotchTheme: "Dark" }, "theme=dark;opaque=false;reducedMotion=false;tokens=local"],
+      ["light", { NotchTheme: "Light" }, "theme=light;opaque=false;reducedMotion=false;tokens=local"],
+      ["high-contrast", { NotchTheme: "HighContrast" }, "theme=high-contrast;opaque=true;reducedMotion=false;tokens=local"],
+      ["reduced-transparency", { NotchTheme: "Dark", ReducedTransparency: true }, "theme=dark;opaque=true;reducedMotion=false;tokens=local"],
+      ["reduced-motion", { NotchTheme: "Dark", ReducedMotion: true }, "theme=dark;opaque=false;reducedMotion=true;tokens=local"],
     ]) {
       writeConfig(cfg);
       const t = await relaunch();
