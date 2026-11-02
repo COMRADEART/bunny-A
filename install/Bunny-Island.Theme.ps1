@@ -14,6 +14,31 @@ function Test-BunnyHexColor([object]$Value) {
  return ($Value -is [string]) -and ($Value -cmatch '^#[0-9a-fA-F]{6}\z')
 }
 
+# A validated 0..1 double from a glass token (rim/sheen alpha), or $null: no coercion, no culture surprises (invariant only).
+function Get-BunnyUnitInterval([object]$Value) {
+ if ($null -eq $Value) { return $null }
+ $parsed = 0.0
+ if (-not [double]::TryParse([string]$Value, [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsed)) { return $null }
+ if ($parsed -lt 0 -or $parsed -gt 1) { return $null }
+ return $parsed
+}
+
+# E2a Glass Intensity: the body's translucency follows ONE bounded integer (0-100, default 85). A saved Host theme carries
+# its intensity in the notch tokens (revision > 0); before any theme is saved the island's own lever maps onto it
+# (low=30, medium=85, high=100 - the same map the web's legacy lever publishes). The bands reproduce the shipped
+# 250/238/218 ladder exactly at those mapped anchors. High contrast stays fully opaque; blur is never touched here.
+function Get-BunnyNotchGlassAlpha($Glass, [int]$Revision, [string]$NativeGlass, [bool]$HighContrast) {
+ if ($HighContrast) { return 255 }
+ $intensity = 85
+ if ($null -ne $Glass -and $Revision -gt 0) { $intensity = [int]$Glass.Intensity }
+ else {
+  switch ($NativeGlass) { 'low' { $intensity = 30 } 'high' { $intensity = 100 } default { $intensity = 85 } }
+ }
+ if ($intensity -lt 58) { return 250 }
+ if ($intensity -lt 93) { return 238 }
+ return 218
+}
+
 # Returns a validated hashtable, or $null when the view is missing, from another schema, or has any invalid value.
 function Get-BunnyNotchTheme($View) {
  if ($null -eq $View) { return $null }
@@ -43,12 +68,25 @@ function Get-BunnyNotchTheme($View) {
   }
   $palettes[$side] = $colors
  }
+ # E2a: the optional glass block from v2 preference tokens (intensity 0-100 + rim/sheen alphas 0..1). Any malformed value
+ # drops the whole block (the island then keeps its own lever) - a bad decoration token never invalidates the theme the
+ # way a bad core token does.
+ $glass = $null
+ $rawGlass = $notch.glass
+ if ($null -ne $rawGlass) {
+  $intensity = 0
+  $rim = Get-BunnyUnitInterval $rawGlass.rimAlpha
+  $sheen = Get-BunnyUnitInterval $rawGlass.sheenAlpha
+  if ([int]::TryParse([string]$rawGlass.intensity, [ref]$intensity) -and $intensity -ge 0 -and $intensity -le 100 -and ($null -ne $rim) -and ($null -ne $sheen)) {
+   $glass = @{ Intensity = $intensity; Rim = $rim; Sheen = $sheen }
+  }
+ }
  $revision = 0
  [void][int]::TryParse([string]$View.revision, [ref]$revision)
  return @{
   Theme = $theme; Name = ([string]$notch.name).Substring(0, [Math]::Min(40, ([string]$notch.name).Length)); Shape = $shape; Font = $font
   Radius = $radius; Border = $border; Glow = [bool]($notch.glow -eq $true); HighContrast = [bool]($notch.highContrast -eq $true)
-  Variant = $variant; Light = $palettes.light; Dark = $palettes.dark; Revision = $revision
+  Variant = $variant; Light = $palettes.light; Dark = $palettes.dark; Revision = $revision; Glass = $glass
  }
 }
 
@@ -98,8 +136,11 @@ function Get-BunnyNotchPalette($Theme, [bool]$Light, [int]$Alpha) {
  }
 }
 
-# A stable key for "did the theme change": the Notch restyles only when this differs, never on every poll.
+# A stable key for "did the theme change": the Notch restyles only when this differs, never on every poll. The glass
+# intensity is part of the key, so intensity-only changes restyle too.
 function Get-BunnyNotchThemeKey($Theme) {
  if ($null -eq $Theme) { return 'default' }
- return '{0}|{1}|{2}|{3}' -f $Theme.Theme, $Theme.Revision, $Theme.Variant, $Theme.HighContrast
+ $suffix = ''
+ if ($null -ne $Theme.Glass) { $suffix = '|{0}|{1}|{2}' -f $Theme.Glass.Intensity, $Theme.Glass.Rim, $Theme.Glass.Sheen }
+ return '{0}|{1}|{2}|{3}{4}' -f $Theme.Theme, $Theme.Revision, $Theme.Variant, $Theme.HighContrast, $suffix
 }
