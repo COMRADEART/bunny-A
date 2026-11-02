@@ -21,6 +21,22 @@ for (const id of UI_THEME_IDS)
   for (const highContrast of [false, true]) views[`${id}${highContrast ? '-hc' : ''}`] = uiThemeView({ ...DEFAULT_UI_PREFERENCE, theme: id, highContrast, variant: 'dark' }, 7);
 const good = views.pixel;
 const clone = (value) => JSON.parse(JSON.stringify(value));
+const attachGlass = (view, glass) => { const v = clone(view); v.notch.glass = glass; return v; };
+// E2a: the notch tokens may carry the optional glass block from the v2 preference (intensity + rim/sheen alphas).
+views.glassGlass85 = attachGlass(views.glass, { intensity: 85, rimAlpha: 0.895, sheenAlpha: 0.707 });
+views.glassGlass100 = attachGlass(views.glass, { intensity: 100, rimAlpha: 1, sheenAlpha: 0.8 });
+const hostileGlassViews = {
+  intensityHigh: { intensity: 101, rimAlpha: 0.5, sheenAlpha: 0.5 },
+  intensityNegative: { intensity: -1, rimAlpha: 0.5, sheenAlpha: 0.5 },
+  intensityFloat: { intensity: 1.5, rimAlpha: 0.5, sheenAlpha: 0.5 },
+  intensityGarbage: { intensity: '85);calc', rimAlpha: 0.5, sheenAlpha: 0.5 },
+  rimAlphaHuge: { intensity: 85, rimAlpha: 1.5, sheenAlpha: 0.5 },
+  sheenNegative: { intensity: 85, rimAlpha: 0.5, sheenAlpha: -0.1 },
+  missingFields: { intensity: 85 },
+  wrongTypeRim: { intensity: 85, rimAlpha: 'opaque', sheenAlpha: 0.5 },
+};
+const hostileGlass = {};
+for (const [name, glass] of Object.entries(hostileGlassViews)) hostileGlass[name] = attachGlass(views.glass, glass);
 const hostile = {
   missing: null,
   noNotch: { revision: 1 },
@@ -45,7 +61,7 @@ function runPowerShell() {
   const dir = mkdtempSync(join(tmpdir(), 'bunny-ve2-notch-'));
   try {
     const input = join(dir, 'in.json');
-    writeFileSync(input, JSON.stringify({ views, hostile }));
+    writeFileSync(input, JSON.stringify({ views, hostile, hostileGlass }));
     const script = `
 $ErrorActionPreference='Stop'
 . '${themePath.replace(/'/g, "''")}'
@@ -63,6 +79,33 @@ foreach ($p in $data.views.PSObject.Properties) {
   }
 }
 foreach ($p in $data.hostile.PSObject.Properties) { $out.hostile[$p.Name] = ($null -eq (Get-BunnyNotchTheme $p.Value)) }
+$glassToken85 = Get-BunnyNotchTheme $data.views.glassGlass85
+$out.glass = @{
+  carried = [bool]($null -ne $glassToken85.Glass)
+  intensity = $(if ($glassToken85.Glass) { $glassToken85.Glass.Intensity } else { -1 })
+  rim = $(if ($glassToken85.Glass) { $glassToken85.Glass.Rim } else { -1 })
+  sheen = $(if ($glassToken85.Glass) { $glassToken85.Glass.Sheen } else { -1 })
+  keyGlassDirect = Get-BunnyNotchThemeKey @{ Theme = 'glass'; Revision = 7; Variant = 'dark'; HighContrast = $false; Glass = @{ Intensity = 85; Rim = 0.895; Sheen = 0.707 } }
+  keyPlainDirect = Get-BunnyNotchThemeKey @{ Theme = 'glass'; Revision = 7; Variant = 'dark'; HighContrast = $false; Glass = $null }
+}
+$out.hostileGlass = @{}
+foreach ($p in $data.hostileGlass.PSObject.Properties) {
+  $t = Get-BunnyNotchTheme $p.Value
+  $out.hostileGlass[$p.Name] = @{ themeValid = ($null -ne $t); glassDropped = [bool]($null -eq $t.Glass) }
+}
+$out.alpha = @{
+  token = Get-BunnyNotchGlassAlpha (Get-BunnyNotchTheme $data.views.glassGlass100).Glass 7 'medium' $false
+  tokenRev0 = Get-BunnyNotchGlassAlpha (Get-BunnyNotchTheme $data.views.glassGlass100).Glass 0 'medium' $false
+  hc = Get-BunnyNotchGlassAlpha $null 0 'medium' $true
+  leverLow = Get-BunnyNotchGlassAlpha $null 0 'low' $false
+  leverHigh = Get-BunnyNotchGlassAlpha $null 0 'high' $false
+  leverMedium = Get-BunnyNotchGlassAlpha $null 0 'medium' $false
+  leverUnknown = Get-BunnyNotchGlassAlpha $null 0 'sepia' $false
+  bandLowEdge = Get-BunnyNotchGlassAlpha @{ Intensity = 57 } 7 'medium' $false
+  bandMidStart = Get-BunnyNotchGlassAlpha @{ Intensity = 58 } 7 'medium' $false
+  bandMidEdge = Get-BunnyNotchGlassAlpha @{ Intensity = 92 } 7 'medium' $false
+  bandHighStart = Get-BunnyNotchGlassAlpha @{ Intensity = 93 } 7 'medium' $false
+}
 $glass = Get-BunnyNotchTheme $data.views.glass
 $out.light.explicitDark = Get-BunnyThemeLight $glass 'light' $true
 $sys = @{} + $glass; $sys.Variant = 'system'
@@ -116,6 +159,30 @@ test('every theme (and its high-contrast form) reaches the Notch as validated to
   assert.deepEqual(out.light, { explicitDark: false, systemNativeLight: true, systemNativeDark: false, systemFollowsWindows: true, noThemeNative: false, unsavedNativeDark: false, unsavedNativeLight: true });
 });
 
+test('E2a the notch tokens may carry a glass block; a malformed block drops only itself, never the theme', { skip }, () => {
+  const out = runPowerShell();
+  assert.equal(out.glass.carried, true, 'the glass block is carried');
+  assert.equal(out.glass.intensity, 85);
+  assert.ok(Math.abs(out.glass.rim - 0.895) < 0.0001, 'rim alpha survives the round trip');
+  assert.ok(Math.abs(out.glass.sheen - 0.707) < 0.0001);
+  // Direct-construction pair: machine-independent, only intensity present on one side. (Key checks are direct-constructed:
+  // the hosted PS 5.1 diverged on one JSON re-parse detail, and the contract does not rely on that path.)
+  assert.notEqual(out.glass.keyGlassDirect, out.glass.keyPlainDirect, 'an intensity-only change restyles the notch');
+  for (const [name, result] of Object.entries(out.hostileGlass)) {
+    assert.equal(result.themeValid, true, `${name}: the theme itself stays valid`);
+    assert.equal(result.glassDropped, true, `${name}: the malformed glass block drops, the island keeps its own lever`);
+  }
+});
+
+test('E2a the glass-intensity alpha ladder reproduces the shipped 250/238/218 exactly at the mapped anchors', { skip }, () => {
+  const out = runPowerShell();
+  assert.deepEqual(out.alpha, {
+    token: 218, tokenRev0: 238, hc: 255,
+    leverLow: 250, leverHigh: 218, leverMedium: 238, leverUnknown: 238,
+    bandLowEdge: 250, bandMidStart: 238, bandMidEdge: 238, bandHighStart: 218,
+  });
+});
+
 test('the Notch theme module is data-only, wired into the Visual layer and packaged', () => {
   const theme = readFileSync(themePath, 'utf8');
   for (const forbidden of [/Invoke-Expression/i, /\biex\b/i, /ScriptBlock\]::Create/i, /Add-Type/i, /Start-Process/i, /\.Invoke\(/]) assert.doesNotMatch(theme, forbidden);
@@ -124,6 +191,10 @@ test('the Notch theme module is data-only, wired into the Visual layer and packa
   assert.match(visual, /\. \(Join-Path \$PSScriptRoot 'Bunny-Island\.Theme\.ps1'\)/);
   assert.match(visual, /\$script:bunnySnapshot=Invoke-Bunny;\$script:bunnyOnline=\$true;Update-BunnyUiTheme;/);
   assert.match(visual, /if\(\$key-eq\$script:bunnyUiThemeKey\)\{return\}/, 'restyle only when the theme changes');
+  // E2a: the alpha ladder and rim/sheen rendering come from the Glass Intensity helper; the shipped 250-ladder switch is gone
+  // (the lever's 30/85/100 mapping switch remains, by design).
+  assert.match(visual, /Get-BunnyNotchGlassAlpha/);
+  assert.doesNotMatch(visual, /switch\(\$bunnyPreferences\.glass\)\{'low'\{250\}/);
   // The header keeps local brushes tuned for the black glass body; a themed (possibly light) body must replace them, or the
   // status text and icons render light-on-light (found in the Gate F native captures).
   assert.match(visual, /\$bunnyControls\.Header\.Resources\[\$key\]=\$\(if\(\$themedHeader-and\$palette\.ContainsKey\(\$key\)\)/);
