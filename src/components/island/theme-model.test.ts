@@ -7,7 +7,7 @@ import {
 } from "./theme-model.ts";
 
 const pref = (patch: Partial<UiThemePreference>): UiThemePreference => ({ ...DEFAULT_UI_PREFERENCE, ...patch });
-const base: ThemeInputs = { host: null, viewer: "workstation", device: null, preview: null, link: { theme: null, variant: null }, cached: null };
+const base: ThemeInputs = { host: null, viewer: "workstation", device: null, preview: null, link: { theme: null, variant: null, glassIntensity: null }, cached: null };
 
 test("precedence: preview, then link, then a device's own look, then the Host, then the cache, then the default", () => {
   assert.deepEqual(effectivePreference(base), { preference: DEFAULT_UI_PREFERENCE, origin: "default" });
@@ -18,15 +18,16 @@ test("precedence: preview, then link, then a device's own look, then the Host, t
   assert.equal(effectivePreference({ ...base, host, device: pref({ theme: "y2k" }) }).preference.theme, "swiss");
   assert.equal(effectivePreference({ ...base, viewer: "device", host, device: pref({ theme: "y2k" }) }).preference.theme, "y2k");
   assert.equal(effectivePreference({ ...base, viewer: "device", host }).preference.theme, "swiss", "a device follows the workstation by default");
-  const linked = effectivePreference({ ...base, host, link: { theme: "bento", variant: "dark" } });
+  const linked = effectivePreference({ ...base, host, link: { theme: "bento", variant: "dark", glassIntensity: null } });
   assert.deepEqual([linked.origin, linked.preference.theme, linked.preference.variant], ["link", "bento", "dark"]);
   const preview = effectivePreference({ ...base, host, preview: pref({ theme: "victorian" }) });
   assert.deepEqual([preview.origin, preview.preference.theme], ["preview", "victorian"]);
 });
 
-test("links accept only known themes and the two appearances", () => {
-  assert.deepEqual(themeLinkFromSearch("?uitheme=cyberpunk&theme=dark"), { theme: "cyberpunk", variant: "dark" });
-  assert.deepEqual(themeLinkFromSearch("?uitheme=<script>&theme=sepia"), { theme: null, variant: null });
+test("links accept only known themes, the two appearances and a bounded glass intensity", () => {
+  assert.deepEqual(themeLinkFromSearch("?uitheme=cyberpunk&theme=dark"), { theme: "cyberpunk", variant: "dark", glassIntensity: null });
+  assert.deepEqual(themeLinkFromSearch("?uitheme=glass&glassintensity=0"), { theme: "glass", variant: null, glassIntensity: 0 });
+  assert.deepEqual(themeLinkFromSearch("?uitheme=<script>&theme=sepia&glassintensity=101"), { theme: null, variant: null, glassIntensity: null });
 });
 
 test("stored values round-trip; damaged or foreign-schema values are ignored, never partially applied", () => {

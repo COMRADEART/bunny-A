@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import {
-  DEFAULT_UI_PREFERENCE, FONT_PROVENANCE, NOTCH_FONTS, UI_THEMES, UI_THEME_IDS, UI_THEME_SCHEMA,
+  DEFAULT_UI_PREFERENCE, FONT_PROVENANCE, NOTCH_FONTS, UI_THEMES, UI_THEME_IDS, UI_THEME_SCHEMA, UI_THEME_SCHEMA_V1,
   accentInk, contrast, notchTheme, over, parseColor, parseUiPreference, resolveTheme, resolveVariant, themeAttributes,
   themeCssVars, themeManifest, validateUiPreference, type Palette, type UiThemeId, type Variant,
 } from "./ui-theme.ts";
@@ -186,7 +186,8 @@ test("the Notch receives flat, opaque #rrggbb tokens for both appearances and a 
   for (const id of UI_THEME_IDS)
     for (const highContrast of [false, true]) {
       const notch = notchTheme({ ...DEFAULT_UI_PREFERENCE, theme: id, highContrast });
-      assert.equal(notch.schema, UI_THEME_SCHEMA);
+      // E1: the notch token channel keeps its exact v1 string (the installed island validates it literally).
+      assert.equal(notch.schema, UI_THEME_SCHEMA_V1);
       for (const variant of ["light", "dark"] as Variant[])
         for (const [key, value] of Object.entries(notch[variant])) assert.match(value, /^#[0-9a-f]{6}$/, `${id}.${variant}.${key}`);
       for (const variant of ["light", "dark"] as Variant[]) {

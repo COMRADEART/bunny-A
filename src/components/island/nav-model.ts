@@ -20,6 +20,7 @@ export type ShellSheet =
   | "settings"
   | "provider"
   | "devices"
+  | "fabric"
   | "design-preview"
   | "phone"
   | "system"
@@ -48,6 +49,7 @@ export const NAV_VIEWS = [
   "models",
   "devices",
   "settings",
+  "server",
   "design-preview",
 ] as const;
 export type NavView = (typeof NAV_VIEWS)[number];
@@ -101,6 +103,8 @@ export const VIEW_ALIASES: Readonly<Record<string, ShellSheet>> = {
   activity: "activity",
   telemetry: "system",
   devices: "devices",
+  // E4: Server Control (the Device Fabric management surface) — deep-linkable, deliberately off the nav lists.
+  server: "fabric",
   projects: "project",
   project: "project",
   files: "files",
@@ -159,6 +163,8 @@ export function activeNavView(sheet: string | null | undefined): NavView {
     case "devices":
     case "phone":
       return "devices";
+    case "fabric":
+      return "server";
     default:
       return "chat";
   }

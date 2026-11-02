@@ -1,0 +1,83 @@
+/* M-E4 Server Control / Device Fabric — management layout over the themed tokens; nothing invented visually. */
+.fabric {
+  display: grid;
+  gap: var(--s4);
+}
+.fabric-head h2 {
+  margin-bottom: var(--s2);
+}
+.fabric-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--s3);
+  margin: var(--s3) 0 0;
+}
+.fabric-facts dt {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  text-transform: var(--eyebrow-case);
+  letter-spacing: var(--eyebrow-tracking);
+}
+.fabric-facts dd {
+  margin: 2px 0 0;
+  font-size: var(--text-body);
+}
+.fabric-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.fabric-table caption {
+  text-align: left;
+  color: var(--muted);
+  padding-bottom: var(--s2);
+}
+.fabric-table :is(th, td) {
+  text-align: left;
+  padding: var(--s2) var(--s2);
+  border-bottom: var(--bw) solid var(--border);
+  vertical-align: top;
+}
+.fabric-table thead th {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  text-transform: var(--eyebrow-case);
+  letter-spacing: var(--eyebrow-tracking);
+  font-weight: 650;
+}
+.fabric-table td[data-state="revoked"],
+.fabric-table td[data-state="expired"] {
+  color: var(--negative);
+}
+.fabric-table td[data-state="idle"] {
+  color: var(--muted);
+}
+.fabric-table td[data-state="active"] {
+  color: var(--positive);
+}
+.fabric-detail {
+  max-width: 56ch;
+  overflow-wrap: anywhere;
+}
+.fabric-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s3);
+  margin: var(--s3) 0 0;
+}
+.fabric-note small {
+  color: var(--muted);
+}
+.fabric-unavailable {
+  border-left: 3px solid var(--warning);
+  padding: var(--s2) var(--s3);
+  color: var(--muted);
+}
+.fabric-empty {
+  color: var(--muted);
+}
+.fabric h4 {
+  margin: var(--s4) 0 var(--s2);
+  font-family: var(--font-display);
+}

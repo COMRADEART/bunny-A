@@ -18,6 +18,7 @@ import {
   Moon,
   PenLine,
   RefreshCw,
+  Server,
   Settings2,
   ShieldCheck,
   Smartphone,
@@ -45,6 +46,7 @@ import { AgenticWorkspace } from "./agentic";
 import { ActivityRow } from "./activity";
 import { Settings } from "./settings";
 import { Pairing, Phone } from "./phone";
+import { FabricWorkspace } from "./fabric";
 import { Telemetry } from "./telemetry";
 import { useHostStream } from "./host-stream";
 import { filteredActivities, returnFocusTo, type ActivityFilters } from "./workspace-model";
@@ -124,6 +126,7 @@ const NAV_ICONS: Record<NavView, LucideIcon> = {
   settings: Settings2,
   models: Cpu,
   devices: Smartphone,
+  server: Server,
   "design-preview": Settings2,
 };
 
@@ -387,6 +390,8 @@ export function Island() {
               <Settings />
             ) : page === "devices" || page === "phone" ? (
               <DevicesWorkspace />
+            ) : page === "fabric" ? (
+              <FabricWorkspace now={now} freshness={freshness} />
             ) : page === "system" ? (
               <Telemetry />
             ) : page === "task" ? (

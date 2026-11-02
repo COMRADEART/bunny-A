@@ -136,7 +136,7 @@ test("VE2 every theme applies while all four Personal Agents own Missions, with 
       assert.equal(delegated.status, 200, JSON.stringify(delegated.body));
     }
     const initial = (await h.state()).body;
-    assert.equal(initial.uiTheme.schema, "bunny-a.ui-theme.v1");
+    assert.equal(initial.uiTheme.schema, "bunny-a.ui-theme.v2");
     assert.equal(initial.uiTheme.revision, 0);
     assert.equal(initial.uiTheme.preference.theme, "glass", "the system default is the accepted glass workspace");
     assert.ok(initial.personalAgentContext.slots.every((row: Body) => row.owned.length === 1), "all four Agents own a Mission");
@@ -158,7 +158,7 @@ test("VE2 every theme applies while all four Personal Agents own Missions, with 
     assert.deepEqual(authority(after), before, "no Mission, Agent, owner, profile, memory, identity or appearance fact changed");
     assert.deepEqual(lifecycle(directory).slice(0, history.length), history, "no lifecycle event was rewritten");
     assert.ok(lifecycle(directory).slice(history.length).every((type) => !/^(agent|mission|task|personal_agent)\./.test(type)), "no lifecycle event was caused by a theme change");
-    assert.deepEqual(after.uiTheme.preference, { theme: "swiss", variant: "dark", accent: "#0047ff", density: "compact", transparency: "low", highContrast: true });
+    assert.deepEqual(after.uiTheme.preference, { theme: "swiss", variant: "dark", accent: "#0047ff", density: "compact", transparency: "low", highContrast: true, glassIntensity: 85 });
     assert.ok(after.events.some((event: Body) => event.type === "appearance.theme" && /Workstation theme: Swiss Design \(revision 23\)\./.test(event.detail)));
 
     const restarted = (await (await reboot()).state()).body;

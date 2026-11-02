@@ -350,3 +350,71 @@
     forced-color-adjust: none;
   }
 }
+
+/* ---- E1: the two built-in Liquid Glass defaults + the Glass Intensity slider ---- */
+.tg-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s3);
+}
+.tg-preset {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 6px;
+  min-width: 132px;
+  min-height: 64px;
+  padding: var(--s3) var(--s4);
+  border: var(--bw, 1px) solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--field);
+  color: var(--fg);
+  cursor: pointer;
+  transition: border-color var(--quick) var(--ease), box-shadow var(--quick) var(--ease);
+}
+.tg-preset[aria-pressed="true"] {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+.tg-preset:disabled {
+  cursor: default;
+}
+.tg-preset-well {
+  width: 72px;
+  height: 34px;
+  border-radius: var(--r-sm);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  /* Silver: a clear pane with a specular glint, not fog. */
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), transparent 55%),
+    linear-gradient(200deg, #dbe3f6, #f4f7fd);
+  box-shadow: 0 2px 6px rgba(30, 40, 80, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+.tg-preset[data-variant="dark"] .tg-preset-well {
+  border: 1px solid rgba(223, 230, 245, 0.28);
+  /* Graphite: the same clear pane with its own cool glint. */
+  background:
+    linear-gradient(180deg, rgba(223, 230, 245, 0.4), transparent 55%),
+    linear-gradient(200deg, #232b44, #0c101d);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(223, 230, 245, 0.14);
+}
+.tg-glass {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s3);
+}
+.tg-glass input[type="range"] {
+  width: 200px;
+  accent-color: var(--action);
+  cursor: pointer;
+}
+.tg-glass output {
+  font-variant-numeric: tabular-nums;
+  min-width: 4ch;
+  text-align: right;
+  color: var(--fg);
+}
+.tg-glass-note {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}

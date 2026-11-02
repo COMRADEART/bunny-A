@@ -220,11 +220,11 @@ function Set-BunnyTheme([bool]$Light) {
  $themedHeader=($null-ne$theme)-and($theme.Theme-ne'glass')-and(-not[Windows.SystemParameters]::HighContrast)
  foreach($key in @($script:bunnyHeaderDefaults.Keys)){$bunnyControls.Header.Resources[$key]=$(if($themedHeader-and$palette.ContainsKey($key)){New-BunnyBrush $palette[$key]}else{$script:bunnyHeaderDefaults[$key]})}
  foreach($key in $palette.Keys){$bunnyWindow.Resources[$key]=New-BunnyBrush $palette[$key]}
- $alpha=switch($bunnyPreferences.glass){'low'{250}'high'{218}default{238}};if([Windows.SystemParameters]::HighContrast){$alpha=255}
+ $alpha=Get-BunnyNotchGlassAlpha $(if($null-ne$theme){$theme.Glass}else{$null}) $(if($null-ne$theme){[int]$theme.Revision}else{0}) $bunnyPreferences.glass ([Windows.SystemParameters]::HighContrast);if([Windows.SystemParameters]::HighContrast){$alpha=255}
  $glass=$bunnyWindow.Resources['BunnyGlass'].Color;$glass.A=[byte]$alpha;$bunnyWindow.Resources['BunnyGlass']=[Windows.Media.SolidColorBrush]::new($glass)
  Set-BunnyGlassSurface
  foreach($key in $palette.Keys){$bunnyWindow.Resources[$key]=New-BunnyBrush $palette[$key]}
- $alpha=switch($bunnyPreferences.glass){'low'{250}'high'{218}default{238}};if([Windows.SystemParameters]::HighContrast){$alpha=255}
+ $alpha=Get-BunnyNotchGlassAlpha $(if($null-ne$theme){$theme.Glass}else{$null}) $(if($null-ne$theme){[int]$theme.Revision}else{0}) $bunnyPreferences.glass ([Windows.SystemParameters]::HighContrast);if([Windows.SystemParameters]::HighContrast){$alpha=255}
  $glass=$bunnyWindow.Resources['BunnyGlass'].Color;$glass.A=[byte]$alpha;$bunnyWindow.Resources['BunnyGlass']=[Windows.Media.SolidColorBrush]::new($glass)
  Set-BunnyGlassSurface
  if($bunnySnapshot){Draw-BunnyProviders}
@@ -466,7 +466,7 @@ function Set-BunnyGlassSurface {
  # Visual Experience 2.0: a non-glass theme draws its own material from validated #rrggbb tokens (no GPU effect either).
  $theme=$script:bunnyUiTheme
  if($null-ne$theme-and$theme.Theme-ne'glass'){
-  $alpha=switch($bunnyPreferences.glass){'low'{250}'high'{218}default{238}}
+  $alpha=Get-BunnyNotchGlassAlpha $theme.Glass $theme.Revision $bunnyPreferences.glass $false
   $p=Get-BunnyNotchPalette $theme ([bool]$script:bunnyLight) $alpha
   $fill=[Windows.Media.LinearGradientBrush]::new();$fill.StartPoint=[Windows.Point]::new(0,0);$fill.EndPoint=[Windows.Point]::new(0,1)
   [void]$fill.GradientStops.Add([Windows.Media.GradientStop]::new([Windows.Media.ColorConverter]::ConvertFromString($p.Fill),0))
@@ -477,13 +477,22 @@ function Set-BunnyGlassSurface {
   $bunnyControls.StripCapsule.Background=$fill;$bunnyControls.StripCapsule.BorderBrush=$stroke
   return
  }
+ # E2a: Glass Intensity (one 0-100 integer, default 85). A saved glass theme carries its intensity in the notch tokens;
+ # before that, the island's own lever maps (low=30, medium=85, high=100). At the default this reproduces today's exact
+ # stops (#24/#0A rim gradient, no tint stop); lower values thin the highlight toward a hairline, higher values brighten
+ # the rim and add a faint top sheen. High Contrast never reaches here (it returned above); no blur changes anywhere.
+ $glassIntensity=$(if($null-ne$theme-and$theme.Theme-eq'glass'-and$theme.Revision-gt0-and$null-ne$theme.Glass){$theme.Glass.Intensity}else{switch($bunnyPreferences.glass){'low'{30}'high'{100}default{85}}})
+ $rimTop=[byte][Math]::Round(255*[Math]::Max(0.04,[Math]::Min(0.35,0.141+(0.30*(($glassIntensity/100.0)-0.85)))))
+ $rimBottom=[byte][Math]::Round(255*[Math]::Max(0.02,[Math]::Min(0.09,0.039+(0.10*(($glassIntensity/100.0)-0.85)))))
+ $sheenTint=[byte][Math]::Round(255*[Math]::Max(0.0,[Math]::Min(0.30,0.35*(($glassIntensity/100.0)-0.85))))
  $fill=[Windows.Media.LinearGradientBrush]::new();$fill.StartPoint=[Windows.Point]::new(0,0);$fill.EndPoint=[Windows.Point]::new(0,1)
  [void]$fill.GradientStops.Add([Windows.Media.GradientStop]::new([Windows.Media.ColorConverter]::ConvertFromString('#EB1A1E2B'),0))
  [void]$fill.GradientStops.Add([Windows.Media.GradientStop]::new([Windows.Media.ColorConverter]::ConvertFromString('#EB07080D'),1))
+ if($sheenTint -gt 0){[void]$fill.GradientStops.Add([Windows.Media.GradientStop]::new([Windows.Media.ColorConverter]::ConvertFromString(('#{0:X2}FFFFFF' -f $sheenTint)),0.10))}
  $fill.Freeze()
  $stroke=[Windows.Media.LinearGradientBrush]::new();$stroke.StartPoint=[Windows.Point]::new(0,0);$stroke.EndPoint=[Windows.Point]::new(0,1)
- [void]$stroke.GradientStops.Add([Windows.Media.GradientStop]::new([Windows.Media.ColorConverter]::ConvertFromString('#24FFFFFF'),0))
- [void]$stroke.GradientStops.Add([Windows.Media.GradientStop]::new([Windows.Media.ColorConverter]::ConvertFromString('#0AFFFFFF'),1))
+ [void]$stroke.GradientStops.Add([Windows.Media.GradientStop]::new([Windows.Media.ColorConverter]::ConvertFromString(('#{0:X2}FFFFFF' -f $rimTop)),0))
+ [void]$stroke.GradientStops.Add([Windows.Media.GradientStop]::new([Windows.Media.ColorConverter]::ConvertFromString(('#{0:X2}FFFFFF' -f $rimBottom)),1))
  $stroke.Freeze()
  $bunnyControls.Glass.Background=$fill;$bunnyControls.Glass.BorderBrush=$stroke
  $bunnyControls.StripCapsule.Background=$fill;$bunnyControls.StripCapsule.BorderBrush=$stroke

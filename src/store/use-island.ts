@@ -1367,7 +1367,7 @@ export const useIsland = create<Island>((set, get) => {
     themePreview: null,
     deviceTheme: null,
     themeCache: null,
-    themeLink: { theme: null, variant: null },
+    themeLink: { theme: null, variant: null, glassIntensity: null },
     widgets: null,
     deviceWidgets: null,
     shownTheme: () => effectivePreference(themeInputs()),
@@ -1376,7 +1376,7 @@ export const useIsland = create<Island>((set, get) => {
       if (state.viewer?.kind === "device") {
         try {
           // A device's own look starts from what it follows, never from a preview or a ?uitheme= link.
-          const followed = effectivePreference({ ...themeInputs(), preview: null, link: { theme: null, variant: null } }).preference;
+          const followed = effectivePreference({ ...themeInputs(), preview: null, link: { theme: null, variant: null, glassIntensity: null } }).preference;
           const next = validateUiPreference(patch, state.deviceTheme ?? followed);
           set({ deviceTheme: next });
           try {
