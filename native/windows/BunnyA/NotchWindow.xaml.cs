@@ -261,6 +261,11 @@ public partial class NotchWindow : Window
         try
         {
             offline = false;
+            // E2b: parse this snapshot's uiTheme.notch (validated against the island's rules); a different key restyles.
+            var incoming = NotchTokens.From(root);
+            var nextKey = incoming?.Key;
+            tokens = incoming;
+            if (nextKey != tokenKey) { tokenKey = nextKey; ApplyTheme(); }
             string? activeTitle = null, activeState = null, activeId = null, activeKind = null;
             var hasApproval = false;
 
@@ -328,6 +333,9 @@ public partial class NotchWindow : Window
 
     private string? lastVoiceState;
     private int lastWorking;
+    // E2b: the Host's validated notch tokens; null = this notch keeps its local config theme (the fallback, unchanged).
+    private NotchTokens? tokens;
+    private string? tokenKey;
 
     /// <summary>Phase 3: a voice-only update (the measured level while capture is confirmed); agent chips are untouched.</summary>
     public void UpdateVoice(JsonElement voice)
@@ -572,7 +580,11 @@ public partial class NotchWindow : Window
         var config = ConfigService.Load();
         var (systemLight, systemTransparency) = WindowsPersonalization();
         HighContrast = config.NotchTheme == "HighContrast" || (config.NotchTheme is not ("Light" or "Dark") && SystemParameters.HighContrast);
-        var light = config.NotchTheme == "Light" || (config.NotchTheme == "System" && systemLight);
+        // E2b: a saved workstation variant (revision > 0, not "system") wins; then the notch's own setting; then
+        // Windows — the island's Get-BunnyThemeLight rule exactly.
+        var themed = tokens is { Revision: > 0 };
+        var light = tokens is { Revision: > 0 } forcedSet && forcedSet.Variant != "system" ? forcedSet.Variant == "light"
+            : config.NotchTheme == "Light" || (config.NotchTheme == "System" && systemLight);
         var opaque = HighContrast || config.ReducedTransparency || (config.NotchTheme == "System" && !systemTransparency);
         void Set(string key, Brush brush) => Resources[key] = brush;
         SolidColorBrush C(string hex) => new((Color)ColorConverter.ConvertFromString(hex));
@@ -586,23 +598,52 @@ public partial class NotchWindow : Window
             Set("NotchAttention", SystemColors.HighlightBrush); Set("NotchPositive", SystemColors.WindowTextBrush); Set("NotchNegative", SystemColors.WindowTextBrush);
             Set("NotchSurface", SystemColors.WindowBrush);
         }
-        else if (light)
+        else if (themed && tokens is { Revision: > 0 } themedSet)
         {
-            Set("NotchText", C("#141826")); Set("NotchMuted", C("#4A5268")); Set("NotchChip", C(opaque ? "#FFFFFFFF" : "#CCFFFFFF")); Set("NotchChipEdge", C("#B8C0D6"));
-            Set("NotchFocus", C("#2F45D8")); Set("NotchAccent", C("#3A4FE0")); Set("NotchAttention", C("#B87800")); Set("NotchPositive", C("#14804F")); Set("NotchNegative", C("#C42B31"));
-            Set("NotchSurface", opaque ? Surface("#FFF4F6FB", "#FFE9ECF5") : Surface("#E6FBFCFF", "#D9EEF1F8"));
+            // E2b: the Host's validated tokens replace text, muted, accent, chip fill/edge and the surface; the status
+            // colours keep their tested C# values (the same rule the island applies to a themed surface). The C#
+            // surface keeps its own translucency; the E1 glass block's sheen strength applies below (never a blur change).
+            string Tok(string key) => themedSet.Color(light, key);
+            string Alpha(string alpha, string hex) => "#" + alpha + hex[1..];
+            Set("NotchText", C(Tok("ink"))); Set("NotchMuted", C(Tok("muted")));
+            Set("NotchAccent", C(Tok("accent")));
+            Set("NotchChip", C(Alpha(opaque ? "FF" : "CC", Tok("fill"))));
+            Set("NotchChipEdge", C(Tok("stroke")));
+            Set("NotchSurface", opaque
+                ? Surface(Alpha("FF", Tok("fill")), Alpha("FF", Tok("fillEnd")))
+                : Surface(Alpha("E6", Tok("fill")), Alpha("D9", Tok("fillEnd"))));
+            NotchPlate.BorderBrush = themedSet.Glow ? C(Tok("glow")) : C(Tok("stroke"));
+            NotchPlate.CornerRadius = NotchBorder.CornerRadius = themedSet.Shape is "pill" or "capsule" ? new CornerRadius(999) : new CornerRadius(Math.Max(2, themedSet.Radius));
+            FontFamily = new FontFamily(themedSet.Font + ", Segoe UI");
         }
         else
         {
-            Set("NotchText", C("#EEF1FA")); Set("NotchMuted", C("#9AA3B8")); Set("NotchChip", C(opaque ? "#FF1C2438" : "#CC1C2438")); Set("NotchChipEdge", C("#36425F"));
-            Set("NotchFocus", C("#B9C6FF")); Set("NotchAccent", C("#6B7BFF")); Set("NotchAttention", C("#E5A000")); Set("NotchPositive", C("#22A06B")); Set("NotchNegative", C("#E5484D"));
-            Set("NotchSurface", opaque ? Surface("#FF1C2236", "#FF121726") : Surface("#E61C2236", "#D9121726"));
+            if (light)
+            {
+                Set("NotchText", C("#141826")); Set("NotchMuted", C("#4A5268")); Set("NotchChip", C(opaque ? "#FFFFFFFF" : "#CCFFFFFF")); Set("NotchChipEdge", C("#B8C0D6"));
+                Set("NotchFocus", C("#2F45D8")); Set("NotchAccent", C("#3A4FE0")); Set("NotchAttention", C("#B87800")); Set("NotchPositive", C("#14804F")); Set("NotchNegative", C("#C42B31"));
+                Set("NotchSurface", opaque ? Surface("#FFF4F6FB", "#FFE9ECF5") : Surface("#E6FBFCFF", "#D9EEF1F8"));
+            }
+            else
+            {
+                Set("NotchText", C("#EEF1FA")); Set("NotchMuted", C("#9AA3B8")); Set("NotchChip", C(opaque ? "#FF1C2438" : "#CC1C2438")); Set("NotchChipEdge", C("#36425F"));
+                Set("NotchFocus", C("#B9C6FF")); Set("NotchAccent", C("#6B7BFF")); Set("NotchAttention", C("#E5A000")); Set("NotchPositive", C("#22A06B")); Set("NotchNegative", C("#E5484D"));
+                Set("NotchSurface", opaque ? Surface("#FF1C2236", "#FF121726") : Surface("#E61C2236", "#D9121726"));
+            }
+            // Returning to the local look puts back everything a themed set had replaced.
+            NotchPlate.BorderBrush = (Brush)FindResource("NotchChipEdge");
+            NotchPlate.CornerRadius = NotchBorder.CornerRadius = new CornerRadius(24);
+            FontFamily = new FontFamily("Segoe UI");
         }
         NotchSheen.Visibility = opaque ? Visibility.Collapsed : Visibility.Visible;
+        // E1: the glass intensity's sheen strength while glass renders (themed and not opaque); the local look keeps 1.
+        NotchSheen.Opacity = !opaque && tokens is { Revision: > 0 } glassSet && glassSet.Glass is { } glassTokens ? glassTokens.SheenAlpha : 1.0;
         NotchPlate.Effect = HighContrast ? null : new DropShadowEffect { BlurRadius = 22, ShadowDepth = 3, Direction = 270, Color = Colors.Black, Opacity = light ? 0.22 : 0.45 };
-        NotchBorder.BorderThickness = NotchPlate.BorderThickness = new Thickness(HighContrast ? 2 : 1);
-        // Readable by UI Automation, so acceptance can check which fallback is active.
-        System.Windows.Automation.AutomationProperties.SetItemStatus(this, $"theme={(HighContrast ? "high-contrast" : light ? "light" : "dark")};opaque={opaque.ToString().ToLowerInvariant()};reducedMotion={ReducedMotion.ToString().ToLowerInvariant()}");
+        var thickness = HighContrast ? 2 : tokens is { Revision: > 0 } borderedSet ? Math.Max(1, Math.Min(4, borderedSet.Border)) : 1;
+        NotchBorder.BorderThickness = NotchPlate.BorderThickness = new Thickness(thickness);
+        // Readable by UI Automation, so acceptance can read which theme source is active.
+        System.Windows.Automation.AutomationProperties.SetItemStatus(this,
+            $"theme={(themed ? tokens!.Theme : HighContrast ? "high-contrast" : light ? "light" : "dark")};opaque={opaque.ToString().ToLowerInvariant()};reducedMotion={ReducedMotion.ToString().ToLowerInvariant()};tokens={(themed ? "host" : "local")}");
         chipSignature = ""; // brushes captured by running animations are rebuilt with the new palette
         RenderChips(chips);
         RequestSnapshot();
