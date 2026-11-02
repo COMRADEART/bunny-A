@@ -4,7 +4,8 @@ import {
   type UiThemePreference, type UiThemeView,
 } from "./ui-theme.ts";
 
-const MIGRATION = "bunny-a.ui-theme.v1";
+/** Versioned migrations of the one theme row: v1 introduced the store; v2 (E1) added glassIntensity with default 85. */
+const MIGRATIONS = ["bunny-a.ui-theme.v1", "bunny-a.ui-theme.v2"] as const;
 
 /**
  * Visual Experience 2.0: the workstation's UI theme preference. One versioned row, kept apart from every execution table:
@@ -17,7 +18,7 @@ export class UiThemeStore {
   constructor(db: HostDatabase) {
     this.db = db;
     db.db.exec("CREATE TABLE IF NOT EXISTS ui_theme_preference(id INTEGER PRIMARY KEY CHECK(id=1),value TEXT NOT NULL,revision INTEGER NOT NULL,updated_at INTEGER NOT NULL)");
-    db.db.prepare("INSERT OR IGNORE INTO migrations(key) VALUES (?)").run(MIGRATION);
+    for (const migration of MIGRATIONS) db.db.prepare("INSERT OR IGNORE INTO migrations(key) VALUES (?)").run(migration);
   }
   private row(): { value: string; revision: number } | undefined {
     return this.db.db.prepare("SELECT value,revision FROM ui_theme_preference WHERE id=1").get() as { value: string; revision: number } | undefined;
@@ -26,7 +27,13 @@ export class UiThemeStore {
     const row = this.row();
     if (!row) return { preference: { ...DEFAULT_UI_PREFERENCE }, revision: 0 };
     try {
-      return { preference: parseUiPreference(JSON.parse(row.value)), revision: row.revision };
+      const raw = JSON.parse(row.value) as Record<string, unknown> | null;
+      const preference = parseUiPreference(raw);
+      // Lazy v1→v2 migration (E1): same choice, glassIntensity gains its default, revision untouched, no event written.
+      if (raw && typeof raw === "object" && raw.schema !== UI_THEME_SCHEMA) {
+        this.db.db.prepare("UPDATE ui_theme_preference SET value=? WHERE id=1").run(JSON.stringify({ schema: UI_THEME_SCHEMA, ...preference }));
+      }
+      return { preference, revision: row.revision };
     } catch {
       return { preference: { ...DEFAULT_UI_PREFERENCE }, revision: row.revision };
     }

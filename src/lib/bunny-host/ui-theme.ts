@@ -9,7 +9,16 @@
  * user-supplied value that reaches styling (an accent colour) is a strict #rrggbb string checked for contrast first.
  */
 
-export const UI_THEME_SCHEMA = "bunny-a.ui-theme.v1";
+export const UI_THEME_SCHEMA = "bunny-a.ui-theme.v2";
+/**
+ * The previous preference schema, still readable (no user choice is lost); it is also the native Notch's exact-match
+ * token string — the installed island validates that literal (install/Bunny-Island.Theme.ps1) and silently ignores unknown
+ * keys, so the notch token channel keeps its spelling and its v1 semantics. E1 (Glass Intensity) splits the two constants.
+ */
+export const UI_THEME_SCHEMA_V1 = "bunny-a.ui-theme.v1";
+export const NOTCH_THEME_SCHEMA = UI_THEME_SCHEMA_V1;
+/** Every preference schema this build accepts: the writer stamps UI_THEME_SCHEMA, older v1 rows parse in unchanged. */
+export const PREFERENCE_SCHEMAS = [UI_THEME_SCHEMA, UI_THEME_SCHEMA_V1] as const;
 
 export const UI_THEME_IDS = [
   "clay", "cybercore", "brutalism", "scrapbook", "surreal", "y2k", "pixel", "synthwave", "glass", "neumorph", "bento",
@@ -809,6 +818,12 @@ export type UiThemePreference = {
   density: DensityChoice;
   transparency: Transparency;
   highContrast: boolean;
+  /**
+   * Glass Intensity 0–100 (default 85): rim, sheen, refraction and depth decoration for glass materials, by fixed
+   * deterministic formulas. It is never a blur control — blur stays owned by `transparency` — and no value here is
+   * read by an authorization path.
+   */
+  glassIntensity: number;
 };
 export const DEFAULT_UI_PREFERENCE: UiThemePreference = Object.freeze({
   theme: DEFAULT_UI_THEME,
@@ -817,9 +832,10 @@ export const DEFAULT_UI_PREFERENCE: UiThemePreference = Object.freeze({
   density: "theme",
   transparency: "medium",
   highContrast: false,
+  glassIntensity: 85,
 }) as UiThemePreference;
 
-const PREFERENCE_KEYS = new Set(["theme", "variant", "accent", "density", "transparency", "highContrast"]);
+const PREFERENCE_KEYS = new Set(["theme", "variant", "accent", "density", "transparency", "highContrast", "glassIntensity"]);
 const HEX = /^#[0-9a-f]{6}$/i;
 
 /** Strict: unknown keys or values are refused, never coerced. Missing keys keep the current value. */
@@ -849,6 +865,11 @@ export function validateUiPreference(input: unknown, current: UiThemePreference 
     if (!(TRANSPARENCIES as readonly unknown[]).includes(record.transparency)) throw new Error("Unsupported transparency.");
     next.transparency = record.transparency as Transparency;
   }
+  if ("glassIntensity" in record) {
+    if (typeof record.glassIntensity !== "number" || !Number.isInteger(record.glassIntensity) || record.glassIntensity < 0 || record.glassIntensity > 100)
+      throw new Error("Glass intensity must be a whole number from 0 to 100.");
+    next.glassIntensity = record.glassIntensity;
+  }
   if ("highContrast" in record) {
     if (typeof record.highContrast !== "boolean") throw new Error("High contrast must be true or false.");
     next.highContrast = record.highContrast;
@@ -861,7 +882,7 @@ export function parseUiPreference(input: unknown): UiThemePreference {
   try {
     const record = input as Record<string, unknown> | null;
     if (record && typeof record === "object" && "schema" in record) {
-      if (record.schema !== UI_THEME_SCHEMA) return { ...DEFAULT_UI_PREFERENCE };
+      if (!(PREFERENCE_SCHEMAS as readonly unknown[]).includes(record.schema)) return { ...DEFAULT_UI_PREFERENCE };
       const { schema: _schema, ...rest } = record;
       return validateUiPreference(rest);
     }
@@ -909,6 +930,102 @@ export function accentInk(accent: string): string | null {
 }
 export const accentUsable = (accent: string) => HEX.test(accent) && accentInk(accent) !== null;
 
+// -------------------------------------------------------------------------------------------------- Glass Intensity
+/**
+ * The approved Glass Intensity mapping (E1): one bounded integer (0–100, default 85) drives rim, specular sheen,
+ * edge refraction and shadow depth for the glass material, by fixed linear formulas — clear glass, restrained blur.
+ * The ideal values are published in docs/ux/BUNNY_A_MASTER_UX_DESIGN.md §4.3; the clear term is the only one a clamp
+ * may reduce, and it never renders a surface under the 4.5:1 rule.
+ */
+export type GlassTokens = {
+  /** The clamped, whole intensity that produced the rest of the tokens. */
+  intensity: number;
+  rim: string;
+  sheen: string;
+  refraction: string;
+  depth: number;
+  /** The panel-alpha reduction actually applied after the contrast clamp: 0..0.06, 0 when decoration is limited. */
+  clear: number;
+  /** The rim/sheen glint colour for the resolved appearance. */
+  rimColor: string;
+  /** High contrast or reduced transparency renders glass solid; the stored preference is retained and explained. */
+  limited: boolean;
+};
+/** Rim/sheen glints for the two Liquid Glass appearances (Silver = light, Graphite = dark; cool white glints graphite). */
+export const GLASS_RIM_COLORS: Record<Variant, string> = { light: "#ffffff", dark: "#dfe6f5" };
+/** The stored value, clamped defensively (validation already bounds it, tests and fixtures may not). */
+export const glassIntensityOf = (preference: UiThemePreference): number =>
+  Math.max(0, Math.min(100, Math.round(preference.glassIntensity)));
+
+const round3 = (value: number) => Math.round(value * 1000) / 1000;
+
+export function glassMaterialTokens(preference: UiThemePreference, palette: Palette, variant: Variant, solidMaterial: boolean): GlassTokens {
+  const i = glassIntensityOf(preference) / 100;
+  const tokens: GlassTokens = {
+    intensity: Math.round(i * 100),
+    rim: `${round3((0.3 + 0.7 * i) * 100)}%`,
+    sheen: `${round3((0.18 + 0.62 * i) * 100)}%`,
+    refraction: `${round3(1 + 3 * i)}px`,
+    depth: Math.round((0.55 + 0.65 * i) * 10000) / 10000,
+    clear: 0,
+    rimColor: GLASS_RIM_COLORS[variant],
+    limited: solidMaterial,
+  };
+  if (solidMaterial) return tokens;
+  // The clear term lightens the main panel; it must keep fg and muted at 4.5:1 composited over page and both washes.
+  const page = solid(palette.page);
+  const panel = parseColor(palette.panel);
+  if (!panel) return tokens;
+  const backdrops = [
+    page,
+    over(parseColor(palette.washA)!, page),
+    over(parseColor(palette.washB)!, page),
+  ];
+  let clear = round3(0.06 * i);
+  while (clear > 0.0005) {
+    const surface = over({ rgb: panel.rgb, alpha: panel.alpha - clear }, page);
+    const overWash = backdrops.map((base) => over({ rgb: panel.rgb, alpha: panel.alpha - clear }, base));
+    const surfaces = [surface, ...overWash];
+    const readable = surfaces.every((s) =>
+      contrast(parseColor(palette.fg)!.rgb, s) >= 4.5 && contrast(parseColor(palette.muted)!.rgb, s) >= 4.5,
+    );
+    if (readable) break;
+    clear = round3(clear - 0.01);
+  }
+  tokens.clear = clear;
+  return tokens;
+}
+
+/** The cleared panel colour for the resolved intensity: --panel and --glass take it; fields and elevated values keep theirs. */
+function panelWithClear(palette: Palette, clear: number): Palette {
+  if (clear <= 0) return palette;
+  const parsed = parseColor(palette.panel);
+  if (!parsed) return palette;
+  const alpha = Math.max(0, parsed.alpha - clear);
+  const panel = `rgba(${parsed.rgb[0]}, ${parsed.rgb[1]}, ${parsed.rgb[2]}, ${round3(alpha)})`;
+  return { ...palette, panel };
+}
+
+/** Scales each layer's px lengths of one CSS box-shadow by the glass depth — glass themes only; anything unparseable passes through. */
+export function scaledGlassShadow(shadow: string, depth: number): string {
+  if (shadow === "none" || depth === 1) return shadow;
+  const layers: string[] = [];
+  let buffer = "";
+  let parens = 0;
+  for (const character of shadow) {
+    if (character === "(") parens += 1;
+    if (character === ")") parens -= 1;
+    if (character === "," && parens === 0) {
+      layers.push(buffer);
+      buffer = "";
+    } else buffer += character;
+  }
+  if (buffer.trim()) layers.push(buffer);
+  return layers
+    .map((layer) => layer.trim().replace(/(-?\d+(?:\.\d+)?)px/g, (match, value) => `${Math.round(parseFloat(value) * depth * 10) / 10}px`))
+    .join(", ");
+}
+
 // ------------------------------------------------------------------------------------------------------------ resolve
 export type ResolvedTheme = {
   manifest: ThemeManifest;
@@ -916,6 +1033,8 @@ export type ResolvedTheme = {
   palette: Palette;
   preference: UiThemePreference;
   density: Exclude<DensityChoice, "theme">;
+  /** Glass Intensity decoration for the glass material; null for every other material. */
+  glass: GlassTokens | null;
   /** Notes when part of the preference was not applied (for example an accent that fails on this theme's page). */
   notes: string[];
 };
@@ -950,7 +1069,10 @@ export function resolveTheme(preference: UiThemePreference, systemDark = false):
   const variant = resolveVariant(manifest, preference.variant, systemDark);
   let palette = manifest.palettes[variant] ?? manifest.palettes[manifest.defaultVariant]!;
   const notes: string[] = [];
+  const solidMaterial = preference.highContrast || preference.transparency === "low";
   if (preference.transparency === "low") palette = { ...palette, panel: palette.panelSolid };
+  const glass = manifest.material === "glass" ? glassMaterialTokens(preference, palette, variant, solidMaterial) : null;
+  if (glass && glass.clear > 0) palette = panelWithClear(palette, glass.clear);
   if (preference.accent) {
     const ink = accentInk(preference.accent);
     const page = solid(palette.page);
@@ -962,7 +1084,7 @@ export function resolveTheme(preference: UiThemePreference, systemDark = false):
   }
   if (preference.highContrast) palette = highContrastPalette(palette);
   const density = preference.density === "theme" ? manifest.geometry.density : preference.density;
-  return { manifest, variant, palette, preference, density, notes };
+  return { manifest, variant, palette, preference, density, glass, notes };
 }
 
 // Glass keeps its accepted uppercase context labels; the others are styles built on tracked capitals.
@@ -1048,10 +1170,21 @@ export function themeCssVars(resolved: ResolvedTheme): Record<string, string> {
     "--focus": p.focus,
     "--disabled": p.muted,
     "--decor": p.decor,
-    "--shadow": p.shadow,
-    "--raised-shadow": p.raisedShadow,
+    "--shadow": resolved.glass && resolved.glass.depth !== 1 ? scaledGlassShadow(p.shadow, resolved.glass.depth) : p.shadow,
+    "--raised-shadow": resolved.glass && resolved.glass.depth !== 1 ? scaledGlassShadow(p.raisedShadow, resolved.glass.depth) : p.raisedShadow,
     "--blur": px(blur),
     "--glass-saturate": blur ? "150%" : "100%",
+    // Glass Intensity (E1): decoration tokens for the glass material. Blur stays owned by transparency — no var here touches it.
+    ...(resolved.glass
+      ? {
+          "--glass-intensity": String(resolved.glass.intensity),
+          "--glass-rim": resolved.glass.rim,
+          "--glass-rim-color": resolved.glass.rimColor,
+          "--glass-sheen": resolved.glass.sheen,
+          "--glass-refract": resolved.glass.refraction,
+          "--glass-depth": String(resolved.glass.depth),
+        }
+      : {}),
     // The phone companion's own token names (phone.css), from the same palette.
     "--pc-bg": p.page,
     "--pc-wash": `radial-gradient(120% 60% at 12% -8%, ${p.washA}, transparent 60%), radial-gradient(90% 50% at 100% 0%, ${p.washB}, transparent 60%)`,
@@ -1093,13 +1226,16 @@ export function themeAttributes(resolved: ResolvedTheme): Record<string, string>
     "data-density": resolved.density,
     "data-hc": String(resolved.preference.highContrast),
     "data-transparency": resolved.preference.transparency,
+    "data-glass-intensity": String(glassIntensityOf(resolved.preference)),
+    ...(resolved.glass?.limited ? { "data-glass-limited": "true" } : {}),
   };
 }
 
 // -------------------------------------------------------------------------------------------------------------- Notch
 export type NotchColors = { fill: string; fillEnd: string; stroke: string; ink: string; muted: string; accent: string; accentInk: string; glow: string };
 export type NotchTheme = {
-  schema: typeof UI_THEME_SCHEMA;
+  /** The island validates this literal (install/Bunny-Island.Theme.ps1) — the notch token channel stays v1-keyed. */
+  schema: typeof NOTCH_THEME_SCHEMA;
   theme: UiThemeId;
   name: string;
   shape: NotchShape;
@@ -1108,6 +1244,8 @@ export type NotchTheme = {
   glow: boolean;
   font: NotchFont;
   highContrast: boolean;
+  /** Glass Intensity (E1), additive and informational: v1-key-tolerant island readers simply ignore it until E2 adopts it. */
+  glass: { intensity: number; rimAlpha: number; sheenAlpha: number };
   /** Both appearances, so the Notch can follow Windows' own light/dark choice when the user picked "system". */
   light: NotchColors;
   dark: NotchColors;
@@ -1133,8 +1271,9 @@ const notchColors = (p: Palette): NotchColors => {
 export function notchTheme(preference: UiThemePreference): NotchTheme {
   const m = themeManifest(preference.theme);
   const pick = (variant: Variant) => resolveTheme({ ...preference, variant }, variant === "dark").palette;
+  const i = glassIntensityOf(preference) / 100;
   return {
-    schema: UI_THEME_SCHEMA,
+    schema: NOTCH_THEME_SCHEMA,
     theme: m.id,
     name: m.name,
     shape: m.notch.shape,
@@ -1143,6 +1282,7 @@ export function notchTheme(preference: UiThemePreference): NotchTheme {
     glow: m.notch.glow && !preference.highContrast,
     font: m.notch.font,
     highContrast: preference.highContrast,
+    glass: { intensity: Math.round(i * 100), rimAlpha: round3(0.3 + 0.7 * i), sheenAlpha: round3(0.18 + 0.62 * i) },
     light: notchColors(pick("light")),
     dark: notchColors(pick("dark")),
     variant: preference.variant,
