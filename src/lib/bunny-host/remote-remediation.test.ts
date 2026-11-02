@@ -24,7 +24,9 @@ function record(name: string, value: unknown) {
   writeFileSync(join(directory, `${name}.json`), JSON.stringify(value, null, 2) + "\n");
 }
 async function until<T>(check: () => Promise<T | false | undefined>, label: string): Promise<T> {
-  const deadline = Date.now() + 15000;
+  // Each wait may include a full Host restart plus recovery; a loaded CI runner has shown single waits
+  // far beyond 15s (yesterday's sibling: 41.9s), so the budget matches the same 30s class as execution-scope.
+  const deadline = Date.now() + 30000;
   do { const result = await check(); if (result) return result; await new Promise(resolve => setTimeout(resolve, 25)); } while (Date.now() < deadline);
   throw new Error(`Timed out: ${label}`);
 }
@@ -486,7 +488,7 @@ test("T9R DEV-01: a device-approved local tool-free task is never rerouted to a 
     // SIMULATED AUTO outcome: the task sits on the local candidate of its own recorded order (a selection a device may launch).
     db.write({ ...db.get(submitted.id), provider: "ollama", model: "qwen3:8b" }, "routing.fixture", "T9R fixture: AUTO selected the local candidate.");
     tasks.approve(submitted.id, by);
-    const deadline = Date.now() + 8000;
+    const deadline = Date.now() + 30000; // same loaded-CI class as the helper above: three transitions per wait budget
     while (!launched.length && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 10));
     // A refused duplicate workstation approve must not clear the device marker.
     assert.throws(() => tasks.approve(submitted.id, "workstation"), /not awaiting approval/);
