@@ -82,6 +82,9 @@ Run-Checked 'javac' @('--release','8','-encoding','UTF-8','-d',$tests,(Join-Path
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.ChatTurnTest')
 Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $workspace 'android/tests/ManifestLauncherTest.java'))
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.ManifestLauncherTest',(Join-Path $sourceDirectory 'AndroidManifest.xml'))
+# E3-A: the device-local appearance model (strict schema reads, the published Glass Intensity mapping, fixed palettes).
+Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/CompanionAppearance.java'),(Join-Path $workspace 'android/tests/CompanionAppearanceTest.java'))
+Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.CompanionAppearanceTest')
 # MA5-S1: the core journeys are native. The compiled app must not reference android.webkit at all.
 $dexBytes = [IO.File]::ReadAllBytes((Join-Path $dex 'classes.dex'))
 if ([Text.Encoding]::ASCII.GetString($dexBytes).Contains('Landroid/webkit/')) { throw 'classes.dex references android.webkit; the companion must not depend on a WebView.' }

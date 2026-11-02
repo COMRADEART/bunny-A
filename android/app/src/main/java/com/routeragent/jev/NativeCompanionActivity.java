@@ -3,6 +3,7 @@ package com.routeragent.jev;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.SharedPreferences;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -19,6 +20,7 @@ import android.os.Looper;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.SeekBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import org.json.JSONArray;
@@ -31,9 +33,12 @@ import java.util.concurrent.Executors;
 
 /** Native Android companion: supervises the workstation over HTTPS. No consequential approval or shell authority. */
 public final class NativeCompanionActivity extends Activity {
-    private static final int BG=Color.rgb(11,16,27), PANEL=Color.rgb(25,32,45), ELEVATED=Color.rgb(34,42,58),
-            FG=Color.rgb(237,242,250), MUTED=Color.rgb(164,179,201), ACCENT=Color.rgb(121,170,255),
-            WARN=Color.rgb(240,207,143), DANGER=Color.rgb(255,164,168), SUCCESS=Color.rgb(134,232,171);
+    // E3-A: the resolved device-local appearance feeds every tint on this screen. It is kept on this device only and
+    // never reaches the workstation; nothing here is read by any authorization path.
+    private int BG, PANEL, ELEVATED, FG, MUTED, ACCENT, WARN, DANGER, SUCCESS;
+    private int rimStroke, washWarn, washAccent, washDanger, navBg;
+    private CompanionAppearance appearance = CompanionAppearance.DEFAULT;
+    private CompanionAppearance.Palette palette = CompanionAppearance.Palette.GRAPHITE;
 
     // Reads and commands run on separate threads so Stop never waits behind a state request.
     private final ExecutorService reads=Executors.newSingleThreadExecutor();
@@ -71,6 +76,7 @@ public final class NativeCompanionActivity extends Activity {
         // started by an earlier screen can no longer report here, so it becomes "outcome unknown" (Book.interrupted).
         if(chat==null) chat=ChatTurn.Book.decode(chatStore.getString("turns",null)); else chat.interrupted();
         saveChat();
+        applyAppearance();
         root=new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(BG);
         root.setOnApplyWindowInsetsListener((view,insets) -> {
             if(Build.VERSION.SDK_INT>=30) Insets30.apply(view,insets);
@@ -107,6 +113,120 @@ public final class NativeCompanionActivity extends Activity {
             android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout() | WindowInsets.Type.ime());
             view.setPadding(bars.left,bars.top,bars.right,bars.bottom);
         }
+    }
+
+    // ==========================================
+    // APPEARANCE (E3-A: the phone keeps its own look on this device; never the workstation's, never authority-bearing)
+    // ==========================================
+
+    /** The stored row, or the factory default when nothing is saved or the row is damaged/foreign. */
+    private CompanionAppearance appearanceStored() {
+        return CompanionAppearance.parse(getSharedPreferences(CompanionAppearance.PREF_FILE, MODE_PRIVATE).getString(CompanionAppearance.PREF_KEY, null));
+    }
+
+    /** "System" follows this phone's own dark mode; light and dark are explicit. */
+    private boolean darkNow() {
+        return (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+    }
+
+    private void applyAppearance() {
+        appearance = appearanceStored();
+        boolean dark = darkNow();
+        palette = dark ? CompanionAppearance.Palette.GRAPHITE : CompanionAppearance.Palette.SILVER;
+        int intensity = appearance.glassIntensity();
+        BG = palette.page;
+        // Panels are glass (the workstation's own translucency) carrying the intensity's clear term. The committed
+        // phone was a single opaque dark look; this phase gives it the two glass appearances (disclosed in the PR).
+        PANEL = CompanionAppearance.panelWithClear(palette.panel, intensity);
+        ELEVATED = palette.elevated;
+        FG = palette.fg;
+        MUTED = palette.muted;
+        ACCENT = palette.accent;
+        WARN = palette.warn;
+        DANGER = palette.danger;
+        SUCCESS = palette.success;
+        rimStroke = CompanionAppearance.rimStroke(intensity, palette.rim);
+        washWarn = palette.washWarn;
+        washAccent = palette.washAccent;
+        washDanger = palette.washDanger;
+        navBg = palette.panelSolid;
+    }
+
+    /** Persists the whole row (schema included, so a future version can migrate), then re-resolves the look. */
+    private void saveAppearance(CompanionAppearance value) {
+        appearance = value;
+        getSharedPreferences(CompanionAppearance.PREF_FILE, MODE_PRIVATE)
+                .edit()
+                .putString(CompanionAppearance.PREF_KEY,
+                        "{\"schema\":\"" + CompanionAppearance.SCHEMA + "\",\"variant\":\"" + value.variant()
+                                + "\",\"glassIntensity\":" + value.glassIntensity() + "}")
+                .apply();
+        applyAppearance();
+    }
+
+    private void appearanceSection(LinearLayout body) {
+        LinearLayout looks=new LinearLayout(this);
+        looks.setOrientation(LinearLayout.VERTICAL);
+        looks.setBackground(surface(PANEL, 10));
+        looks.setPadding(dp(14), dp(12), dp(14), dp(14));
+        TextView heading=text("Appearance (this device)", 15, FG);
+        heading.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        if(Build.VERSION.SDK_INT>=28) heading.setAccessibilityHeading(true);
+        looks.addView(heading);
+        looks.addView(text("This phone's look, kept on this device. It never changes the workstation's theme.", 12, MUTED));
+
+        LinearLayout variants=new LinearLayout(this);
+        variants.setOrientation(LinearLayout.HORIZONTAL);
+        String[] names= {"system","light","dark"};
+        String[] labels= {"System","Light","Dark"};
+        for (int i=0;i<3;i++) {
+            final String name=names[i];
+            boolean chosen=appearance.variant().equals(name);
+            Button choice=new Button(this);
+            choice.setText(labels[i]);
+            choice.setAllCaps(false);
+            choice.setMinHeight(dp(48));
+            choice.setTextSize(13);
+            choice.setTextColor(chosen?palette.onAccent:FG);
+            choice.setBackground(surface(chosen?ACCENT:Color.TRANSPARENT, 8));
+            choice.setSelected(chosen);
+            choice.setContentDescription("Appearance " + labels[i] + ("system".equals(name) ? ", follows this phone's dark mode" : "") + (chosen ? ", selected" : ""));
+            choice.setOnClickListener(v -> {
+                if(!appearance.variant().equals(name)) {
+                    saveAppearance(CompanionAppearance.of(name, appearance.glassIntensity()));
+                    renderCurrentTab(true);
+                }
+            });
+            variants.addView(choice, new LinearLayout.LayoutParams(0, -2, 1f));
+        }
+        add(looks, variants, 10);
+
+        TextView label=text("Glass intensity  ·  rim, panel clearness, reflection strength. It is not a blur control; blur is unchanged.", 12, FG);
+        add(looks, label, 12);
+        final TextView live=text(appearance.glassIntensity() + "%", 13, ACCENT);
+        SeekBar seek=new SeekBar(this);
+        seek.setMax(100);
+        seek.setProgress(appearance.glassIntensity());
+        seek.setContentDescription("Glass intensity " + appearance.glassIntensity() + " percent of 100");
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int value, boolean fromUser) {
+                int bounded=Math.max(0,Math.min(100,value));
+                live.setText(bounded + "%");
+                bar.setContentDescription("Glass intensity " + bounded + " percent of 100");
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+            // Commit on release only: one row write per adjustment, like the workstation slider.
+            @Override public void onStopTrackingTouch(SeekBar bar) {
+                int value=Math.max(0,Math.min(100,bar.getProgress()));
+                if(value!=appearance.glassIntensity()) {
+                    CompanionAppearance next=CompanionAppearance.of(appearance.variant(), value);
+                    if(next!=null) { saveAppearance(next); renderCurrentTab(true); }
+                }
+            }
+        });
+        add(looks, seek, 6);
+        add(looks, live, 2);
+        add(body, looks, 14);
     }
 
     // ==========================================
@@ -212,6 +332,8 @@ public final class NativeCompanionActivity extends Activity {
         GradientDrawable d=new GradientDrawable();
         d.setColor(color);
         d.setCornerRadius(dp(radiusDp));
+        // E3-A: the glass edge - a 1 dp rim whose strength is the intensity's own rim term. Never a blur change.
+        d.setStroke(dp(1), rimStroke);
         return d;
     }
 
@@ -236,7 +358,7 @@ public final class NativeCompanionActivity extends Activity {
         b.setAllCaps(false);
         b.setMinHeight(dp(48));
         b.setTextSize(15);
-        b.setTextColor(primary?BG:FG);
+        b.setTextColor(primary?palette.onAccent:FG);
         b.setBackground(surface(primary?ACCENT:PANEL));
         b.setOnClickListener(action);
         return b;
@@ -272,7 +394,7 @@ public final class NativeCompanionActivity extends Activity {
     private View createBottomNavigation() {
         LinearLayout nav=new LinearLayout(this);
         nav.setOrientation(LinearLayout.HORIZONTAL);
-        nav.setBackgroundColor(Color.rgb(18, 24, 36));
+        nav.setBackgroundColor(navBg);
         nav.setPadding(dp(8), dp(6), dp(8), dp(6));
         nav.addView(createNavItem("📋 Tasks", "Tasks", 0), new LinearLayout.LayoutParams(0, dp(52), 1f));
         nav.addView(createNavItem("💬 Chat", "Chat", 1), new LinearLayout.LayoutParams(0, dp(52), 1f));
@@ -407,7 +529,7 @@ public final class NativeCompanionActivity extends Activity {
         b.setTextSize(13);
         b.setMinHeight(dp(48));
         b.setTextColor(color);
-        b.setBackground(surface(Color.rgb(44, 20, 24), 6));
+        b.setBackground(surface(washDanger, 6));
         b.setOnClickListener(action);
         return b;
     }
@@ -421,7 +543,7 @@ public final class NativeCompanionActivity extends Activity {
         LinearLayout body=page("Supervised Work");
         statusView=text(statusLine(), 12, lastFailure==null ? MUTED : WARN);
         add(body, statusView, 6);
-        banner(body, "🛡️ Workstation authority", "Approvals, file changes and tools are decided on Windows. This phone can watch and stop work.", WARN, Color.rgb(38, 30, 20));
+        banner(body, "🛡️ Workstation authority", "Approvals, file changes and tools are decided on Windows. This phone can watch and stop work.", WARN, washWarn);
 
         int approvals=0;
         JSONArray missions=snapshot.optJSONObject("missions")==null ? null : snapshot.optJSONObject("missions").optJSONArray("missions");
@@ -463,7 +585,7 @@ public final class NativeCompanionActivity extends Activity {
             addCard(body, prompt.length()>80 ? prompt.substring(0,80) + "…" : prompt, detail, stoppable ? "stop" : null, t.optString("id"));
             shown++;
         }
-        if(approvals>0) banner(body, "⚖️ " + approvals + " waiting for approval", "Open Bunny A on Windows to review and decide.", ACCENT, Color.rgb(36, 46, 68));
+        if(approvals>0) banner(body, "⚖️ " + approvals + " waiting for approval", "Open Bunny A on Windows to review and decide.", ACCENT, washAccent);
         if(shown==0) add(body, text("No missions or tasks on the workstation.", 14, FG), 20);
         add(body, button("Refresh Now", true, v -> schedulePoll(0)), 20);
     }
@@ -590,7 +712,7 @@ public final class NativeCompanionActivity extends Activity {
     private LinearLayout bubble(String sender, String body, boolean user, String label, int labelColor) {
         LinearLayout bubble=new LinearLayout(this);
         bubble.setOrientation(LinearLayout.VERTICAL);
-        bubble.setBackground(surface(user ? ELEVATED : Color.rgb(20, 28, 44), 8));
+        bubble.setBackground(surface(user ? ELEVATED : PANEL, 8));
         bubble.setPadding(dp(12), dp(8), dp(12), dp(8));
         TextView from=text(sender, 11, user ? ACCENT : SUCCESS);
         from.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -628,7 +750,7 @@ public final class NativeCompanionActivity extends Activity {
         LinearLayout body=page("Companion Chat");
         statusView=text(statusLine(), 12, lastFailure==null ? MUTED : WARN);
         add(body, statusView, 6);
-        banner(body, "🛡️ Workstation authority", "The phone can ask for local, tool-free answers and stop them. Files, shell and approvals stay on Windows.", ACCENT, Color.rgb(36, 46, 68));
+        banner(body, "🛡️ Workstation authority", "The phone can ask for local, tool-free answers and stop them. Files, shell and approvals stay on Windows.", ACCENT, washAccent);
 
         LinearLayout chatBox=new LinearLayout(this);
         chatBox.setOrientation(LinearLayout.VERTICAL);
@@ -695,6 +817,7 @@ public final class NativeCompanionActivity extends Activity {
 
     private void showSystemTab() {
         LinearLayout body=page("Workstation Connection");
+        appearanceSection(body);
         LinearLayout card=new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setBackground(surface(PANEL, 10));
