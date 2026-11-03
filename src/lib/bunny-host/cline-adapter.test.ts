@@ -1,19 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ClineAdapter, clineLaunchArgs, clineRunResult } from "./adapters.server.ts";
 import { ClineNormalizer } from "./events.ts";
 import { systemContext } from "./discovery.server.ts";
 import type { AdapterHooks, AdapterResult } from "./contracts.ts";
-import type { OrchTask } from "../orch/types.ts";
+import type { OrchTask, ProviderLive } from "../orch/types.ts";
 
-// The transcripts below are the REAL cline 3.0.74 --json line shapes, captured live on 2026-11-03:
-// the error run verbatim (the provider's own subscription refusal) and a mirrored completed run.
+// The transcripts below are the REAL cline 3.0.74 --json line shapes, captured live on 2026-11-03.
 const LINE_START = `{"ts":"2026-11-03T04:21:54.731Z","type":"hook_event","hookEventName":"agent_start","agentId":"agent_8173f620-6316-458a-ad3f-d60a8817ced5","taskId":"conv_1793679714724_75h73mp","parentAgentId":null}`;
 const LINE_ITERATION = `{"ts":"2026-11-03T04:21:54.732Z","type":"agent_event","event":{"type":"iteration_start","iteration":1}}`;
-const LINE_AGENT_ERROR = `{"ts":"2026-11-03T04:21:55.902Z","type":"hook_event","hookEventName":"agent_error","agentId":"agent_8173f620-6316-458a-ad3f-d60a8817ced5","taskId":"conv_1793679714724_75h73mp","parentAgentId":null}`;
 const LINE_ERROR = (message: string) => `{"ts":"2026-11-03T04:21:56.284Z","type":"error","message":${JSON.stringify(message)}}`;
 const SUBSCRIPTION = "No access to ClinePass subscription models yet. Subscribe to ClinePass: https://app.cline.example/dashboard/subscription";
 const RUN_ERROR = (message: string) => `{"ts":"2026-11-03T04:21:55.903Z","type":"agent_event","event":{"type":"error","error":{"name":"Error","message":${JSON.stringify(message)}},"errorClass":"unknown","recoverable":false,"iteration":1}}`;
@@ -23,15 +21,18 @@ const RUN_ERROR_RESULT = (message: string) => `{"ts":"2026-11-03T04:21:56.284Z",
 /** npm's real cmd-shim text (the m2.test fixture pattern): "%dp0%\node.exe" + the target, which parseNpmShim reads. */
 const SHIM = (relative: string) => `@ECHO off\r\nGOTO start\r\n:find_dp0\r\nSET dp0=%~dp0\r\nEXIT /b\r\n:start\r\nSETLOCAL\r\nCALL :find_dp0\r\n\r\nIF EXIST "%dp0%\\node.exe" (\r\n  SET "_prog=%dp0%\\node.exe"\r\n) ELSE (\r\n  SET "_prog=node"\r\n  SET PATHEXT=%PATHEXT:;.JS;=;%\r\n)\r\n\r\nendLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\\${relative}" %*\r\n`;
 
-/** A fake cline in npm's real layout: cline.cmd → node_modules/cline/cline-fixture.mjs (manifest beside the script). */
+/** A fake cline in npm's real layout. Any RUN records a marker, so a "discovery never executes cline" test can prove it. */
 function clineFixture(transcript: string, exit = 0) {
   const dir = mkdtempSync(join(tmpdir(), "bunny-cline-"));
   const packDir = join(dir, "node_modules", "cline");
   const binDir = join(packDir, "bin"); mkdirSync(binDir, { recursive: true });
   const script = join(binDir, "cline-fixture.mjs");
+  const marker = join(dir, "runs.txt");
   const shim = (join(dir, "cline.cmd"));
-  writeFileSync(script, `const args = process.argv.slice(2);
+  writeFileSync(script, `import {appendFileSync} from 'node:fs';
+const args = process.argv.slice(2);
 if (args.includes('--version')) { console.log("version probes never run; the manifest carries the version"); process.exit(1); }
+appendFileSync(${JSON.stringify(marker)}, "run:" + args.join(" ") + "\\n");
 process.stdout.write(${JSON.stringify(transcript)} + "\\n");
 process.stderr.write(${JSON.stringify(LINE_ERROR("error from stderr"))} + "\\n");
 process.exitCode = ${exit};
@@ -54,46 +55,31 @@ process.exitCode = ${exit};
     session: () => {},
   };
   const task = { id: "cline-fixture", provider: "cline", model: null, prompt: "Say ready", cwd: dir } as unknown as OrchTask;
-  return { dir, adapter, hooks, events, output, get usage() { return usage; }, get model() { return model; }, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+  return { dir, adapter, hooks, events, output, get usage() { return usage; }, get model() { return model; }, marker, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
-test("cline detect: a completed probe proves the configured provider and unlocks routing", async () => {
+test("cline detect: discovery never executes cline and never spends — the verdict waits for an explicit run", async () => {
   const env = clineFixture([LINE_START, LINE_ITERATION, RUN_COMPLETED].join("\n") + "\n");
   try {
     const live = await env.adapter.detect();
     assert.equal(live.installed, true);
     assert.equal(live.version, "3.0.74");
-    assert.equal(live.authenticated, true);
-    assert.deepEqual(live.models, ["cline-pass/qwen3.8-max"]);
-    assert.equal(live.current_model, "cline-pass/qwen3.8-max");
-    assert.equal(live.availability, "ready");
-    assert.match(live.detail, /signed in through its configured provider/);
-    assert.equal(live.features?.launch.supported, true);
-    // A second detect inside the probe-age window replays the verified verdict without running the CLI again.
-    const again = await env.adapter.detect();
-    assert.equal(again.authenticated, true);
-    assert.equal(again.availability, "ready");
-  } finally { env.cleanup(); }
-});
-
-test("cline detect: the provider's own refusal text is carried, never paraphrased or faked signed-in", async () => {
-  const env = clineFixture([LINE_START, LINE_ITERATION, LINE_AGENT_ERROR, RUN_ERROR_RESULT(SUBSCRIPTION), LINE_ERROR(SUBSCRIPTION)].join("\n") + "\n", 1);
-  try {
-    const live = await env.adapter.detect();
-    assert.equal(live.installed, true);
+    assert.equal(existsSync(env.marker), false, "detection must never run the CLI: cline self-updates, and an unattended spend is refused by design");
     assert.equal(live.authenticated, false);
     assert.equal(live.authenticatedState, "not_authenticated");
     assert.equal(live.availability, "authentication_required");
-    assert.match(live.detail, /No access to ClinePass subscription models yet/);
-    assert.deepEqual(live.models, []);
+    assert.match(live.detail, /validated only during an explicit user-initiated run/);
+    assert.equal(live.features?.launch.supported, true);
   } finally { env.cleanup(); }
 });
 
-test("cline launch: ready sessions run act-mode argv and the transcript's receipt lands", async () => {
+test("cline launch: with an owner-verified detected state, act-mode argv runs and the transcript's receipt lands", async () => {
   const env = clineFixture([LINE_START, LINE_ITERATION, RUN_COMPLETED].join("\n") + "\n");
   try {
-    // The adapter's own detect must have verified the provider before launch (the manager routes it only then).
     await env.adapter.detect();
+    // The explicit user-initiated path stores the verified verdict on the adapter (the follow-up slice's contract);
+    // launch mechanics are testable against it, exactly like the codex fixture's injected detected state.
+    env.adapter.detected = { ...env.adapter.detected!, authenticated: true, authenticatedState: "authenticated", models: ["cline-pass/qwen3.8-max"], current_model: "cline-pass/qwen3.8-max", availability: "ready" } as ProviderLive;
     const result = await env.adapter.launch({ id: "cline-fixture", provider: "cline", prompt: "Say ready", cwd: env.dir } as OrchTask, env.hooks).done as AdapterResult;
     assert.equal(result.ok, true, result.error);
     assert.match(result.output, /ready/);
@@ -105,6 +91,7 @@ test("cline launch: ready sessions run act-mode argv and the transcript's receip
     assert.equal(env.model, "cline-pass/qwen3.8-max");
     assert.ok(env.events.some((event) => event.type === "agent.started"));
     assert.ok(env.events.some((event) => event.type === "agent.completed" && /finished \(completed/.test(event.detail)));
+    assert.match(readFileSync(env.marker, "utf8"), /run:/, "the launch path executed the fixture exactly once");
   } finally { env.cleanup(); }
 });
 
@@ -120,7 +107,7 @@ test("cline launch: a read-scoped task is refused before any process exists", as
 });
 
 test("cline launch: without a verified provider the launch refuses honestly", async () => {
-  const env = clineFixture([LINE_START, LINE_ITERATION, LINE_AGENT_ERROR, RUN_ERROR_RESULT(SUBSCRIPTION), LINE_ERROR(SUBSCRIPTION)].join("\n") + "\n", 1);
+  const env = clineFixture([LINE_START, LINE_ITERATION, RUN_ERROR_RESULT(SUBSCRIPTION), LINE_ERROR(SUBSCRIPTION)].join("\n") + "\n", 1);
   try {
     await env.adapter.detect();
     assert.throws(() => env.adapter.launch({ id: "cline-fixture", provider: "cline", prompt: "Say ready", cwd: env.dir } as OrchTask, env.hooks), /not ready for execution/);
