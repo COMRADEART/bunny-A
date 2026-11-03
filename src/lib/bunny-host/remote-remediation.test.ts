@@ -23,6 +23,18 @@ function record(name: string, value: unknown) {
   mkdirSync(directory, { recursive: true });
   writeFileSync(join(directory, `${name}.json`), JSON.stringify(value, null, 2) + "\n");
 }
+
+// F-CI1-1 / CI run 41550964955: an in-Host restart moments before a fetch can hand Node's keep-alive pool a dead
+// socket, so a transient ECONNRESET/refusal races the new listener. One retry absorbs the reset; a real refusal
+// (wrong token, refused action) still fails the test — only network-level failures retry.
+async function resilient(input: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    return await fetch(input, init);
+  }
+}
 async function until<T>(check: () => Promise<T | false | undefined>, label: string): Promise<T> {
   // Each wait may include a full Host restart plus recovery; a loaded CI runner has shown single waits
   // far beyond 15s (yesterday's sibling: 41.9s), so the budget matches the same 30s class as execution-scope.
@@ -45,17 +57,17 @@ async function fixture(filesystem = new FilesystemCapability()) {
   };
   let { started: host, base } = await boot();
   const api = async (action: string, data: unknown = {}, token = host.token, extra: Record<string, unknown> = {}) => {
-    const response = await fetch(`${base}/command`, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ action, data, ...extra }) });
+    const response = await resilient(`${base}/command`, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ action, data, ...extra }) });
     // Credentials stay in memory; evidence never serializes the response to pairing.create or /pair.
     return { status: response.status, body: await response.json() };
   };
   const state = async (token = host.token) => {
-    const response = await fetch(`${base}/state`, { headers: { authorization: `Bearer ${token}` } });
+    const response = await resilient(`${base}/state`, { headers: { authorization: `Bearer ${token}` } });
     return { status: response.status, body: await response.json() };
   };
   const pair = async (name = "T9R disposable client") => {
     const code = (await api("pairing.create")).body.pairCode;
-    const paired = await fetch(`${base}/pair`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code, name }) });
+    const paired = await resilient(`${base}/pair`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code, name }) });
     assert.equal(paired.status, 200);
     return await paired.json() as { token: string; deviceId: string };
   };
@@ -178,7 +190,7 @@ test("T9R client-only connection loss during admitted work leaves the same Host 
   const controller = new AbortController();
   try {
     const a = await f.make("Client disconnect receipt");
-    const stream = await fetch(`${f.base}/events`, { headers: { authorization: `Bearer ${f.device.token}` }, signal: controller.signal });
+    const stream = await resilient(`${f.base}/events`, { headers: { authorization: `Bearer ${f.device.token}` }, signal: controller.signal });
     assert.equal(stream.status, 200);
     assert.equal((await f.api("mission.respond", { requestId: a.request.id, decision: "allow_once" }, f.device.token)).status, 200);
     await promoteStaged(f, a.agent.missionId!);
