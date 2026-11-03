@@ -114,9 +114,11 @@ test("cline launch: without a verified provider the launch refuses honestly", as
   } finally { env.cleanup(); }
 });
 
-test("cline: launch argv is act-mode JSON with the cwd, a bounded retry loop and the prompt last; run_result parses off a transcript", () => {
+test("cline: launch argv is act-mode JSON with the cwd, a bounded retry loop, an end-of-options guard and the prompt last; run_result parses off a transcript", () => {
   const task = { id: "t", provider: "cline", prompt: "Do the work", cwd: "C:/project" } as OrchTask;
-  assert.deepEqual(clineLaunchArgs(task), ["--json", "-c", "C:/project", "--retries", "2", "Do the work"]);
+  assert.deepEqual(clineLaunchArgs(task), ["--json", "-c", "C:/project", "--retries", "2", "--", "Do the work"]);
+  // A prompt beginning with a dash cannot become a CLI option: the guard holds.
+  assert.deepEqual(clineLaunchArgs({ ...task, prompt: "--yolo everything" } as OrchTask), ["--json", "-c", "C:/project", "--retries", "2", "--", "--yolo everything"]);
   const run = clineRunResult([LINE_START, RUN_COMPLETED, LINE_ERROR("late")].join("\n"));
   assert.equal(run?.finishReason, "completed");
   assert.equal(run?.text, "ready");
