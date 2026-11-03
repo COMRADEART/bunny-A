@@ -1,0 +1,92 @@
+{
+  "sourceCommit": "28903a6c23936be58ebdf5c94fe8b2ed0e21b26c",
+  "verifiedMain": {
+    "sha": "28903a6c23936be58ebdf5c94fe8b2ed0e21b26c",
+    "protected": true,
+    "requiredChecks": [
+      "typecheck, MA4/routing/sandbox-contract tests, UI tests, builds",
+      "full MA3/MA4 regression (npm test)",
+      "static security checks"
+    ]
+  },
+  "baselineCi": [
+    {
+      "name": "static security checks",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/COMRADEART/bunny-A/actions/runs/41587033385/job/125754837260"
+    },
+    {
+      "name": "typecheck, MA4/routing/sandbox-contract tests, UI tests, builds",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/COMRADEART/bunny-A/actions/runs/41587033385/job/125754837080"
+    },
+    {
+      "name": "full MA3/MA4 regression (npm test)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/COMRADEART/bunny-A/actions/runs/41587033385/job/125754836946"
+    }
+  ],
+  "initialOpenPullRequests": 0,
+  "environment": {
+    "platform": "win32",
+    "node": "26.13.0",
+    "ciNode": "24",
+    "hostState": "isolated temporary application-data directory",
+    "screenshots": "real built desktop adapter; Chromium viewport/media emulation"
+  },
+  "local": {
+    "typecheck": "PASS",
+    "mobileWebBuild": "PASS",
+    "desktopBuild": "PASS",
+    "uiTests": {
+      "status": "PASS",
+      "passed": 443,
+      "failed": 0
+    },
+    "focusedGlassTests": {
+      "status": "PASS",
+      "passed": 21,
+      "failed": 0
+    },
+    "browserKeyboardDom": {
+      "status": "PASS",
+      "passed": 11,
+      "failed": 0
+    },
+    "productSourceDiff": "none (generated route tree line ending churn excluded)",
+    "devRender": {
+      "status": "FAIL",
+      "reason": "shared node_modules junction fonts rejected by Vite filesystem allow list; no uncaught page errors; visible desktop/mobile content"
+    },
+    "desktopBuiltHomeRender": {
+      "status": "PASS",
+      "pageErrors": 0,
+      "consoleErrors": 0,
+      "desktopMobileVisible": true
+    },
+    "baselineMatrix": {
+      "cases": 190,
+      "partial": 176,
+      "fail": 8,
+      "blocked": 6,
+      "reason": "8 companion non-Home hydration cases fail; 6 related-only Connected Accounts cases do not qualify Connected Services"
+    },
+    "layoutProbes": {
+      "cases": 18,
+      "landscapeOverflowCases": 2,
+      "otherDefects": "see F01-F07; document overflow is not sufficient for control availability"
+    }
+  },
+  "qualifications": {
+    "narrator": "BLOCKED: no verified native assistive technology session or spoken-output evidence",
+    "talkBack": "BLOCKED: no connected and qualified physical Android device; adb unavailable",
+    "nativeWindowsNotch": "BLOCKED: installed native window, drag, DPI, multi-monitor and UIA not exercised",
+    "nativeAndroid": "BLOCKED: Activity build/install and physical device rendering not exercised",
+    "populatedStates": "PARTIAL: no seeded tasks, teams, approvals, projects or memory; genuine empty states only",
+    "performance": "PARTIAL: no frame-time, compositor, battery or physical-device profiling; E5D"
+  },
+  "prCi": "PENDING: baseline main success does not establish PR head success"
+}
