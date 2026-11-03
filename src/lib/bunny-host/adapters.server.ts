@@ -668,28 +668,14 @@ export class ClineAdapter extends CliBase implements ProviderAdapter {
     if (!launch) { live.detail = "Cline not found on PATH or in known install locations."; return this.detected = live; }
     live.installed = true; live.executable = launch.path; this.print = fingerprint(launch.path); this.launchTarget = launch;
     live.capabilities = this.agentCapabilities();
-    // The signed-in state cannot be read headlessly (`cline config` needs a TTY): one tiny real completion on the
-    // flat-rate lane decides it, repeating only when the executable changed or 10 minutes passed.
+    // Never run a real Cline invocation during background detection/refresh.
+    // Authentication/readiness must be established from an explicit user-initiated run path.
     if (this.probedFor !== this.print || Date.now() - this.probedAt > CLINE_AUTH_PROBE_MAX_AGE_MS) {
-      const probeRun = await probe(launch, ["--json", "-c", process.cwd(), CLINE_AUTH_PROBE_PROMPT], 30_000);
       this.probedFor = this.print; this.probedAt = Date.now();
-      const run = clineRunResult(probeRun.stdout);
-      if (probeResultSucceeded(probeRun, run)) {
-        live.authenticated = true; live.authenticatedState = "authenticated";
-        live.models = run?.modelId ? [run.modelId] : [];
-        live.current_model = run?.modelId || null;
-        live.usageCapabilities = { shortWindow: false, weekly: false, resetTime: false, tokenUsage: true, activeJobs: true, source: "cline run_result counts (flat-rate lane; Bunny-A claims no cost)" };
-        live.evidence ??= [];
-        live.evidence.push(`auth probe → completed · ${run?.modelId || "the configured provider's model"}`);
-        live.detail = `Cline ${live.version} · signed in through its configured provider${run?.modelId ? ` (${run.modelId})` : ""}.`;
-      } else {
-        live.authenticated = false; live.authenticatedState = "not_authenticated";
-        // The provider's own refusal text speaks (e.g. the subscription access message); never paraphrased into a claim.
-        const message = (run?.text || firstLine(probeRun.stderr) || firstLine(probeRun.stdout) || "").replace(/https?:\/\/\S+/g, "").trim();
-        live.evidence ??= [];
-        live.evidence.push(`auth probe → ${probeRun.code === null ? "no exit" : `exit ${probeRun.code}`}${message ? `: ${firstLine(message)}` : ""}`);
-        live.detail = `Cline ${live.version} is installed, but its configured provider is not ready: ${message ? firstLine(message).slice(0, 200) : `the auth probe ended (${probeRun.timedOut ? "timed out" : `exit ${probeRun.code ?? "error"}`}).`}`;
-      }
+      live.authenticated = false; live.authenticatedState = "not_authenticated";
+      live.evidence ??= [];
+      live.evidence.push("auth probe skipped in automatic detection (safety: no unattended Cline execution)");
+      live.detail = `Cline ${live.version} is installed. Authentication/readiness is validated only during an explicit user-initiated run.`;
     } else if (this.detected) {
       // Between probes, the last verified verdict stands verbatim.
       live.authenticated = this.detected.authenticated; live.authenticatedState = this.detected.authenticatedState;
