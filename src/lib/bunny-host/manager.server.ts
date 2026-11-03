@@ -102,6 +102,8 @@ export type ManagerOptions = {
   dataDirectory?: string | null;
   /** M-A-3 T13.1 test seams for intelligence services; production uses Ollama, real fetch and Windows DPAPI. */
   intelligence?: { layaRuntime?: LayaRuntime; jevFetch?: FetchLike; jevProtector?: SecretProtector; now?: () => number };
+  /** MA6 Phase 1B: the UOF recording layer beside the router. Recording only — it never selects or reranks. */
+  uof?: { recordRouting(facts: import("./uof-coordinator.server.ts").RoutingFacts): void };
 };
 
 export class TaskManager {
@@ -211,6 +213,8 @@ export class TaskManager {
   readProcesses: () => Promise<ProcessInfo[]>;
   /** Host-owned folders (mission worktrees) a delegated child task may use as its working directory. */
   workspaceRoots: string[] = [];
+  /** MA6 Phase 1B: the UOF recording layer beside the router (null: recording off). */
+  private optionsUof: NonNullable<ManagerOptions["uof"]> | null = null;
   /**
    * Installed by the mission owner; checked for direct approvals of pending children too. "launch" is the final
    * check on the exact provider/model that will start (after any launch-time reroute) and spends a single-use grant.
@@ -230,6 +234,7 @@ export class TaskManager {
     options: ManagerOptions = {},
   ) {
     this.db = db;
+    this.optionsUof = options.uof ?? null;
     this.defaultRoot = realpathSync(defaultRoot);
     this.workspaceRootConfigured = !!options.workspaceRoot;
     this.projects = new ProjectRegistry(db, options.workspaceRoot ?? this.defaultRoot);
@@ -1503,6 +1508,8 @@ export class TaskManager {
           : { terminalNote: "No model facts on this Host; BunnyRouter provider decision stands." }),
       }),
     );
+    // MA6 Phase 1B: the UOF lane ledger records this decision beside the router (recording only).
+    this.optionsUof?.recordRouting({ taskId: task.id, providers: live, decision });
     if (selection) {
       this.emit(
         this.db.event(
@@ -1597,6 +1604,8 @@ export class TaskManager {
           : { terminalNote: "No model facts on this Host; BunnyRouter provider decision stands." }),
       }),
     );
+    // MA6 Phase 1B: the retarget's manual selection records into the UOF lane ledger beside the router too.
+    this.optionsUof?.recordRouting({ taskId: task.id, providers: this.live(), decision });
     return this.update(
       task,
       {
