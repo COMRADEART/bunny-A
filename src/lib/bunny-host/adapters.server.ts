@@ -648,7 +648,8 @@ export function clineRunResult(stdout: string): { finishReason: string; text: st
 export function clineLaunchArgs(task: OrchTask, platform = process.platform): string[] {
   // cline has no read-only mode on this build: a read-scoped task is REFUSED at launch (below), never launched restricted.
   // --retries bounds cline's own consecutive-mistake retry loop; the Host's runtime limit governs the session.
-  return ["--json", "-c", task.cwd ?? ".", "--retries", "2", task.prompt];
+  // `--` prevents prompt text beginning with "-" from being parsed as additional CLI options.
+  return ["--json", "-c", task.cwd ?? ".", "--retries", "2", "--", task.prompt];
 }
 
 export class ClineAdapter extends CliBase implements ProviderAdapter {
