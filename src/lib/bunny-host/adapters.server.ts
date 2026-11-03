@@ -11,7 +11,7 @@ import type { NativeAccount } from "./connections.server.ts";
 import { CODEX_READ_DISABLED_FEATURES, CodexCompatibilityGate, emptyCodexCompatibility, executableStamp } from "./codex-compatibility.server.ts";
 export { CODEX_READ_DISABLED_FEATURES } from "./codex-compatibility.server.ts";
 import { hasTool, locate, systemContext, type DiscoveryContext, type Launchable } from "./discovery.server.ts";
-import { ClaudeNormalizer, CodexNormalizer, normalizedTool as toolType } from "./events.ts";
+import { ClaudeNormalizer, CodexNormalizer, ClineNormalizer, normalizedTool as toolType } from "./events.ts";
 import { safeError } from "./failure.server.ts";
 import { trackOwnedChild } from "./owned-processes.server.ts";
 import { OwnedProcessGroup, outputPipe, runWindowsOwnedProcess, type OwnedProcessRecord } from "./owned-process-group.server.ts";
@@ -72,7 +72,17 @@ export const FEATURES: Record<ProviderId, ProviderFeatures> = {
     projectAwareness: unsupported("Text only; it does not read or write the project folder."),
   },
   opencode: detectOnly("OpenCode"),
-  cline: detectOnly("Cline"),
+  cline: {
+    launch: supported("cline --json in the approved project folder (act mode, auto-approve); a read-scoped task is refused because cline has no read-only mode."),
+    stop: supported("Ends the owned cline process tree and verifies no recorded process remains."),
+    sendInput: unsupported("The task's prompt is one argument; stdin closes unused."),
+    approval: unsupported("Tool auto-approval is cline act-mode's own; there is no mid-run ask Bunny-A could answer."),
+    resume: unsupported("Not implemented by Bunny-A."),
+    modelSelection: unsupported("The model comes from the provider configured by `cline auth`; the session reports which model ran."),
+    terminalAttachment: unsupported(HEADLESS),
+    usageQuota: unsupported("The flat-rate subscription lane is not metered by Bunny-A; the session reports token counts without cost claims."),
+    projectAwareness: supported("Runs with its working directory set to the approved project root (--cwd)."),
+  },
   cursor: detectOnly("Cursor Agent"),
 };
 function detectOnly(name: string): ProviderFeatures {
@@ -204,7 +214,7 @@ export class OllamaAdapter implements ProviderAdapter {
  * Applies a normalizer's events to adapter hooks. Kept for callers that parse one event at a time;
  * live sessions keep a normalizer per session so repeated item events are not double-counted.
  */
-export function parseAgentEvent(provider: ProviderId, event: Record<string, unknown>, hooks: AdapterHooks, normalizer: CodexNormalizer | ClaudeNormalizer = provider === "codex" ? new CodexNormalizer() : new ClaudeNormalizer()) {
+export function parseAgentEvent(provider: ProviderId, event: Record<string, unknown>, hooks: AdapterHooks, normalizer: CodexNormalizer | ClaudeNormalizer | ClineNormalizer = (provider === "codex" ? new CodexNormalizer() : provider === "cline" ? new ClineNormalizer() : new ClaudeNormalizer())) {
   for (const item of normalizer.normalize(event)) {
     if (item.sessionId) hooks.session(item.sessionId, null);
     if (item.model) hooks.model?.(item.model);
@@ -223,7 +233,7 @@ export function parseAgentEvent(provider: ProviderId, event: Record<string, unkn
  * the session; it never falls back to an unowned spawn. `spawnChild` exists only for tests that inject stream
  * faults into the legacy child-process path; production callers never pass it.
  */
-export function spawnSession(id: "codex" | "claude", launch: Launchable, args: string[], task: OrchTask, hooks: AdapterHooks, sessionId: string, normalizer:CodexNormalizer|ClaudeNormalizer=id === "codex" ? new CodexNormalizer() : new ClaudeNormalizer(), spawnChild:typeof spawn=spawn): RunningSession {
+export function spawnSession(id: "codex" | "claude" | "cline", launch: Launchable, args: string[], task: OrchTask, hooks: AdapterHooks, sessionId: string, normalizer: CodexNormalizer | ClaudeNormalizer | ClineNormalizer = (id === "codex" ? new CodexNormalizer() : id === "cline" ? new ClineNormalizer() : new ClaudeNormalizer()), spawnChild: typeof spawn = spawn): RunningSession {
   if(hooks.beforeDispatch){
     let owned: RunningSession|null=null,stopped=false;
     // M-A-3 T13.3 N-C: dispatched:false is certified only while no provider process has been asked to start.
@@ -235,7 +245,7 @@ export function spawnSession(id: "codex" | "claude", launch: Launchable, args: s
   }
   return spawnUnwrappedSession(id,launch,args,task,hooks,sessionId,normalizer,spawnChild);
 }
-function spawnUnwrappedSession(id: "codex" | "claude", launch: Launchable, args: string[], task: OrchTask, hooks: AdapterHooks, sessionId: string, normalizer:CodexNormalizer|ClaudeNormalizer, spawnChild:typeof spawn): RunningSession {
+function spawnUnwrappedSession(id: "codex" | "claude" | "cline", launch: Launchable, args: string[], task: OrchTask, hooks: AdapterHooks, sessionId: string, normalizer: CodexNormalizer | ClaudeNormalizer | ClineNormalizer, spawnChild: typeof spawn): RunningSession {
   if (process.platform === "win32" && spawnChild === spawn) return containedSession(id, launch, args, task, hooks, sessionId, normalizer);
   let child: ChildProcess | null = null; let stopped = false; let spawned = false; let output = ""; let stderr = ""; let buffer = ""; let providerError: string | null = null;
   const terminate = async (userStop=false) => {
@@ -295,7 +305,7 @@ const pause = (ms: number) => new Promise<void>((done) => { setTimeout(done, ms)
  * membership, resumes it, then writes the prompt over an unnamed pipe. Root exit or Stop terminates the WHOLE job
  * (descendants of exited parents included) and the session ends only on kernel accounting, never on a sample.
  */
-function containedSession(id: "codex" | "claude", launch: Launchable, args: string[], task: OrchTask, hooks: AdapterHooks, sessionId: string, normalizer: CodexNormalizer | ClaudeNormalizer): RunningSession {
+function containedSession(id: "codex" | "claude" | "cline", launch: Launchable, args: string[], task: OrchTask, hooks: AdapterHooks, sessionId: string, normalizer: CodexNormalizer | ClaudeNormalizer | ClineNormalizer): RunningSession {
   let group: OwnedProcessGroup | null = null; let stopped = false; let output = ""; let stderr = ""; let buffer = ""; let providerError: string | null = null;
   let outcome: OwnedProcessRecord["state"] = "failed"; let ending: Promise<void> | null = null; let wake: (() => void) | null = null;
   let containment: SessionContainment = { mechanism: "windows-job-object", state: "launching", admitted: false, operationId: null, rootPid: null, rootCreatedAt: null, activeProcesses: null, totalProcesses: null, terminatedAtEnd: null, detail: "Creating the Windows job before any provider process exists." };
@@ -615,6 +625,94 @@ export class ClaudeAdapter extends CliBase implements ProviderAdapter {
 }
 
 /**
+ * The Cline execution adapter. Transcript = cline 3.0.74's `--json` JSONL (schema captured live 2026-11-03: hook_event /
+ * agent_event / run_result lines). Its flat-rate sign-in cannot be read headlessly (`cline config` needs a TTY), so a
+ * tiny real completion is the auth probe, bounded like the other adapters' probes. The transcript's own provider/model
+ * text is the only model claim; nothing is invented.
+ */
+const CLINE_AUTH_PROBE_MAX_AGE_MS = 10 * 60_000;
+const CLINE_AUTH_PROBE_PROMPT = "Reply with exactly one word: ready";
+
+/** The final run_result of a cline --json transcript, or null when none completed. */
+export function clineRunResult(stdout: string): { finishReason: string; text: string; modelId: string } | null {
+  let last: { finishReason: string; text: string; modelId: string } | null = null;
+  for (const line of stdout.split(/\r?\n/)) {
+    try {
+      const row = JSON.parse(line) as { type?: string; finishReason?: string; text?: string; model?: { id?: string } };
+      if (row?.type === "run_result") last = { finishReason: row.finishReason ?? "", text: row.text ?? "", modelId: row.model?.id ?? "" };
+    } catch { /* non-JSON transcript lines pass through elsewhere */ }
+  }
+  return last;
+}
+
+export function clineLaunchArgs(task: OrchTask, platform = process.platform): string[] {
+  // cline has no read-only mode on this build: a read-scoped task is REFUSED at launch (below), never launched restricted.
+  // --retries bounds cline's own consecutive-mistake retry loop; the Host's runtime limit governs the session.
+  return ["--json", "-c", task.cwd ?? ".", "--retries", "2", task.prompt];
+}
+
+export class ClineAdapter extends CliBase implements ProviderAdapter {
+  id = "cline" as const;
+  detected: ProviderLive | null = null;
+  private probedFor: string | null = null;
+  private probedAt = 0;
+  capabilities() { return FEATURES.cline; }
+  async detect() {
+    const live = providerBase(this.id); live.probedAt = Date.now();
+    // Cline is never executed for discovery: running any cline command starts its self-updater (observed:
+    // `cline --version` ran `npm update -g cline`), so the version comes from the npm package manifest instead.
+    const found = locate(this.ctx(), this.id);
+    live.version = found.version ?? null;
+    live.evidence = [...found.checked, ...(found.note ? [found.note] : [])].slice(-8);
+    const launch = found.launch;
+    if (!launch) { live.detail = "Cline not found on PATH or in known install locations."; return this.detected = live; }
+    live.installed = true; live.executable = launch.path; this.print = fingerprint(launch.path); this.launchTarget = launch;
+    live.capabilities = this.agentCapabilities();
+    // The signed-in state cannot be read headlessly (`cline config` needs a TTY): one tiny real completion on the
+    // flat-rate lane decides it, repeating only when the executable changed or 10 minutes passed.
+    if (this.probedFor !== this.print || Date.now() - this.probedAt > CLINE_AUTH_PROBE_MAX_AGE_MS) {
+      const probeRun = await probe(launch, ["--json", "-c", process.cwd(), CLINE_AUTH_PROBE_PROMPT], 30_000);
+      this.probedFor = this.print; this.probedAt = Date.now();
+      const run = clineRunResult(probeRun.stdout);
+      if (probeResultSucceeded(probeRun, run)) {
+        live.authenticated = true; live.authenticatedState = "authenticated";
+        live.models = run?.modelId ? [run.modelId] : [];
+        live.current_model = run?.modelId || null;
+        live.usageCapabilities = { shortWindow: false, weekly: false, resetTime: false, tokenUsage: true, activeJobs: true, source: "cline run_result counts (flat-rate lane; Bunny-A claims no cost)" };
+        live.evidence ??= [];
+        live.evidence.push(`auth probe → completed · ${run?.modelId || "the configured provider's model"}`);
+        live.detail = `Cline ${live.version} · signed in through its configured provider${run?.modelId ? ` (${run.modelId})` : ""}.`;
+      } else {
+        live.authenticated = false; live.authenticatedState = "not_authenticated";
+        // The provider's own refusal text speaks (e.g. the subscription access message); never paraphrased into a claim.
+        const message = (run?.text || firstLine(probeRun.stderr) || firstLine(probeRun.stdout) || "").replace(/https?:\/\/\S+/g, "").trim();
+        live.evidence ??= [];
+        live.evidence.push(`auth probe → ${probeRun.code === null ? "no exit" : `exit ${probeRun.code}`}${message ? `: ${firstLine(message)}` : ""}`);
+        live.detail = `Cline ${live.version} is installed, but its configured provider is not ready: ${message ? firstLine(message).slice(0, 200) : `the auth probe ended (${probeRun.timedOut ? "timed out" : `exit ${probeRun.code ?? "error"}`}).`}`;
+      }
+    } else if (this.detected) {
+      // Between probes, the last verified verdict stands verbatim.
+      live.authenticated = this.detected.authenticated; live.authenticatedState = this.detected.authenticatedState;
+      live.models = this.detected.models ?? []; live.current_model = this.detected.current_model;
+      live.detail = this.detected.detail; live.availability = this.detected.availability;
+    }
+    live.availability = live.authenticated ? "ready" : "authentication_required";
+    return this.detected = live;
+  }
+  launch(task: OrchTask, hooks: AdapterHooks): RunningSession {
+    // cline offers no read-only mode: refusing is the honest scope, not launching restricted.
+    if (task.executionScope?.access === "read") throw new Error("Cline has no read-only mode in Bunny-A; a read-scoped task is refused rather than launched with write tools.");
+    const launch = this.launchTarget;
+    if (!launch || !this.detected?.authenticated) throw new Error("Cline is not ready for execution; approve its provider connection first.");
+    return spawnSession("cline", launch, clineLaunchArgs(task), task, hooks, task.sessionId ?? crypto.randomUUID(), new ClineNormalizer());
+  }
+}
+/** The auth probe decides signed-in only on a clean exit with a completed run result. */
+function probeResultSucceeded(probeRun: ProbeResult, run: { finishReason: string } | null): boolean {
+  return probeRun.code === 0 && probeRun.timedOut === false && run?.finishReason === "completed";
+}
+
+/**
  * Default-on codex-cli 0.153.4 features that register tools without any config.toml entry, so
  * --ignore-user-config leaves them on: ChatGPT connector apps (the codex_apps MCP server, e.g. Gmail
  * send, GitHub merge, deploys), local/remote plugins and their MCP servers, browser and computer control,
@@ -687,5 +785,5 @@ export class DetectOnlyAdapter extends CliBase implements ProviderAdapter {
 /** Production adapter set. `paths` supplies user-configured executable paths from Host settings. */
 export function defaultAdapters(paths: () => Partial<Record<ProviderId, string>> = () => ({})): ProviderAdapter[] {
   const ctx = () => systemContext(paths());
-  return [new OllamaAdapter(ctx), new CodexAdapter(ctx), new ClaudeAdapter(ctx), new DetectOnlyAdapter("opencode", ctx), new DetectOnlyAdapter("cline", ctx), new DetectOnlyAdapter("cursor", ctx)];
+  return [new OllamaAdapter(ctx), new CodexAdapter(ctx), new ClaudeAdapter(ctx), new DetectOnlyAdapter("opencode", ctx), new ClineAdapter(ctx), new DetectOnlyAdapter("cursor", ctx)];
 }

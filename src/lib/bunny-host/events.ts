@@ -164,6 +164,42 @@ export class CodexNormalizer {
   }
 }
 
+/**
+ * Cline's `--json` transcript, captured live from cline 3.0.74: one JSONL object per line, typed
+ * `hook_event` (agent lifecycle), `agent_event` (iteration/error inner events), `run_result`
+ * (the final message, usage counts and the model that ran) and `error` (the fatal message repeated).
+ * Unknown lines fall through to output — nothing is invented into a claim.
+ */
+export class ClineNormalizer {
+  normalize(event: Record<string, unknown>): NormalizedEvent[] {
+    const out: NormalizedEvent[] = [];
+    const type = str(event.type);
+    if (type === "hook_event") {
+      if (str(event.hookEventName) === "agent_start") out.push({ type: "agent.started", detail: "Cline agent began its run." });
+      // agent_error arrives as its own typed agent_event error line, which decides the failure.
+    } else if (type === "agent_event") {
+      const inner = record(event.event);
+      if (!inner) return out;
+      const kind = str(inner.type);
+      if (kind === "iteration_start") out.push({ type: "agent.thinking", detail: typeof inner.iteration === "number" ? `Cline iteration ${inner.iteration}.` : "Cline iteration started." });
+      else if (kind === "error") out.push({ type: "agent.error", detail: clip(str(record(inner.error)?.message) || "Cline reported an error.") });
+    } else if (type === "run_result") {
+      const usage = record(event.usage);
+      if (usage) out.push({ type: "", detail: "", usage: { inputTokens: num(usage.inputTokens), outputTokens: num(usage.outputTokens), cachedInputTokens: num(usage.cacheReadTokens), source: `cline run_result (provider-reported counts; finishReason ${str(event.finishReason) || "unknown"})` } });
+      if (str(event.text)) out.push({ type: "", detail: "", output: str(event.text) });
+      const model = record(event.model);
+      if (model?.id) out.push({ type: "", detail: "", model: str(model.id) });
+      const finish = str(event.finishReason);
+      if (finish && finish !== "error") out.push({ type: "agent.completed", detail: `Cline run finished (${finish}; ${typeof event.durationMs === "number" ? `${Math.round((event.durationMs as number) / 100) / 10}s` : "duration not reported"}).` });
+      // finishReason "error" is decided by the typed error line and the process exit; never claimed complete.
+    } else if (type === "error") {
+      // The typed agent_event error above already failed the session; this repeat stays an honest warning only.
+      out.push({ type: "agent.warning", detail: clip(str(event.message) || "Cline reported an error line.") });
+    }
+    return out;
+  }
+}
+
 function claudeTool(name: string, input: Record<string, unknown>): NormalizedEvent {
   const path = str(input.file_path) || str(input.notebook_path) || str(input.path);
   if (name === "TodoWrite") {
