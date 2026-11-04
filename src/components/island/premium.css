@@ -1412,6 +1412,14 @@
 .t8-app .bunny-toast span {
   overflow-wrap: anywhere;
 }
+/* E5D: on the phone profiles the fixed toast rises above the bottom dock strip (the ws-drawer reopen controls sit
+   at var(--s3) + a 44px control), so it never covers the dock's quick actions or the reopen controls. It stays
+   fixed and visible; desktop keeps the bottom-centre toast. The companion phone surface owns its own dock — none. */
+@media (max-width: 767px), (max-height: 500px) and (min-width: 768px) {
+  .t8-app:not([data-surface="companion"]) .bunny-toast {
+    bottom: calc(var(--s3) + 52px);
+  }
+}
 
 /* M-A-3 T10 voice surface. Every animation here is driven by real snapshot data; reduced motion turns them off. */
 .t8-app.bunny-app .voice-panel {

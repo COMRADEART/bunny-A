@@ -476,6 +476,17 @@
   inset: var(--s6) var(--s3) calc(var(--s3) + min(72dvh, 680px)) var(--s3);
   max-height: none;
 }
+/* E5D: on the phone profiles the context dock presents collapsed (workspace-layout phone default: the rail) and its
+   expanded content joins the split's own flow — a fixed drawer would cover the composer, the offline banner and the
+   reopen controls over ~73% of a 390px viewport. The band mirrors phoneViewportProfile and premium.css's own bands. */
+@media (max-width: 767px), (max-height: 500px) and (min-width: 768px) {
+  .bunny-app.t8-app .workspace-split > .cx-panel[data-collapsed="false"]:not(.ws-drawer) {
+    position: static;
+    grid-column: 1 / -1;
+    width: auto;
+    max-height: none;
+  }
+}
 /* The phone companion owns the whole viewport, including landscape widths that also match desktop breakpoints.
    It must never be placed into the desktop shell's sidebar column. */
 .bunny-app.t8-app[data-surface="companion"] {
