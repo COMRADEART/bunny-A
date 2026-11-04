@@ -40,3 +40,12 @@ test("E5D colors: forced colours resolve the theme-card titles (and their in-use
   const gallery = readFileSync(fileURLToPath(new URL("./theme-gallery.css", import.meta.url)), "utf8");
   assert.match(gallery, /\.tg-mini\s*\{[^}]*forced-color-adjust:\s*none/, "the miniature keeps its own design");
 });
+test("E6A targets: character chips, intensity/high-contrast rows and policy rows reach 44px on the phone bands only", () => {
+  const band = /@media \(max-width: 767px\), \(max-height: 500px\) and \(min-width: 768px\) \{[\s\S]*?\n\}/.exec(glass);
+  assert.ok(band, "the glass phone band exists");
+  assert.ok(band[0].includes(".ch-chip") && band[0].includes("min-height: 44px"), "character chips reach the thumb bar");
+  assert.ok(band[0].includes(".ca-intensity label") && band[0].includes(".ca-check"), "intensity and high-contrast rows reach the thumb bar");
+  assert.ok(band[0].includes(".policy-row"), "the background-task policy rows reach the thumb bar");
+  const ptasks = readFileSync(fileURLToPath(new URL("./ptasks.tsx", import.meta.url)), "utf8");
+  assert.ok(ptasks.includes('className="caption policy-row"'), "the policy labels carry the row class the band rules target");
+});

@@ -494,6 +494,23 @@
     width: auto;
     max-height: none;
   }
+  /* E6A touch targets: the recorded sub-44px controls reach the bar on phone bands only — the
+     character slot chips (34px), the animation-intensity and high-contrast rows and the background
+     task policy rows (native 13px boxes inside short labels). Desktop keeps its compact pills. */
+  .bunny-app.t8-app .ch-chip {
+    min-height: 44px;
+    padding: 8px 16px;
+  }
+  .bunny-app.t8-app .ca-intensity label,
+  .bunny-app.t8-app .ca-check,
+  .bunny-app.t8-app .policy-row {
+    min-height: 44px;
+  }
+  .bunny-app.t8-app .policy-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
 }
 /* The phone companion owns the whole viewport, including landscape widths that also match desktop breakpoints.
    It must never be placed into the desktop shell's sidebar column. */
