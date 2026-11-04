@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import {
   COORDINATION_NOT_CONFIGURED, fabricDeviceRows, fabricEvents, fabricLedgerRows, fabricOverview, fabricProfiles, fabricUsageRows,
 } from "./fabric-model.ts";
@@ -7,6 +9,11 @@ import type { HostSnapshot } from "../../lib/bunny-host/contracts.ts";
 
 /** E4 truth locks: Server Control renders only served fields; coordination is never shown as live; a cost is known
  *  only where the ledger calls it known; nothing invents a node, percentage or quota. */
+
+/* F04 locks read the sources themselves (like glass-contrast reads its tokens): the surfaces carry the token
+ * gutters, every table gets its overflow wrapper, and the narrow composition is container-driven. */
+const fabricCss = readFileSync(fileURLToPath(new URL("./fabric.css", import.meta.url)), "utf8");
+const fabricTsx = readFileSync(fileURLToPath(new URL("./fabric.tsx", import.meta.url)), "utf8");
 
 const now = 1_800_000_000_000;
 type AnyDevice = NonNullable<HostSnapshot["devices"]>[number];
@@ -102,4 +109,34 @@ test("the routing ledger rows are bounded and absent when the Host does not serv
   assert.equal(bounded.length, 10, "the fabric shows a bounded window");
   assert.deepEqual(bounded[0], decision, "rows pass through unchanged");
   assert.deepEqual(fabricLedgerRows(null), [], "no host, no rows, no invention");
+});
+
+test("F04: every direct Server Control surface carries the token gutter, not the material's 0px", () => {
+  assert.match(fabricCss, /\.fabric > \.t8-surface \{[^}]*padding: var\(--s4\);/, "desk gutter is var(--s4)");
+  assert.match(
+    fabricCss,
+    /@media \(max-width: 720px\) \{\s*\.fabric > \.t8-surface \{[^}]*padding: var\(--s3\);/,
+    "the compressed phone shell narrows the gutter to the next token",
+  );
+});
+
+test("F04: every fabric-table sits in an explicit overflow wrapper that scrolls in-panel, never past it", () => {
+  assert.match(fabricCss, /\.fabric-scroll \{[^}]*overflow-x: auto;/, "the wrapper owns the overflow");
+  const tables = fabricTsx.match(/<table className="fabric-table"/g)?.length ?? 0;
+  const wrappers = fabricTsx.match(/<div className="fabric-scroll">/g)?.length ?? 0;
+  assert.ok(tables > 0 && wrappers === tables, `each of the ${tables} tables is wrapped (${wrappers} wrappers)`);
+});
+
+test("F04: the panels are composition containers; narrow panels reflow cells before the wrapper scrolls", () => {
+  assert.match(fabricCss, /\.fabric > \.t8-surface \{[^}]*container-type: inline-size;/, "panel-width container per the a548456 pattern");
+  assert.match(
+    fabricCss,
+    /@container \(max-width: 560px\) \{[\s\S]*?\.bunny-app \.fabric-table :is\(th, td\) \{[^}]*padding: var\(--s2\) var\(--s1\);/,
+    "narrow cells drop to the small token gutters",
+  );
+  assert.match(
+    fabricCss,
+    /@container \(max-width: 560px\) \{[\s\S]*?\.bunny-app \.fabric-table :is\(th, td\) \{[^}]*overflow-wrap: anywhere;/,
+    "long tokens wrap before the table widens",
+  );
 });

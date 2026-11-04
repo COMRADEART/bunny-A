@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useRouterState } from "@tanstack/react-router";
 import {
   ArrowRight,
   Check,
@@ -127,7 +128,10 @@ export function Phone({ now: fixedNow }: PhoneProps = {}) {
   const store = useIsland();
   const now = usePhoneClock(fixedNow);
   const systemReduced = usePrefersReducedMotion();
-  const [route, setRoute] = useState<PhoneRoute>(() => routeFromSearch(typeof window === "undefined" ? "" : window.location.search));
+  // The router's parsed search is the one search value the server render and the client's first paint both hold —
+  // deriving the first route from window.location here handed the server "" and the client the real tab (React #418).
+  const searchStr = useRouterState({ select: (state) => state.location.searchStr });
+  const [route, setRoute] = useState<PhoneRoute>(() => routeFromSearch(searchStr));
   const movedByUser = useRef(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const status = phoneStatus(store.connection, now);

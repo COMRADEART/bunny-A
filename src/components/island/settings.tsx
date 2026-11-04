@@ -42,16 +42,28 @@ function Setting({
     </div>
   );
 }
-export function Settings() {
+/**
+ * The Settings surface. E5B F06: the Settings-embedded capability groups (AI & Models routing
+ * controls, Providers, Privacy and permissions) are also navigation destinations — those entries
+ * mount this same surface anchored to their group via `initialGroup`/`heading`, so every entry
+ * opens an existing surface that names itself.
+ */
+export function Settings({
+  initialGroup,
+  heading,
+}: {
+  initialGroup?: Group;
+  heading?: { eyebrow: string; title: string };
+}) {
   const store = useIsland();
-  const [group, setGroup] = useState<Group>(store.accountFocus ? "AI & Models" : "Appearance");
+  const [group, setGroup] = useState<Group>(initialGroup ?? (store.accountFocus ? "AI & Models" : "Appearance"));
   const [notification, setNotification] = useState("");
   return (
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">Settings</p>
-          <h1>Make Bunny feel like yours.</h1>
+          <p className="eyebrow">{heading?.eyebrow ?? "Settings"}</p>
+          <h1>{heading?.title ?? "Make Bunny feel like yours."}</h1>
         </div>
       </div>
       {store.host !== "online" &&

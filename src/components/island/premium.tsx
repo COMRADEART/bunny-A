@@ -5,21 +5,27 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { ThemedDialogContent, useAmbient, useDocumentTheme, useThemeScope } from "./theme";
 import {
   Activity,
+  Bell,
   Bot,
+  CalendarClock,
   Cpu,
   FileText,
   Folder,
   Gauge,
   Layers,
   LayoutGrid,
+  Link2,
   ListChecks,
   Menu,
   MessageSquare,
   Moon,
   PenLine,
+  Plug,
   RefreshCw,
+  Route,
   Server,
   Settings2,
+  Shield,
   ShieldCheck,
   Smartphone,
   Sparkles,
@@ -41,6 +47,8 @@ import {
 } from "./ui";
 import { Approval, TaskDetail } from "./task";
 import { TaskRow, Notifications } from "./desktop";
+import { ConnectedAccounts } from "./accounts";
+import { Proactive } from "./proactive";
 import { Projects } from "./projects";
 import { AgenticWorkspace } from "./agentic";
 import { ActivityRow } from "./activity";
@@ -63,6 +71,8 @@ import { ChatHome } from "./chat-home";
 import { Approvals } from "./approvals";
 import { Files } from "./files";
 import { ContextPanel } from "./context-panel";
+import { escapeClosesDrawer, useWorkspaceLayout } from "./workspace-layout";
+import { drawerEdgeFor } from "@/lib/bunny-host/widgets";
 import { DesignPreview } from "./design-preview";
 import { ThemePreviewBar } from "./theme-gallery";
 import { useReconcileItems } from "./reconciliation";
@@ -121,12 +131,18 @@ const NAV_ICONS: Record<NavView, LucideIcon> = {
   projects: Folder,
   files: FileText,
   approvals: ShieldCheck,
+  safety: Shield,
   activity: Activity,
-  telemetry: Gauge,
-  settings: Settings2,
+  notifications: Bell,
+  automations: CalendarClock,
+  routing: Route,
   models: Cpu,
+  providers: Plug,
+  accounts: Link2,
   devices: Smartphone,
+  telemetry: Gauge,
   server: Server,
+  settings: Settings2,
   "design-preview": Settings2,
 };
 
@@ -151,7 +167,30 @@ export function Island() {
     memory: () => store.setSheet("agents"),
     reconcile: () => store.setSheet("approvals"),
   };
-  const widgetLayout = store.shownWidgets().layout;
+  const widgetsPref = store.shownWidgets();
+  const widgetLayout = widgetsPref.layout;
+  // F01: the workspace row allocates from the measured remaining inline size (workspace-layout.ts); demoted columns
+  // open as fixed drawers on the edge away from the Notch — the widget drawer's contract, shell-wide.
+  const splitRef = useRef<HTMLDivElement>(null);
+  const widgetEdge = drawerEdgeFor(widgetsPref.notchEdge);
+  // The demoted widget drawer starts closed on every demotion: on narrow windows the context drawer is already open
+  // on the shared edge, so "one drawer on the edge, one above it" is a deliberate ask, never a surprise.
+  const [widgetsDrawerOpen, setWidgetsDrawerOpen] = useState(false);
+  const widgetToggleRef = useRef<HTMLButtonElement>(null);
+  const widgetsDrawerRef = useRef<HTMLDivElement>(null);
+  const widgetSidebar = widgetLayout === "sidebar";
+  const { placements, contextCollapsed, setContextCollapsed } = useWorkspaceLayout(splitRef, {
+    widgetSidebar,
+    widgetSidebarWidth: widgetsPref.sidebarWidth,
+  });
+  // Focus returns to the dock control after the drawer closes (toggle click or Escape) — never on mount: the
+  // drawer starts closed, so the first run must not steal focus from where the viewer already is.
+  const restoredOnce = useRef(false);
+  useEffect(() => {
+    if (widgetsDrawerOpen) return;
+    if (!restoredOnce.current) { restoredOnce.current = true; return; }
+    widgetToggleRef.current?.focus();
+  }, [widgetsDrawerOpen]);
   const scope = useThemeScope();
   const ambient = useAmbient();
   useDocumentTheme();
@@ -360,7 +399,7 @@ export function Island() {
             {store.syncStatus}
           </p>
         )}
-        <div className="workspace-split">
+        <div className="workspace-split" data-cols={placements.columns} ref={splitRef}>
           <main id="bunny-content" className="workspace-content" tabIndex={-1}>
             {page === "missions" || page === "agentic" ? (
               <AgenticWorkspace />
@@ -384,6 +423,18 @@ export function Island() {
               <Approvals />
             ) : page === "provider" ? (
               <ModelsWorkspace />
+            ) : page === "routing" ? (
+              // E5B F06: Settings-embedded capabilities become real destinations — the same Settings
+              // surface, anchored to the group that holds the routing controls.
+              <Settings key={page} initialGroup="AI & Models" heading={{ eyebrow: "Routing", title: "How Bunny picks a model for each Task." }} />
+            ) : page === "providers" ? (
+              <Settings key={page} initialGroup="Providers" heading={{ eyebrow: "Providers", title: "The model services this Host can use." }} />
+            ) : page === "safety" ? (
+              <Settings key={page} initialGroup="Privacy and permissions" heading={{ eyebrow: "Safety", title: "What Bunny may do, and what always waits for you." }} />
+            ) : page === "accounts" ? (
+              <ConnectedAccountsWorkspace />
+            ) : page === "automations" ? (
+              <AutomationsWorkspace />
             ) : page === "activity" ? (
               <ActivityWorkspace now={now} />
             ) : page === "settings" ? (
@@ -412,8 +463,47 @@ export function Island() {
             )}
             {widgetLayout === "board" && page !== "widgets" && <WidgetSurface mode="board" page={page} openers={widgetOpeners} />}
           </main>
-          {widgetLayout === "sidebar" && <WidgetSurface mode="sidebar" page={page} openers={widgetOpeners} />}
-          {page !== "design-preview" && <ContextPanel now={now} />}
+          {widgetSidebar && placements.widgets === "inline" && <WidgetSurface mode="sidebar" page={page} openers={widgetOpeners} />}
+          {widgetSidebar && placements.widgets === "drawer" && page !== "design-preview" && (
+            <>
+              <button
+                ref={widgetToggleRef}
+                type="button"
+                className="wd-drawer-toggle ws-drawer-toggle"
+                data-edge={widgetEdge}
+                data-slot="secondary"
+                aria-expanded={widgetsDrawerOpen}
+                aria-controls="bunny-widgets-drawer"
+                onClick={() => setWidgetsDrawerOpen(!widgetsDrawerOpen)}
+              >
+                {widgetsDrawerOpen ? "Close widgets" : "Widgets"}
+              </button>
+              {widgetsDrawerOpen && (
+                <div
+                  id="bunny-widgets-drawer"
+                  className="ws-drawer"
+                  data-open="true"
+                  data-edge={widgetEdge}
+                  ref={widgetsDrawerRef}
+                  onKeyDown={(event) => {
+                    if (!escapeClosesDrawer(event, widgetsDrawerRef.current?.contains(event.target as Node) ?? false)) return;
+                    event.preventDefault();
+                    setWidgetsDrawerOpen(false);
+                  }}
+                >
+                  <WidgetSurface mode="sidebar" page={page} openers={widgetOpeners} />
+                </div>
+              )}
+            </>
+          )}
+          {page !== "design-preview" && (
+            <ContextPanel
+              now={now}
+              placement={placements.context === "drawer" ? "drawer" : "inline"}
+              collapsed={contextCollapsed}
+              onToggle={() => setContextCollapsed(!contextCollapsed)}
+            />
+          )}
         </div>
         {widgetLayout === "drawer" && <WidgetSurface mode="drawer" page={page} openers={widgetOpeners} />}
         <footer className="workspace-footer">
@@ -476,6 +566,43 @@ function ConnectionBanner({ freshness }: { freshness: string }) {
         Reconnect
       </button>
     </div>
+  );
+}
+/**
+ * E5B F06: the Proactive surface (the exact section embedded in Tasks and Server Control) as its own
+ * destination. Copy states only what the Host does: goals, schedules, monitors, and approvals stay real.
+ */
+function AutomationsWorkspace() {
+  return (
+    <>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Automation / Proactive</p>
+          <h1>Automations</h1>
+          <p>Goals, schedules and monitors the Host runs; anything consequential still waits for your approval.</p>
+        </div>
+      </div>
+      <Proactive />
+    </>
+  );
+}
+/**
+ * E5B F06: the Connected Services destination is the existing AI provider account broker
+ * (accounts.tsx). The label states its actual capability — no email, calendar or document services
+ * are claimed, because none exists.
+ */
+function ConnectedAccountsWorkspace() {
+  return (
+    <>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Accounts</p>
+          <h1>Connected accounts</h1>
+          <p>Model provider sign-in, plan and permission controls on this Host. There are no email, calendar or document connections to manage.</p>
+        </div>
+      </div>
+      <ConnectedAccounts />
+    </>
   );
 }
 function ModelsWorkspace() {

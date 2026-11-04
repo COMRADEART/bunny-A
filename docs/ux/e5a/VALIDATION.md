@@ -63,3 +63,53 @@ node scripts/e5a-layout-probes.mjs
 ```
 
 Targeted baseline recapture retains other records when `E5A_APPEND=1` and `E5A_SCREENS` names a comma-separated inventory ID (or `companion`). Raw JSON and image filenames stay linked in EVIDENCE.md. If probes fail, keep the failure evidence; do not weaken Host authentication, permissions or approval gates to obtain a green capture.
+
+## E5C+E5D qualification
+
+Appended 2026-11-04. This section closes the E5A defects F01–F08 on `feat/e5c-e5d-universal-ui` (head `4caeca9`; fix commits `e3b398f`, `6ba186c`, `be845b5`, `c8e3f87`, `a548456`, `ddfb362`, `b301ff2`, plus E5D additions `25fa3fb`, `c77d58e`, `c408f0e`, `38d2994`, evidence runs `ba75912`, `4caeca9`). The standalone record with verbatim commands, per-commit rollback and the full evidence index is [docs/ux/e5d/QUALIFICATION.md](../e5d/QUALIFICATION.md). The same status meanings as above apply.
+
+### Defect closure matrix
+
+Every row is measured on the fixed build with the E5A probe vocabulary and the E5D matrix; 440 captures, **0 FAIL**, zero console errors across all captures.
+
+| Defect | Fix commit | Measured closure | Status |
+|---|---|---|---|
+| F01 workspace allocation | `c8e3f87` | Dedicated widget-sidebar (320px) + expanded-context case: Settings **50px → 329px @1181**, **134px → 428px @1280** | PASS |
+| F02 settings rows | `a548456` | At 375px the Appearance row is **291px wide with client = scroll** (System/Light/Dark all unclipped; was 140px client / 192px scroll under `overflow:hidden`). At 844×390 @125% text the document width is **844px** (was 870px / 26px overflow) | PASS |
+| F03 ultrawide width | `be845b5` | `.workspace-content` cap removed: Server Control consumes the full 2048px track (matrix: split width 2344px, `max-width: none`) | PASS |
+| F04 panel gutters + tables | `ddfb362` | Token gutters on every direct `.t8-surface` panel and explicit `.fabric-scroll` wrappers in source; read-only authority and labels byte-identical | PASS for empty state; populated long-cell behaviour PARTIAL |
+| F05 material/media precedence | `6ba186c` + `c408f0e` | OS reduced transparency: computed blur **0px** and opaque surface, decorative filtering removed, stored intensity kept and the limit explained in Appearance. Forced colors: decoration removed and preset titles resolve to CanvasText. The `blur(24px) saturate(1.5)` invariant for the stored-intensity material is preserved | PARTIAL — CDP-emulated only; native/browser environments and a physical OS pass stay open |
+| F06 navigation IA | `b301ff2` | 8 new nav destinations each verified by cold-load deep link; Notifications no longer highlights Activity and vice versa. Home/Chat alias is blueprint-specified design (owner-review item); Connected Accounts mapping recorded, never relabelled as services | PASS for the touched destinations, with retained owner-open notes |
+| F07 inspector reachability | `c8e3f87` + `c77d58e` | Context drawer focus contract (drawer semantics at 1180/1181, focus management restored); widget drawer demoted; phone profile resolves to a collapsed dock whose expanded form joins the layout flow — the offline toast no longer covers it | PASS; expanded in-flow dock has no Escape binding (drawer Escape live at 1180/1181) — recorded open |
+| F08 companion hydration | `e3b398f` | Both renders derive from the same router search: parity across the four deep-linked tabs, direct load, reload and reload-Back; no React #418 | PASS |
+
+### Acceptance matrix
+
+| Criterion / toolchain | Status | Basis |
+|---|---|---|
+| F01–F03 geometry (above) | PASS | Measured on the fixed build; plain-route corpus in the E5D matrix. |
+| F04 empty-state composition | PASS | Matrix captures at every profile; populated rows PARTIAL (seeded Host required). |
+| F05 reduction / forced colors | PARTIAL | Measured PASS under CDP emulation (blur 0px / CanvasText titles); physical OS confirmation open. |
+| F06 destinations + highlight mapping | PASS | 8 cold-load deep links verified; Notifications≠Activity; Home/Chat alias and services mapping owner-open by design. |
+| F07 drawer/dock + focus contract | PASS | Focus management verified; Escape gap on the expanded in-flow phone dock recorded. |
+| F08 companion parity | PASS | ×4 tabs + reload + reload-Back, clean console. |
+| 125% text-scale persistence | PARTIAL | Root `fontSize` 20px verified after navigation on 7 of 8 profile legs; the connected-services silver landscape leg stayed at 16px and is recorded **BLOCKED** rather than captured at the wrong scale. |
+| 44px touch targets (E5D cases) | PARTIAL | Stale-pairing reveal and AI & Models tab pills reach 44px on phone bands; desktop keeps its 40px pills. Pre-existing targets below the E5A vocabulary (AI tab desk rows 40px, character chips 34px, policy checkboxes 13×13) are triage-verified pre-existing, not regressions, and are recorded, not fixed here. |
+| Keyboard checks (`e5a-keyboard-checks.mjs`) | PASS | 11/11 on the fixed build. |
+| Layout probes (`e5a-layout-probes.mjs`) | PASS | 18 cases, 0 overflow. |
+| E5D focus cases | 4 PASS + 2 BLOCKED | Focus ring measured on home/settings both variants; approvals walks reached no Tab-reachable control because the isolated Host has an empty approval queue — nothing focusable, recorded honestly. |
+| Island component tests (`npm run test:ui`) | PASS | 473/473. |
+| Navigation model tests | PASS | 10/10. |
+| Full regression (`npm test`) | PARTIAL | 1763/1764; the single failure is the X53 live-mission flake under concurrent load, which passes solo (17.1s) on the final branch. |
+| Builds | PASS | `npm run build` (web/Vercel target) and `JEV_DESKTOP_BUILD=1 npm run build` both exit 0. |
+| `npm audit` | PASS | 0 vulnerabilities. |
+| Android hermetic gates | PASS | Native tool preparation (with one legitimate retry), 8 JVM test classes, INTERNET-only manifest, aapt2-verified single-permission APK (v4). |
+| Windows native UIA (notch binary build + `verify-ma5-s1-windows.mjs` / `scripts/ma5-s2/verify-notch-windows.mjs`) | BLOCKED | dotnet SDK absent in the qualification environment → JEV notch binary build and both UIA verification scripts not executed. |
+| Narrator / TalkBack / physical Android device | BLOCKED | Not executed; no emulation-as-hardware claim. |
+| Populated dialogs (sign-out, revoke, stop, consent, artifact) | BLOCKED | Require a paired device or seeded Host; protocol-excluded consistently with E5A. |
+| Connected Services mapping | PARTIAL | relatedOnly by design (16 captures labelled related-only Connected Accounts); owner-reopenable; Connected Accounts labels stay accurate and are never relabelled. |
+| Home/Chat alias | PARTIAL | Blueprint-specified design; the alias is an owner-review item, not silently dropped. |
+
+### Harness correction (offline → live)
+
+The first E5D capture run (`ba75912`, 2026-11-04, at source `b301ff2`) produced 434 cases: 386 PARTIAL + 48 BLOCKED. The adapter had no Host data directory wiring, so state-backed sections rendered empty: Lotus Memory ×16, Automations ×16 and Connected Services ×16 recorded BLOCKED. The correction wires `BUNNY_HOST_DATA_DIRECTORY` on **both the Host process and the adapter**; the definitive run (`4caeca9`, at source `38d2994`, 2026-11-04) captures 440 cases against the live Host: **422 PARTIAL, 18 BLOCKED (16 relatedOnly connected-services by design + 2 focus-approvals with nothing focusable), 0 FAIL**. Lotus Memory and Automations now render real state and are PARTIAL. No capture was relabelled to make the correction look like a feature result; the first run stays in the ledger with its honest caveat.

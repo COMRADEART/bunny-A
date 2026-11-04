@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import {
-  DEFAULT_UI_PREFERENCE, FONT_PROVENANCE, NOTCH_FONTS, UI_THEMES, UI_THEME_IDS, UI_THEME_SCHEMA, UI_THEME_SCHEMA_V1,
+  DEFAULT_UI_PREFERENCE, FONT_PROVENANCE, MATERIAL_MEDIA_OVERRIDES, NOTCH_FONTS, NOTCH_THEME_SCHEMA, UI_THEMES,
+  UI_THEME_IDS, UI_THEME_SCHEMA, UI_THEME_SCHEMA_V1,
   accentInk, contrast, notchTheme, over, parseColor, parseUiPreference, resolveTheme, resolveVariant, themeAttributes,
   themeCssVars, themeManifest, validateUiPreference, type Palette, type UiThemeId, type Variant,
 } from "./ui-theme.ts";
@@ -171,6 +172,45 @@ test("density, transparency and theme tokens reach the CSS variables", () => {
   for (const id of UI_THEME_IDS)
     for (const value of Object.values(themeCssVars(resolveTheme({ ...DEFAULT_UI_PREFERENCE, theme: id }))))
       assert.doesNotMatch(value, /url\(|<|>|javascript:|expression\(|@import/i);
+});
+
+test("OS accessibility media outrank the stored Glass Intensity: opaque surfaces, decoration removed, storage untouched (F05)", () => {
+  // No media active: the E1 invariant stands — blur stays owned by transparency at every intensity.
+  for (const intensity of [0, 50, 85, 100])
+    assert.equal(
+      themeCssVars(resolveTheme({ ...DEFAULT_UI_PREFERENCE, theme: "glass", glassIntensity: intensity }))["--blur"],
+      "24px",
+      `blur(24px) untouched at intensity ${intensity}`,
+    );
+  assert.equal(themeAttributes(resolveTheme({ ...DEFAULT_UI_PREFERENCE, theme: "glass" }))["data-glass-intensity"], "85", "the stored intensity is carried and reported");
+  for (const { media, tokens } of MATERIAL_MEDIA_OVERRIDES) {
+    assert.ok(!("--glass-intensity" in tokens), `${media}: the OS limit never rewrites the stored intensity`);
+    assert.equal(tokens["--blur"], "0px", `${media}: decorative filtering is removed, not re-radius'd`);
+    if (media === "(prefers-reduced-transparency: reduce)") {
+      assert.equal(tokens["--glass"], "var(--glass-solid)", "reduced transparency wins over the stored translucent panel");
+      assert.equal(tokens["--panel"], "var(--glass-solid)", "reduced transparency wins over the stored intensity's clear term");
+    } else {
+      assert.equal(tokens["--panel"], undefined, "forced colors keep the OS Canvas colour handling");
+    }
+  }
+  // The overrides ride beside the schemas — no version bump anywhere.
+  assert.equal(UI_THEME_SCHEMA, "bunny-a.ui-theme.v2");
+  assert.equal(NOTCH_THEME_SCHEMA, UI_THEME_SCHEMA_V1);
+  // Seam: glass.css must carry each media block with these exact tokens as !important (they have to beat the
+  // themed root's inline theme vars and every normal declaration) and drop backdrop-filter outright on glass.
+  const css = readFileSync(new URL("../../components/island/glass.css", import.meta.url), "utf8");
+  const galleryCss = readFileSync(new URL("../../components/island/theme-gallery.css", import.meta.url), "utf8");
+  for (const { media, tokens } of MATERIAL_MEDIA_OVERRIDES) {
+    const start = css.indexOf(`@media ${media}`);
+    assert.ok(start >= 0, `glass.css has a ${media} block`);
+    const block = css.slice(start, css.indexOf("\n}", start));
+    assert.ok(block.includes("backdrop-filter: none !important"), `${media}: glass.css drops backdrop-filter outright`);
+    for (const [name, value] of Object.entries(tokens))
+      assert.ok(block.includes(`${name}: ${value} !important`), `${media}: token ${name} lands in glass.css as !important`);
+    const reveal = media === "(prefers-reduced-transparency: reduce)" ? "tg-os-reduced-transparency" : "tg-os-forced-colors";
+    assert.ok(galleryCss.includes(reveal), `the Appearance surface explains the ${media} limit`);
+  }
+  assert.match(css, /--blur: 24px;/, "the blur(24px) default itself is untouched");
 });
 
 test("the glass theme reproduces the accepted T13 glass tokens exactly (no regression of the default)", () => {

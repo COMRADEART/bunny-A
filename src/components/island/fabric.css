@@ -3,6 +3,14 @@
   display: grid;
   gap: var(--s4);
 }
+/* F04: .t8-surface provides a material, not content gutters — every Server Control panel carries the token gutters
+   itself so headings, facts, the coordinator warning and actions keep a breathing distance from the rims at every
+   breakpoint. Each panel is also the inline-size container the narrow table composition queries (the a548456
+   pattern: compose by panel width, not the viewport). */
+.fabric > .t8-surface {
+  padding: var(--s4);
+  container-type: inline-size;
+}
 .fabric-head h2 {
   margin-bottom: var(--s2);
 }
@@ -80,4 +88,22 @@
 .fabric h4 {
   margin: var(--s4) 0 var(--s2);
   font-family: var(--font-display);
+}
+/* F04: the explicit overflow wrapper every table sits in — a wide table scrolls inside its panel, never past it. */
+.fabric-scroll {
+  overflow-x: auto;
+}
+/* F04 narrow composition: inside a narrow panel, cells drop to the small token gutters and wrap long tokens first,
+   so the table reflows before the wrapper's scroll becomes the resting state (base-scoped like a548456 so it wins). */
+@container (max-width: 560px) {
+  .bunny-app .fabric-table :is(th, td) {
+    padding: var(--s2) var(--s1);
+    overflow-wrap: anywhere;
+  }
+}
+/* F04: on the compressed phone shell the gutter narrows to the next token; the shell's own breakpoint convention. */
+@media (max-width: 720px) {
+  .fabric > .t8-surface {
+    padding: var(--s3);
+  }
 }
