@@ -97,3 +97,14 @@ The base matrix contains 26 sections × 2 variants × 3 viewports = 156 records,
 - [Layout probes](evidence/layout-probes.json): breakpoint, ultrawide, 375px, 125% text, landscape and widget-sidebar cases.
 - [Keyboard/DOM checks](evidence/keyboard-checks.json): eleven passing browser checks; not spoken Narrator/TalkBack evidence.
 - [Validation report](VALIDATION.md): build/test outcomes and explicit hardware/environment limitations.
+
+## E5C+E5D evidence ledger
+
+Two capture runs over the fix line `e3b398f`→`4caeca9`, both against the real built desktop adapter with an isolated Host state directory and no mocked responses. Records and PNGs live in `../e5d/evidence/`; the qualification record is [docs/ux/e5d/QUALIFICATION.md](../e5d/QUALIFICATION.md).
+
+- **`ba75912` — first 434-case run** (committed evidence; source commit at capture time `b301ff2`, capturedAt 2026-11-04T05:10Z). 434 cases: 386 PARTIAL + 48 BLOCKED, 416 screen + 8 intensity + 10 media. **Honest offline-state caveat:** the adapter had no Host data directory wiring yet, so 32 state-backed screen captures are BLOCKED (Lotus Memory ×16, Automations ×16) on top of the 16 relatedOnly connected-services records; no focus cases existed in this run. 601 files added.
+- **`4caeca9` — definitive 440-case live run** (source commit `38d2994`, capturedAt 2026-11-04T15:12:32Z, after the corrected `BUNNY_HOST_DATA_DIRECTORY` wiring on both Host and adapter). 440 cases: **422 PARTIAL + 18 BLOCKED + 0 FAIL**, 416 screen + 8 intensity + 10 media + 6 focus, zero console errors and zero failed resources across every capture. The 18 blocked: 16 connected-services relatedOnly by design (the absent destination, never relabelled — this section's silver landscape-text125 leg kept a 16px root size after navigation and was recorded BLOCKED instead of capturing at the wrong scale) + 2 focus-approvals (an empty approval queue has nothing Tab-focusable). 606 files rewritten; the manifest [e5d-matrix.json](../e5d/evidence/e5d-matrix.json) references 437 PNGs — three capture records carry no PNG because there was nothing honest to capture (connected-services silver landscape-text125 and both focus-approvals) — and 201 first-run panel PNGs remain on disk superseded but retained (638 PNGs total in `../e5d/evidence/`).
+
+Run totals on the fixed build: keyboard checks 11/11, layout probes 18 cases / 0 overflow, focus cases 4 PASS (ring measured) + 2 BLOCKED, island tests 473/473, navigation tests 10/10, full regression 1763/1764 (X53 live-mission flake under load; solo PASS at 17.1s), both `npm run build` targets exit 0, `npm audit` 0 vulnerabilities, Android hermetic gates PASS.
+
+Contact sheets built from the definitive matrix, grouped per profile/variant: [../e5d/sheets/](../e5d/sheets/) — `e5d-contacts-<profile>-<variant>-01.png` for all 8 profiles × both variants plus one extras sheet for the intensity/media/focus cases.
