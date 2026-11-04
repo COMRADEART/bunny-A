@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
-import { SCREENS, PROFILES, VARIANTS, GLASS_INTENSITIES, MEDIA_CASES, caseId, planCases } from "./e5d-matrix-plan.mjs";
+import {
+  SCREENS, PROFILES, VARIANTS, GLASS_INTENSITIES, MEDIA_CASES, FOCUS_SCREENS, FOCUS_PROFILE_ID,
+  caseId, planCases,
+} from "./e5d-matrix-plan.mjs";
 
 test("screen list matches the canonical E5A/SCREENS.md inventory exactly", () => {
   // Anchored to docs/ux/e5a/SCREENS.md and scripts/e5a-ui-baseline.mjs; any drift is a TODO-E5C decision.
@@ -29,13 +32,19 @@ test("viewport set covers the E5D responsive matrix", () => {
   assert.equal(caseId("home", "dark", "ultrawide"), "home-graphite-ultrawide");
 });
 
-test("plan enumerates screens x variants x profiles plus intensity and media sweeps", () => {
+test("plan enumerates screens x variants x profiles plus intensity, media and focus sweeps", () => {
   const cases = planCases();
   assert.equal(cases.length, SCREENS.length * PROFILES.length * VARIANTS.length
     + VARIANTS.length * GLASS_INTENSITIES.length
-    + VARIANTS.length * Object.keys(MEDIA_CASES).length);
+    + VARIANTS.length * Object.keys(MEDIA_CASES).length
+    + VARIANTS.length * FOCUS_SCREENS.length);
+  assert.equal(cases.length, 440, "416 screen + 8 intensity + 10 media + 6 focus");
   const ids = new Set(cases.map((c) => c.id));
   assert.equal(ids.size, cases.length, "case ids must be unique");
+  assert.deepEqual(
+    [...new Set(cases.map((c) => c.kind))].sort(),
+    ["focus", "intensity", "media", "screen"],
+  );
   const intensity = cases.filter((c) => c.kind === "intensity");
   assert.deepEqual(
     intensity.filter((c) => c.variant === "light").map((c) => c.id),
@@ -45,6 +54,18 @@ test("plan enumerates screens x variants x profiles plus intensity and media swe
     cases.filter((c) => c.kind === "media" && c.variant === "dark").map((c) => c.id),
     ["high-contrast-graphite-desktop", "reduced-transparency-graphite-desktop", "os-reduced-transparency-graphite-desktop", "reduced-motion-graphite-desktop", "forced-colors-graphite-desktop"],
   );
+  // Focus cases: keyboard-focused states at the desktop baseline, both variants, stable ids.
+  assert.deepEqual(
+    cases.filter((c) => c.kind === "focus").map((c) => c.id),
+    [
+      "focus-home-silver-desktop", "focus-settings-silver-desktop", "focus-approvals-silver-desktop",
+      "focus-home-graphite-desktop", "focus-settings-graphite-desktop", "focus-approvals-graphite-desktop",
+    ],
+  );
+  for (const c of cases.filter((c) => c.kind === "focus")) {
+    assert.equal(c.profile.id, FOCUS_PROFILE_ID);
+    assert.ok(c.screen.view && c.screen.target, `${c.id} needs a real screen`);
+  }
   // The base matrix stays at intensity 85; only the sweep varies it.
   for (const c of cases.filter((c) => c.kind === "screen")) assert.equal(c.options.intensity, undefined);
 });
@@ -60,6 +81,10 @@ test("subset is an OR substring match over id, screen and profile", () => {
   // The intensity/media sweeps capture the Settings screen, so the settings token pulls them.
   assert.ok(settings.some((c) => c.id === "intensity-0-silver-desktop"));
   assert.ok(settings.some((c) => c.id === "forced-colors-graphite-desktop"));
+  assert.ok(settings.some((c) => c.id === "focus-settings-silver-desktop"));
+  const focus = planCases(["focus"]);
+  assert.equal(focus.length, VARIANTS.length * FOCUS_SCREENS.length);
+  assert.ok(focus.every((c) => c.kind === "focus"));
   const combo = planCases(["graphite", "mobile-375"]);
   assert.ok(combo.every((c) => c.variant === "dark" || c.profile.id === "mobile-375"));
   assert.ok(planCases(["no-such-token"]).length === 0);

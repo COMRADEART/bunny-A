@@ -96,6 +96,12 @@ export const MEDIA_CASES = {
   "forced-colors": { forcedColors: true },
 };
 
+/** Focused-state cases (matrix defect 2): keyboard focus at the desktop baseline, both variants.
+ * The runner Tab-presses like a real keyboard user until a control inside the screen's target is
+ * focused; ids are stable for tests. 2 variants x 3 screens = 6 cases. */
+export const FOCUS_SCREENS = ["home", "settings", "approvals"];
+export const FOCUS_PROFILE_ID = "desktop";
+
 export function caseId(prefix, variant, profileId) {
   return `${prefix}-${THEME_NAMES[variant]}-${profileId}`;
 }
@@ -105,7 +111,8 @@ export function caseIncluded(idText, tokens = []) {
 }
 
 /** Enumerates the whole matrix: screens x variants x profiles, then the Settings x desktop
- * intensity and media sweeps. --subset tokens are OR-matched against "<id> <screen id>". */
+ * intensity, media and keyboard-focus sweeps. --subset tokens are OR-matched against
+ * "<id> <screen id>". */
 export function planCases(tokens = []) {
   const settings = SCREENS.find((s) => s.id === "settings");
   const cases = [];
@@ -139,6 +146,16 @@ export function planCases(tokens = []) {
         variant,
         prefix: name,
         options,
+      });
+  for (const variant of VARIANTS)
+    for (const id of FOCUS_SCREENS)
+      cases.push({
+        kind: "focus",
+        screen: SCREENS.find((s) => s.id === id),
+        profile: PROFILES.find((p) => p.id === FOCUS_PROFILE_ID),
+        variant,
+        prefix: `focus-${id}`,
+        options: {},
       });
   return cases
     .map((c) => ({ ...c, id: caseId(c.prefix, c.variant, c.profile.id) }))

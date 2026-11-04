@@ -21,6 +21,9 @@
  * (<id>-<silver|graphite>-<profile>.png). Exits 1 on any FAIL or when no capture PARTIALed
  * (a dead adapter or misconfigured Host must not green-light); BLOCKED stays honest-but-green
  * per E5A (screens may be unreachable until Lane A lands — see TODO-E5C in e5d-matrix-plan.mjs).
+ * Focus cases (kind focus) Tab-press like a real keyboard user and record focusRect/focus ring;
+ * the 125% text leg re-applies the preference once and records BLOCKED rather than capture at
+ * a scale the app did not apply.
  */
 import { chromium } from "playwright";
 import { mkdirSync, readFileSync } from "node:fs";
@@ -71,6 +74,64 @@ save();
 // Exit decision counts THIS run only: an E5D_APPEND recapture must not ride on old PARTIALs.
 const run = { partial: 0, fail: 0 };
 
+const SETTLED_SELECTOR =
+  '.stream-indicator[data-connection="live"], .stream-indicator[data-connection="polling"], ' +
+  '.stream-indicator[data-connection="offline"], .pc-root[data-status="live"]';
+const settled = (page, timeout = 12000) =>
+  page.waitForFunction((sel) => !!document.querySelector(sel), SETTLED_SELECTOR, { timeout });
+
+/** 125% text leg (F02), E5A's working mechanism (scripts/e5a-layout-probes.mjs): the Text size
+ * select only persists when picked on a fully settled page — a change event that lands before
+ * React hydration is dropped and the preference never saves — so wait for hydration (the theme
+ * attribute for light flips only then) and a settled connection, select, then verify fontSize. */
+async function applyTextScale(page, variant, scale) {
+  await page.locator(`.bunny-app[data-theme="${variant}"]`).waitFor({ timeout: 25000 });
+  await settled(page, 20000);
+  await page.getByLabel("Text size", { exact: true }).selectOption(String(scale));
+  await page
+    .waitForFunction(
+      (s) => getComputedStyle(document.documentElement).fontSize === `${16 * s}px`,
+      scale,
+      { timeout: 5000 },
+    )
+    .catch(() => {}); // the target-navigation verify in capture() is the authority
+}
+
+/** Keyboard focus (focus cases): :focus-visible shows only for real keyboard interaction, so
+ * press Tab (trusted key presses, never focus()) until a visible control inside the target
+ * surface is focused. Returns the focus evidence or null when the walk reaches nothing. */
+const FOCUS_TAB_STEPS = 40;
+async function keyboardFocus(page, targetSelector) {
+  for (let step = 1; step <= FOCUS_TAB_STEPS; step++) {
+    await page.keyboard.press("Tab");
+    const hit = await page.evaluate(
+      (sel) => {
+        const a = document.activeElement;
+        if (!a || a === document.body || !a.closest(sel)) return null;
+        const r = a.getBoundingClientRect(),
+          s = getComputedStyle(a);
+        if (!(r.width > 0 && r.height > 0) || s.visibility === "hidden" || s.display === "none")
+          return null;
+        return {
+          tag: a.tagName.toLowerCase(),
+          label: a.getAttribute("aria-label") || (a.textContent || "").trim().slice(0, 60),
+          focusVisible: a.matches(":focus-visible"),
+          focusRect: {
+            x: Math.round(r.x),
+            y: Math.round(r.y),
+            width: Math.round(r.width),
+            height: Math.round(r.height),
+          },
+          ring: { outline: `${s.outlineWidth} ${s.outlineStyle} ${s.outlineColor}`, boxShadow: s.boxShadow },
+        };
+      },
+      targetSelector,
+    );
+    if (hit) return { ...hit, tabStep: step, surface: targetSelector };
+  }
+  return null;
+}
+
 const browser = await chromium.launch({ headless: true });
 async function capture(kase) {
   const { screen, profile, variant, options } = kase;
@@ -103,27 +164,25 @@ async function capture(kase) {
     consoleErrors: errors,
     failedResources,
   };
+  const params = new URLSearchParams({
+    view: screen.view,
+    uitheme: "glass",
+    theme: variant,
+    glassintensity: String(options.intensity ?? 85),
+  });
+  const settingsHref = new URL(
+    `/?view=settings&uitheme=glass&theme=${variant}&glassintensity=${options.intensity ?? 85}`,
+    base,
+  ).href;
+  const targetHref = new URL("?" + params, base).href;
   try {
-    const params = new URLSearchParams({
-      view: screen.view,
-      uitheme: "glass",
-      theme: variant,
-      glassintensity: String(options.intensity ?? 85),
-    });
     if (profile.textScale) {
       // Landscape 844x390 at supported 125% text (F02): set the appearance preference first,
       // then navigate to the target within the same context.
-      await page.goto(
-        new URL(
-          `/?view=settings&uitheme=glass&theme=${variant}&glassintensity=${options.intensity ?? 85}`,
-          base,
-        ).href,
-        { waitUntil: "domcontentloaded" },
-      );
-      await page.locator(`.bunny-app[data-theme="${variant}"]`).waitFor({ timeout: 25000 });
-      await page.getByLabel("Text size", { exact: true }).selectOption(String(profile.textScale));
+      await page.goto(settingsHref, { waitUntil: "domcontentloaded" });
+      await applyTextScale(page, variant, profile.textScale);
     }
-    const response = await page.goto(new URL("?" + params, base).href, {
+    const response = await page.goto(targetHref, {
       waitUntil: "domcontentloaded",
     });
     record.httpStatus = response.status();
@@ -137,22 +196,35 @@ async function capture(kase) {
       const fontSize = await page.evaluate(
         () => getComputedStyle(document.documentElement).fontSize,
       );
-      if (fontSize !== `${16 * profile.textScale}px`)
+      if (fontSize !== `${16 * profile.textScale}px`) {
+        // Never capture the 125% leg at the wrong scale: re-apply once through the app's real
+        // control path, then verify; a second failure is BLOCKED with the measured reason.
         record.notes.push(
-          `125% text did not survive navigation (root fontSize ${fontSize}); landscape case ran at a different scale (TODO-E5C).`,
+          `125% text lost on navigation (root fontSize ${fontSize}); re-applying through the Settings control once.`,
         );
+        await page.goto(settingsHref, { waitUntil: "domcontentloaded" });
+        await applyTextScale(page, variant, profile.textScale);
+        const retry = await page.goto(targetHref, { waitUntil: "domcontentloaded" });
+        record.httpStatus = retry.status();
+        record.url = page.url();
+        await page
+          .locator(`.bunny-app[data-theme="${variant}"][data-glass-intensity="${options.intensity ?? 85}"]`)
+          .waitFor({ timeout: 25000 });
+        const after = await page.evaluate(
+          () => getComputedStyle(document.documentElement).fontSize,
+        );
+        if (after !== `${16 * profile.textScale}px`) {
+          record.status = "BLOCKED";
+          record.notes.push(
+            `125% text-scale could not be applied (root fontSize ${after} even after re-applying through the Settings control); recorded BLOCKED instead of capturing at ${after}.`,
+          );
+          return;
+        }
+      }
     }
-    await page
-      .waitForFunction(
-        () =>
-          !!document.querySelector(
-            '.stream-indicator[data-connection="live"], .stream-indicator[data-connection="polling"], .stream-indicator[data-connection="offline"], .pc-root[data-status="live"]',
-          ),
-        { timeout: 12000 },
-      )
-      .catch(() =>
-        record.notes.push("Host did not reach a settled connection indicator in 12 seconds."),
-      );
+    await settled(page).catch(() =>
+      record.notes.push("Host did not reach a settled connection indicator in 12 seconds."),
+    );
     if (screen.group)
       await page
         .getByRole("navigation", { name: "Settings groups" })
@@ -193,6 +265,19 @@ async function capture(kase) {
       );
     await page.waitForTimeout(350);
     await page.evaluate(() => document.fonts.ready);
+    if (kase.kind === "focus") {
+      // Press Tab only after scrollIntoViewIfNeeded so the focused control and its ring stay in
+      // frame for the capture below.
+      // No Tab-reachable control means no focus evidence: BLOCK instead of an unfocused frame.
+      record.focus = await keyboardFocus(page, screen.target);
+      if (!record.focus) {
+        record.status = "BLOCKED";
+        record.notes.push(
+          `Keyboard Tab walk (${FOCUS_TAB_STEPS} presses) reached no visible control inside ${screen.target}; no focus evidence without a focused control.`,
+        );
+        return;
+      }
+    }
     record.measurements = await page.evaluate(() => {
       const box = (selector) => {
         const el = document.querySelector(selector);
