@@ -75,7 +75,8 @@ export function FabricWorkspace({ now, freshness }: { now: number; freshness: st
         {devices.length === 0 ? (
           <Empty title="No devices are registered." detail="Pairing happens on the Devices page." />
         ) : (
-          <table className="fabric-table">
+          <div className="fabric-scroll">
+            <table className="fabric-table">
             <thead>
               <tr>
                 <th scope="col">Name</th>
@@ -96,7 +97,8 @@ export function FabricWorkspace({ now, freshness }: { now: number; freshness: st
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
         <p className="fabric-note">
           <button className="btn secondary" type="button" onClick={() => store.setSheet("devices")}>
@@ -124,7 +126,8 @@ export function FabricWorkspace({ now, freshness }: { now: number; freshness: st
         {ledger.length === 0 ? (
           <p className="fabric-empty">No routing decisions recorded yet. The ledger shows what the router actually chose; no scores or quotas are invented.</p>
         ) : (
-          <table className="fabric-table">
+          <div className="fabric-scroll">
+            <table className="fabric-table">
             <thead>
               <tr>
                 <th scope="col">Task</th>
@@ -149,12 +152,14 @@ export function FabricWorkspace({ now, freshness }: { now: number; freshness: st
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
         {profiles.length === 0 ? (
           <Empty title="No performance profiles yet." detail="Profiles appear as real tasks complete." />
         ) : (
-          <table className="fabric-table">
+          <div className="fabric-scroll">
+            <table className="fabric-table">
             <thead>
               <tr>
                 <th scope="col">Provider</th>
@@ -177,13 +182,15 @@ export function FabricWorkspace({ now, freshness }: { now: number; freshness: st
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
         <h4>Usage ledger (known costs only)</h4>
         {usage.length === 0 ? (
           <p className="fabric-empty">No ledger rows in this session yet. Unknown costs stay unknown here.</p>
         ) : (
-          <table className="fabric-table">
+          <div className="fabric-scroll">
+            <table className="fabric-table">
             <thead>
               <tr>
                 <th scope="col">Provider</th>
@@ -206,7 +213,8 @@ export function FabricWorkspace({ now, freshness }: { now: number; freshness: st
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
         <p className="fabric-note">
           <button className="btn secondary" type="button" onClick={() => store.setSheet("provider")}>
@@ -222,7 +230,8 @@ export function FabricWorkspace({ now, freshness }: { now: number; freshness: st
         {events.length === 0 ? (
           <Empty title="No events yet." />
         ) : (
-          <table className="fabric-table">
+          <div className="fabric-scroll">
+            <table className="fabric-table">
             <thead>
               <tr>
                 <th scope="col">#</th>
@@ -241,7 +250,8 @@ export function FabricWorkspace({ now, freshness }: { now: number; freshness: st
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
       </section>
 
