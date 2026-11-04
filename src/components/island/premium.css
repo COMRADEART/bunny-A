@@ -938,6 +938,8 @@
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 61;
+  /* A fixed-width dialog is also a settings-row container: the shared F02 geometry stacks inside it too. */
+  container-type: inline-size;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--r-shell);
@@ -1178,10 +1180,6 @@
   }
   .t8-app .project-tools {
     flex-wrap: wrap;
-  }
-  .t8-app .setting-row {
-    flex-wrap: wrap;
-    gap: var(--s3);
   }
 }
 @media (prefers-reduced-motion: reduce) {

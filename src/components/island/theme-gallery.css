@@ -1,6 +1,9 @@
 /* Theme Gallery (Settings → Appearance). Cards inherit the shown theme; each miniature carries its own theme's tokens. */
 .tg {
   display: grid;
+  /* F02: the rows' min-content (a long label word plus a fixed-width control) used to size these auto tracks and
+     overflow the panel — the track must clamp to the container and let the shared row geometry wrap instead. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--s5);
 }
 .tg-status {
@@ -43,6 +46,8 @@
   margin: 0;
   padding: 0;
   display: grid;
+  /* Same F02 clamp as .tg above: settings rows size to the container, tracks never fit their min-content. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--s2);
 }
 .tg-tuning legend {
@@ -95,7 +100,8 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  /* F02: the 280px minimum never exceeds its own container (same guard as .project-grid). */
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
   gap: var(--s4);
 }
 .tg-card {
