@@ -13,7 +13,7 @@ BLOCKED = the required destination, device or channel was unavailable.
 |---|---|---|---|
 | 1 | **X53 false-FAIL on an unbuilt ownership artifact set** — the Git steps launch through `windowsOwnershipModule()`, which reads `native/bunny-owned-process.node(.json)` built by pretest; on a bare checkout step 1 failed ENOENT three times, the first Host never reached its stop role and the test died "Owned disposable Host failed to exit". Now skips as NOT TESTED (same honesty class as the existing Calculator/input-desktop gates). Reproduced with artifacts moved out: 0 fail / 1 skipped in 0.9 s; artifacts restored after. | `5e78248` | reproduction noted in the commit; evidence protocol below |
 | 2 | **X53 completion wait vs mission budget under concurrent load** — one failure in 34 loaded attempts (solo, serial-under-build-load, pairwise-concurrent, 4-way layered build+typecheck+test:ui load): 105.9 s, `Timeout: Integrated Mission completion`, the test's whole-leg 100 s deadline binding while the mission's own per-step contract is 600 s; every other loaded run completed in ≤24 s. The completion wait is now 180 s (inside the mission budget, inside the raised 240 s node:test timeout) and a timeout records `integrated-stall.json` with the last observed agent state plus worker output, so a future stall carries its own evidence instead of silence. The post-fix run passes 17.6 s. | `5e78248` | campaign tally in commit body |
-| 3 | **125% text leg measured mid-application** — the runner read root `fontSize` immediately after navigation, racing the app's post-hydration scale pass: the definitive E5D matrix lost the scale on 9 of 25 silver landscape navigations (each held after its single re-apply) and one double loss falsely recorded connected-services as unable to apply 125% text. Measurement now waits for the scale to settle (bounded 5 s `waitForFunction`), keeps the single real-control re-apply, and BLOCKs only on a measured non-settling fontSize. Fresh full leg: 52 captures = 50 PARTIAL + the 2 relatedOnly connected-services blocks that are blocked by design, **zero scale notes**. | `925811b` | isolated-harness leg run on the live adapter + host (`connection: live` in both sampled records) |
+| 3 | **125% text leg measured mid-application** — the runner read root `fontSize` immediately after navigation, racing the app's post-hydration scale pass: the definitive E5D matrix lost the scale on 9 of 25 silver landscape navigations (each held after its single re-apply) and one double loss falsely recorded connected-services as unable to apply 125% text. Measurement now waits for the scale to settle (bounded 5 s `waitForFunction`), keeps the single real-control re-apply, and BLOCKs only on a measured non-settling fontSize. Fresh full leg: 52 captures = 50 PARTIAL + the 2 relatedOnly connected-services blocks that are blocked by design, **zero scale notes**. | `925811b` | committed ledger `docs/ux/e6a/evidence/landscape-text125-leg.json`; sampled records show `connection: live` |
 | 4 | **Expanded in-flow phone dock had no Escape binding** (E5D F07 retained open item) — `premium.tsx` hands the shell's `dock` placement through; `ContextPanel` binds the shared `escapeClosesDrawer` guard for it: Escape from inside the expanded dock collapses to the rail and focus returns to the reopen control, exactly the drawer contract. Desktop inline panels keep no Escape binding. | `f7b724f` | new `context-dock.test.ts` lock; `npm run test:ui` 474/474 |
 | 5 | **Phone-band touch targets** — character slot chips (34 px), animation-intensity and high-contrast rows and the background-task policy rows (native 13 px boxes inside short labels) now reach the 44 px thumb bar on the phone bands only; desktop keeps its compact pills by design. | `925811b` | `e5d-css-fixes.test.ts` source lock; 8/8 in the touched suites |
 | 6 | **Populated isolated fixtures** — approval offer (left pending), consent granted → COMPLETED with two verified artifacts, consent revoked through the real dialog → STOPPED, two real paired devices with a revoke executed through the real UI dialog, Server Control populated. 0 console errors. | See below | `docs/ux/e6a/evidence/populated/` (script `scripts/e6a-populated-captures.mjs`) |
@@ -49,6 +49,31 @@ dialog captured and confirmed → `revoked: true`; artifacts `filesystem.read/co
 | Paired-device authority (item 8) | PASS | `tests/native-companion.test.ts` 4/4 — consequential approvals refused to devices (`APPROVAL_ON_HOST`), workstation-only actions refused |
 | Windows native UIA (dotnet) | BLOCKED | Needs the dotnet SDK — owner-attended (Phase E6B) |
 | Narrator / TalkBack / physical Android | BLOCKED | Owner-attended (Phases E6B/E6C) |
+
+## Verification runs (commands verbatim)
+
+```powershell
+npm run typecheck                                        # clean after every fix
+npx eslint <touched files>                               # 0 errors
+npm run test:ui                                          # 474/474 (new dock Escape lock included)
+E5A_ISOLATED_HOST=1 node scripts/e5a-keyboard-checks.mjs  # 11/11 PASS, errors []
+E5A_ISOLATED_HOST=1 node scripts/e5a-layout-probes.mjs    # 18 captures, 0 overflows
+node --experimental-strip-types --test src/lib/bunny-host/ui-theme.test.ts src/lib/bunny-host/ui-theme-glass.test.ts
+                                                         # 23/23 — 22 themes; blur invariant across 101 intensities
+node --experimental-strip-types --test tests/native-companion.test.ts   # 4/4 device-authority matrix
+E5D_ISOLATED_HOST=1 node scripts/e5d-capture-matrix.mjs http://127.0.0.1:8082/ <out> --subset=landscape-text125
+                                                         # 52 cases: 50 PARTIAL + 2 relatedOnly by design, 0 scale notes
+npm test                                                 # full regression: 1764 + 62 + 318 checks, 0 fail,
+                                                         # 1 skip = "MA4 live free-model Host contract (opt-in)",
+                                                         # X53 PASS 16.8 s
+npm audit                                                # 0 vulnerabilities
+```
+
+Post-fix phone-band measurements (live 390×844 mobile context on the rebuilt output; evidence
+`docs/ux/e6a/evidence/postfix-touch/`): `.ch-chip` chips 44/44/44/44, `.ca-intensity` rows 44×3,
+`.ca-check` 44, `.policy-row` rows 44 — the runner's input-box vocabulary still lists the native
+13 px boxes (that is the input element's own size), so the row measurement above is the
+touch-target evidence.
 
 ## Harness facts learned this phase (for E6B/E6D)
 
