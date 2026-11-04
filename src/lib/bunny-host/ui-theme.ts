@@ -1026,6 +1026,29 @@ export function scaledGlassShadow(shadow: string, depth: number): string {
     .join(", ");
 }
 
+// -------------------------------------------------------------------------------------------------- material/media precedence
+/**
+ * Shared material/media precedence (E5B, docs/ux/e5a/DEFECTS.md F05): OS accessibility media outrank every
+ * in-app preference and the stored Glass Intensity. glass.css lands each entry's tokens with !important inside the
+ * matching media query so they beat the themed root's inline vars (themeCssVars) and every normal declaration,
+ * whatever its specificity, and drops backdrop-filter on the glass surface family: opaque surfaces, decorative
+ * filtering (blur, saturation) removed. The stored preference is never rewritten and the limit is explained on the
+ * Appearance surface (theme-gallery). Without either media nothing applies — the E1 invariant blur(24px) at
+ * intensity 0/50/85/100 stays untouched. ui-theme.test.ts reads glass.css to keep the two in lockstep.
+ */
+export const MATERIAL_MEDIA_OVERRIDES: ReadonlyArray<{ media: string; tokens: Record<string, string> }> = [
+  {
+    media: "(prefers-reduced-transparency: reduce)",
+    // Opaque wins over the stored translucent panel, exactly like the in-app Opaque option resolves it.
+    tokens: { "--glass": "var(--glass-solid)", "--panel": "var(--glass-solid)", "--blur": "0px" },
+  },
+  {
+    media: "(forced-colors: active)",
+    // Colours stay with the OS Canvas handling; only the decoration (blur/saturation) is ours to remove.
+    tokens: { "--blur": "0px" },
+  },
+];
+
 // ------------------------------------------------------------------------------------------------------------ resolve
 export type ResolvedTheme = {
   manifest: ThemeManifest;

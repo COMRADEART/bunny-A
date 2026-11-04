@@ -269,6 +269,14 @@ export function ThemeGallery() {
             {glassLimitedNote(shown)}
           </small>
         )}
+        {/* F05: an OS accessibility limit never reaches the preference store, so the OS media itself reveals the
+            explanation (theme-gallery.css); the slider keeps showing the stored value. */}
+        <small className="tg-glass-note tg-os-reduced-transparency" role="note">
+          System reduced transparency renders glass opaque — stored intensity retained.
+        </small>
+        <small className="tg-glass-note tg-os-forced-colors" role="note">
+          System forced colors remove glass decoration — stored intensity retained.
+        </small>
         <div className="setting-row">
           <div>
             <strong>Transparency</strong>

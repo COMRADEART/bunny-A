@@ -418,3 +418,19 @@
   color: var(--muted);
   font-size: var(--text-xs);
 }
+/* F05: the OS material limits are invisible to the preference store, so each OS media query reveals its own
+   explanation beside the Glass Intensity slider; without the OS limit the lines stay inert. */
+.tg-os-reduced-transparency,
+.tg-os-forced-colors {
+  display: none;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .tg-os-reduced-transparency {
+    display: inline;
+  }
+}
+@media (forced-colors: active) {
+  .tg-os-forced-colors {
+    display: inline;
+  }
+}

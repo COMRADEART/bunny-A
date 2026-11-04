@@ -127,34 +127,48 @@
   }
 }
 @media (prefers-reduced-transparency: reduce) {
-  .bunny-app.t8-app {
-    --blur: 0px;
-    --glass: var(--glass-solid);
-    --panel: var(--glass-solid);
+  /* F05 shared material/media precedence: the OS limit outranks every in-app preference and the stored Glass
+     Intensity, so the tokens must carry !important to beat the themed root's inline vars (themeCssVars) and the
+     surface rule must outrank every normal filter rule, whichever its specificity ([data-ui-theme] also reaches
+     the portaled dialogs and the phone). Tokens: ui-theme.ts MATERIAL_MEDIA_OVERRIDES; ui-theme.test.ts keeps
+     this block and that table in lockstep. */
+  [data-ui-theme] {
+    --glass: var(--glass-solid) !important;
+    --panel: var(--glass-solid) !important;
+    --blur: 0px !important;
   }
   .bunny-app.t8-app .glass,
   .bunny-app.t8-app .t8-surface,
   .bunny-app.t8-app .app-sidebar,
   .bunny-app.t8-app .cx-panel,
-  .bunny-app.t8-app .connection-banner {
+  .bunny-app.t8-app .connection-banner,
+  .bunny-app.t8-app .offline-banner,
+  .bunny-app.t8-app .attention-banner {
     background: var(--glass-solid);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
   }
 }
 @media (forced-colors: active) {
+  /* F05: readable OS Canvas colours already win (the browser adjusts them); what is ours to remove is the
+     decoration — the computed backdrop filter — with the same !important precedence as above. */
+  [data-ui-theme] {
+    --blur: 0px !important;
+  }
   .bunny-app.t8-app,
   .bunny-app.t8-app .glass,
   .bunny-app.t8-app .t8-surface,
   .bunny-app.t8-app .app-sidebar,
   .bunny-app.t8-app .cx-panel,
-  .bunny-app.t8-app .connection-banner {
+  .bunny-app.t8-app .connection-banner,
+  .bunny-app.t8-app .offline-banner,
+  .bunny-app.t8-app .attention-banner {
     background: Canvas;
     color: CanvasText;
     border-color: CanvasText;
     box-shadow: none;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
   }
 }
 
