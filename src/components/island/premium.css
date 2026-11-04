@@ -1419,6 +1419,26 @@
   .t8-app:not([data-surface="companion"]) .bunny-toast {
     bottom: calc(var(--s3) + 52px);
   }
+  /* E5D: the stale-pairing note is a real control on these profiles too — it keeps its loopback-only origin truth
+     (settings.tsx renders it only there) while the reveal button reaches the 44px thumb bar. */
+  .t8-app .offline-note .button {
+    min-height: 44px;
+    width: 100%;
+    padding: 0 var(--s4);
+  }
+}
+/* E5D: the AI & Models tabs are thumb controls inside the settings-panel container (a548456's container-aware
+   geometry): on a narrow container each tab reaches the 44px bar and the fill makes the seven tabs wrap in tidy
+   full rows instead of ragging. Desktop keeps the 40px pill. */
+@container (max-width: 560px) {
+  .bunny-app.t8-app .ai-tabs [role="tab"] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
 }
 
 /* M-A-3 T10 voice surface. Every animation here is driven by real snapshot data; reduced motion turns them off. */

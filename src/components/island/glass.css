@@ -170,6 +170,14 @@
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
   }
+  /* E5D: the two Liquid Glass preset cards are toggle buttons, and in forced colours a disabled button's label
+     resolves to GrayText (dark red in Chromium's palette, which reads as an error). The card titles are headings,
+     so they keep OS CanvasText (the F05 pattern); the disabled state still shows through the shell's own opacity,
+     and the card's in-use tag keeps the same heading colour. The miniatures keep their own forced-color-adjust:
+     none so each theme card still draws its real design. */
+  .bunny-app.t8-app :is(.tg-preset, .tg-preset .tg-tag) {
+    color: CanvasText;
+  }
 }
 
 /* The dark character well: character art always sits on this, so its dark visor never disappears into light glass. */
