@@ -1,0 +1,234 @@
+{
+  "classification": "POPULATED ISOLATED FIXTURE",
+  "base": "http://127.0.0.1:8082/",
+  "steps": [
+    {
+      "step": "pending approval offer created",
+      "value": {
+        "agentId": "45f36664-2c8a-4c30-b1e9-161e602a7723"
+      }
+    },
+    {
+      "step": "granted consent agent completed",
+      "value": {
+        "agentId": "e36222fc-4e7c-4744-8f65-d0e2d3b28eb9",
+        "artifacts": 2
+      }
+    },
+    {
+      "step": "paired devices",
+      "value": {
+        "count": 2,
+        "names": [
+          "E6A QA Phone",
+          "E6A Revoke Phone"
+        ]
+      }
+    },
+    {
+      "step": "consent revoke exercised",
+      "value": {
+        "pending": "STOPPED"
+      }
+    }
+  ],
+  "statesSeen": {
+    "pendingApproval": "45f36664-2c8a-4c30-b1e9-161e602a7723",
+    "consentGranted": "e36222fc-4e7c-4744-8f65-d0e2d3b28eb9",
+    "pairedDevices": [
+      "49353b8e-92c0-40dc-b57d-cd35075eebcb",
+      "8bed2376-d358-4904-88b6-35e1a2804ed5"
+    ],
+    "pendingAfterConsentRevoke": "STOPPED",
+    "devicesAfterRevoke": [
+      {
+        "name": "E6A QA Phone",
+        "revoked": false
+      },
+      {
+        "name": "E6A Revoke Phone",
+        "revoked": true
+      }
+    ]
+  },
+  "dialogs": {
+    "approvalsPage": "e6a-approvals-populated.png",
+    "agentPanel": "e6a-agent-panel-authorization.png",
+    "authorizationCard": "e6a-authorization-card.png",
+    "denyConsentDialog": "e6a-deny-consent-dialog.png",
+    "denyConsentTitle": "Deny this Mission access?The Host refuses this consent offer and stops the Agent",
+    "denyConsentFocusInside": true,
+    "denyConsentEscapeCloses": true,
+    "denyConsentEffect": "cancelled; offer intact",
+    "revokeConsentDialog": "e6a-revoke-consent-dialog.png",
+    "revokeConsentTitle": "Revoke this Mission access?The Host ends this authorization and stops the Agent.",
+    "revokeConsentEffect": "revoked",
+    "activityArtifacts": "e6a-activity-artifacts.png",
+    "serverControl": "e6a-server-control-populated.png",
+    "devicesPage": "e6a-devices-populated.png",
+    "revokeDialog": "e6a-revoke-dialog.png",
+    "revokeDialogTitle": "Revoke E6A Revoke Phone?The device loses access immediately and its open activit",
+    "revokeEffect": "revoke applied"
+  },
+  "consoleErrors": [],
+  "evidence": [
+    {
+      "kind": "artifacts",
+      "from": {
+        "id": "e36222fc-4e7c-4744-8f65-d0e2d3b28eb9",
+        "name": "E6A Granted consent",
+        "state": "COMPLETED",
+        "missionId": "bca7b212-f8ac-475e-8713-d4e09c6c3a8c",
+        "createdAt": 1793814718565,
+        "updatedAt": 1793814719144,
+        "failure": null,
+        "run": {
+          "id": "4a2ac413-9031-49de-aa74-fff65a5ef22b",
+          "generation": 1,
+          "state": "COMPLETED",
+          "startedAt": 1793814718691,
+          "endedAt": 1793814719144
+        },
+        "checkpoints": 7,
+        "lastCheckpoint": {
+          "boundary": "after_verification",
+          "at": 1793814719068,
+          "replaySafety": "VERIFY_BEFORE_REPLAY"
+        },
+        "pausedAt": null,
+        "stoppedAt": null,
+        "note": null,
+        "authorization": {
+          "id": "ca7c9a4d-59ff-4415-bdc2-c0bf94f06dd7",
+          "revision": 2,
+          "state": "COMPLETED",
+          "objective": "Read the approved instruction",
+          "capabilities": [
+            "filesystem.compare",
+            "filesystem.exists",
+            "filesystem.list",
+            "filesystem.read"
+          ],
+          "browserOrigins": [],
+          "applications": [],
+          "roots": [
+            "C:\\Users\\allam\\Documents\\new\\bunny-A-e6a",
+            "C:\\Users\\allam\\Documents\\new\\bunny-A-e6a"
+          ],
+          "commands": [],
+          "riskCeiling": "EXECUTE",
+          "expiresAt": 1793818318639,
+          "durationMs": 3600000,
+          "maximumActions": 20,
+          "maximumConcurrency": 1,
+          "admitted": 2,
+          "completed": 2,
+          "failed": 0,
+          "unknown": 0,
+          "remainingActions": 18,
+          "remainingMs": 3599221,
+          "latestAdmission": {
+            "agent_id": "e36222fc-4e7c-4744-8f65-d0e2d3b28eb9",
+            "mission_id": "bca7b212-f8ac-475e-8713-d4e09c6c3a8c",
+            "task_id": null,
+            "step_id": "4b992be4-b34b-4d0d-a701-8393189b317b",
+            "capability": "filesystem.compare",
+            "resource_reference": "70dcaf847cc7014fab622298008ff73e6a2ccc097289a1f87c58deaa53ef6d18",
+            "attempt_kind": "action",
+            "id": "e70041cb-865e-42bf-81e0-81dae70ac22d",
+            "envelope_id": "ca7c9a4d-59ff-4415-bdc2-c0bf94f06dd7",
+            "revision": 1,
+            "host_generation": "302ad698-1054-4874-8f92-2a7374e6c87a",
+            "admitted_at": 1793814719021,
+            "finished_at": 1793814719056,
+            "outcome": "COMPLETED"
+          },
+          "pending": [],
+          "limitations": [
+            "Restart requires fresh reviewed consent.",
+            "Model delegation supports tool-free Ollama inference; workspace CLI tools require separate review.",
+            "Terminal delegation supports pure read/assertion Node checks in a read-only snapshot, with no executable imports, subprocesses or network APIs; script edits require new consent.",
+            "Browser observation is bound to exact approved origins and a Mission-owned profile. Desktop scope is verified Calculator arithmetic only; ambiguous effects require review."
+          ]
+        },
+        "activity": {
+          "application": "filesystem",
+          "action": "filesystem.read",
+          "step": "Inspect",
+          "completed": 1,
+          "total": 1,
+          "verification": "Verified",
+          "artifacts": [
+            {
+              "id": "c67b28b1-70b1-44ac-97fa-326cab7071ef",
+              "title": "filesystem.read observation",
+              "verified": true
+            },
+            {
+              "id": "645bb214-90b4-4a4f-af28-1bc5dcab8cc7",
+              "title": "filesystem.compare observation",
+              "verified": true
+            }
+          ],
+          "history": [
+            {
+              "step": "Inspect",
+              "action": "filesystem.read",
+              "state": "completed"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        {
+          "id": "c67b28b1-70b1-44ac-97fa-326cab7071ef",
+          "title": "filesystem.read observation",
+          "verified": true
+        },
+        {
+          "id": "645bb214-90b4-4a4f-af28-1bc5dcab8cc7",
+          "title": "filesystem.compare observation",
+          "verified": true
+        }
+      ]
+    },
+    {
+      "kind": "screenshot",
+      "file": "e6a-approvals-populated.png"
+    },
+    {
+      "kind": "screenshot",
+      "file": "e6a-agent-panel-authorization.png"
+    },
+    {
+      "kind": "screenshot",
+      "file": "e6a-authorization-card.png"
+    },
+    {
+      "kind": "screenshot",
+      "file": "e6a-deny-consent-dialog.png"
+    },
+    {
+      "kind": "screenshot",
+      "file": "e6a-revoke-consent-dialog.png"
+    },
+    {
+      "kind": "screenshot",
+      "file": "e6a-activity-artifacts.png"
+    },
+    {
+      "kind": "screenshot",
+      "file": "e6a-server-control-populated.png"
+    },
+    {
+      "kind": "screenshot",
+      "file": "e6a-devices-populated.png"
+    },
+    {
+      "kind": "screenshot",
+      "file": "e6a-revoke-dialog.png"
+    }
+  ],
+  "at": "2026-11-04T17:52:11.646Z",
+  "fixtureWorkspace": "C:\\Users\\allam\\Documents\\new\\bunny-A-e6a\\test-results\\e6a-populated-fixture-5112"
+}
