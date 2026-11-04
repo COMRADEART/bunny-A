@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   agentActionAvailability,
   agentRoute,
@@ -29,6 +30,7 @@ import {
   HOME_ROUTE,
   PHONE_TABS,
   AGENT_ACTION_STATES,
+  type PhoneRoute,
 } from "./phone-model.ts";
 import type { SnapshotViewer } from "../../lib/bunny-host/contracts.ts";
 import type { AgentSnapshot, AgentState } from "../../lib/bunny-host/agent-types.ts";
@@ -85,6 +87,36 @@ test("a detail keeps its origin tab highlighted and Back returns there; a tab re
   assert.deepEqual(parentRoute(missionRoute("m", "missions")), { kind: "tab", tab: "missions" });
   assert.equal(routeTab({ kind: "tab", tab: "chat" }), "chat");
   assert.deepEqual(parentRoute({ kind: "tab", tab: "chat" }), HOME_ROUTE);
+});
+
+// F08: the companion's first paint must be the same route on the server render and the client's hydration paint.
+// Pre-fix the server fed the route initializer an empty search while the client parsed the real URL, so the server
+// painted Home for every deep link while the client painted the linked tab (React error #418 on direct
+// ?companion=1&tab=… opens; Home never diverged because both inputs happened to map to Home).
+test("every companion deep link names the route both first renders derive (Home never diverged; every tab would)", () => {
+  const links: [string, PhoneRoute][] = [
+    ["?companion=1", HOME_ROUTE],
+    ["?companion=1&tab=chat", { kind: "tab", tab: "chat" }],
+    ["?companion=1&tab=agents", { kind: "tab", tab: "agents" }],
+    ["?companion=1&tab=missions", { kind: "tab", tab: "missions" }],
+    ["?companion=1&tab=settings", { kind: "tab", tab: "settings" }],
+  ];
+  for (const [link, first] of links) {
+    assert.deepEqual(routeFromSearch(link), first, `${link} names its first route`);
+    assert.equal(JSON.stringify(routeFromSearch(link)) === JSON.stringify(routeFromSearch("")), link === "?companion=1",
+      "the old server input (empty search) only ever reproduced the Home link — the divergence behind #418");
+  }
+});
+
+test("the Phone component derives its first route from the router search, never a window-only parse (F08 wiring)", () => {
+  const phone = readFileSync(new URL("./phone.tsx", import.meta.url), "utf8");
+  assert.match(phone, /const searchStr = useRouterState\(\{ select: \(state\) => state\.location\.searchStr \}\)/,
+    "the router's parsed search (one value on the server and the client's first paint, as premium.tsx relies on) feeds the route");
+  const start = phone.indexOf("useState<PhoneRoute>(");
+  assert.ok(start > 0, "Phone keeps its first-route state");
+  const init = phone.slice(start, phone.indexOf(");", start));
+  assert.match(init, /routeFromSearch\(searchStr\)/);
+  assert.doesNotMatch(init, /typeof window|window\.location/, "no empty-search server branch in the first-route initializer");
 });
 
 // ---------------------------------------------------------------------------------------------------------------
