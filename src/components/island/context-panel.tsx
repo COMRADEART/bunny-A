@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Activity, ChevronRight, MessageSquare, PanelRightClose, PanelRightOpen, ShieldCheck } from "lucide-react";
 import { useIsland } from "@/store/use-island";
 import { WeaponCharacter, usePrefersReducedMotion } from "./characters";
@@ -8,34 +8,29 @@ import { CONNECTION_LABEL } from "./connection-model";
 import { approvalCount, pendingApprovalItems } from "./approvals-model";
 import { modelActivity, personalAgentRows, reviewsLabel, telemetryView } from "./context-model";
 import { WEAPON_LABEL } from "@/lib/bunny-host/personal-agents";
-
-const COLLAPSE_KEY = "bunny-a.context-panel.v1";
-
-/** Collapsed state is a per-viewer convenience only. Storage can be blocked, so every access is guarded. */
-function readCollapsed(): boolean {
-  try {
-    return window.localStorage.getItem(COLLAPSE_KEY) === "collapsed";
-  } catch {
-    return false;
-  }
-}
-function writeCollapsed(collapsed: boolean) {
-  try {
-    window.localStorage.setItem(COLLAPSE_KEY, collapsed ? "collapsed" : "expanded");
-  } catch {
-    // Storage is unavailable: the panel still works for this visit.
-  }
-}
+import { drawerEdgeFor } from "@/lib/bunny-host/widgets";
+import { escapeClosesDrawer } from "./workspace-layout";
 
 /**
  * The right context panel: Personal Agents, reviews, Host state, what models are running, real Host telemetry and quick
  * actions that only open existing surfaces. Nothing here is a placeholder: no sample means "Sensor unavailable", never a figure.
+ *
+ * Placement comes from the shared workspace allocation model (workspace-layout.ts): "inline" is the sticky panel of the
+ * wide shell, "drawer" is the same panel as a fixed drawer at narrow widths — focus moves into it when it opens, Escape
+ * closes it and focus returns to the reopen control. The collapsed rail is the owner's own preference either way.
  */
-export function ContextPanel({ now }: { now: number }) {
+export function ContextPanel({
+  now, placement, collapsed, onToggle,
+}: {
+  now: number;
+  placement: "inline" | "drawer";
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
   const systemReduced = usePrefersReducedMotion();
 
   const store = useIsland();
-  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const panelRef = useRef<HTMLElement>(null);
   // The toggle is a different element in each state, so focus is moved to the new one after a toggle, not lost to the page.
   const toggleRef = useRef<HTMLButtonElement>(null);
   const focusToggle = useRef(false);
@@ -46,11 +41,21 @@ export function ContextPanel({ now }: { now: number }) {
   }, [collapsed]);
   const toggle = () => {
     focusToggle.current = true;
-    setCollapsed((value) => {
-      writeCollapsed(!value);
-      return !value;
-    });
+    onToggle();
   };
+  // Escape only from inside the drawer (shared guard): the composer and real dialogs keep their own Escape.
+  useEffect(() => {
+    if (placement !== "drawer" || collapsed) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (!escapeClosesDrawer(event, panelRef.current?.contains(document.activeElement) ?? false)) return;
+      event.preventDefault();
+      toggle();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [placement, collapsed, onToggle]);
+  // The drawer always opens on the edge away from the Notch, like the widget drawer.
+  const edge = drawerEdgeFor(store.shownWidgets().notchEdge);
   const live = hostLive(store.connection, now || Date.now());
   const approvals = approvalCount(
     pendingApprovalItems({
@@ -62,6 +67,7 @@ export function ContextPanel({ now }: { now: number }) {
   );
 
   if (collapsed) {
+    // The owner's collapsed rail: it never demotes (it is already the collapsed form) and keeps its re-open control.
     return (
       <aside className="cx-panel" id="bunny-context-panel" data-collapsed="true" aria-label="Context panel">
         <button ref={toggleRef} className="icon-button" type="button" onClick={toggle} aria-label="Context panel" aria-expanded={false} aria-controls="bunny-context-panel">
@@ -76,7 +82,15 @@ export function ContextPanel({ now }: { now: number }) {
   const agents = personalAgentRows(store.personalAgents, live);
 
   return (
-    <aside className="cx-panel" id="bunny-context-panel" data-collapsed="false" aria-label="Context panel">
+    <aside
+      className={placement === "drawer" ? "cx-panel ws-drawer" : "cx-panel"}
+      id="bunny-context-panel"
+      data-collapsed="false"
+      data-open={placement === "drawer" ? "true" : undefined}
+      data-edge={placement === "drawer" ? edge : undefined}
+      ref={panelRef}
+      aria-label="Context panel"
+    >
       <div className="section-heading">
         <h2 style={{ fontSize: "var(--text-body)", margin: 0 }}>Context</h2>
         <button ref={toggleRef} className="icon-button" type="button" onClick={toggle} aria-label="Context panel" aria-expanded aria-controls="bunny-context-panel">

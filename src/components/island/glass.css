@@ -429,6 +429,53 @@
   font-size: var(--text-sm);
 }
 
+/* ----- Workspace allocation (F01/F07) and the shared drawer primitive ---------------------------------------------
+   The split's columns come from the measured remaining inline size (workspace-layout.ts drives data-cols), not
+   from a viewport breakpoint: the main pane keeps its usable minimum and the context inspector / widget sidebar
+   leave the grid before it is squeezed — never hidden, demoted into drawers. A demoted column becomes a fixed
+   panel on the edge away from the Notch (drawerEdgeFor): the widget drawer's contract (wd-drawer-anchor[data-open],
+   widgets.css) made shell-wide. E5C screens adopt .ws-drawer / .ws-drawer-toggle with their own panel classes. */
+.bunny-app.t8-app .workspace-split[data-cols="1"] { grid-template-columns: minmax(0, 1fr); }
+.bunny-app.t8-app .workspace-split[data-cols="2"] { grid-template-columns: minmax(0, 1fr) auto; }
+.bunny-app.t8-app .workspace-split[data-cols="3"] { grid-template-columns: minmax(0, 1fr) auto auto; }
+.bunny-app.t8-app[data-ui-theme][data-material] .ws-drawer[data-open="true"] {
+  position: fixed;
+  z-index: 30;
+  inset: auto var(--s3) var(--s3) auto;
+  width: min(440px, calc(100vw - 2 * var(--s3)));
+  max-height: min(72dvh, 680px);
+  overflow: auto;
+  /* A floating panel is read over moved content, so it takes the solid surface like the widget drawer. */
+  background: var(--glass-solid);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: var(--bw, 1px) solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--raised-shadow);
+}
+.bunny-app.t8-app[data-ui-theme][data-material] .ws-drawer[data-open="true"][data-edge="left"] { inset: auto auto var(--s3) var(--s3); }
+.bunny-app.t8-app[data-ui-theme][data-material] .ws-drawer[data-open="true"][data-edge="top"] { inset: var(--s6) var(--s3) auto var(--s3); width: auto; }
+.bunny-app.t8-app[data-ui-theme][data-material] .ws-drawer[data-open="true"][data-edge="bottom"] { inset: auto var(--s3) var(--s3) var(--s3); width: auto; }
+/* The reopen control of a closed drawer docks in the corner the panel would take; "secondary" stacks above it.
+   It must stay tappable over its own drawer and over the context sheet, so it rides above the drawers. */
+.bunny-app.t8-app[data-ui-theme][data-material] .ws-drawer-toggle {
+  position: fixed;
+  z-index: 31;
+  inset: auto var(--s3) var(--ws-dock-bottom, var(--s3)) auto;
+}
+.bunny-app.t8-app[data-ui-theme][data-material] .ws-drawer-toggle[data-edge="left"] { inset: auto auto var(--ws-dock-bottom, var(--s3)) var(--s3); }
+.bunny-app.t8-app[data-ui-theme][data-material] .ws-drawer-toggle[data-slot="secondary"] { --ws-dock-bottom: calc(var(--s3) + 52px); }
+/* Two workspace drawers never cover each other: while the context inspector's drawer is open on the shared edge,
+   the second drawer (the demoted widget sidebar, or the saved widget-drawer layout) takes the band above it. */
+.bunny-app.t8-app[data-ui-theme][data-material]:has(.cx-panel[data-open="true"]) .ws-drawer[data-open="true"]:not(.cx-panel) {
+  inset: var(--s6) var(--s3) calc(var(--s3) + min(72dvh, 680px)) var(--s3);
+  width: auto;
+  max-height: none;
+}
+.bunny-app.t8-app[data-ui-theme][data-material]:has(.cx-panel[data-open="true"]) .wd-drawer-anchor[data-open="true"] .wd-studio {
+  inset: var(--s6) var(--s3) calc(var(--s3) + min(72dvh, 680px)) var(--s3);
+  max-height: none;
+}
 /* The phone companion owns the whole viewport, including landscape widths that also match desktop breakpoints.
    It must never be placed into the desktop shell's sidebar column. */
 .bunny-app.t8-app[data-surface="companion"] {
@@ -439,21 +486,6 @@
   padding: 0;
 }
 
-/* ----- Responsive: the context panel leaves the grid on narrow windows and becomes a collapsed rail ------------- */
-@media (max-width: 1180px) {
-  .bunny-app.t8-app .workspace-split {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .bunny-app.t8-app .cx-panel {
-    position: static;
-    width: 100%;
-    max-height: none;
-  }
-  /* A collapsed rail keeps its re-open control at the top of the page, not after the whole page content. */
-  .bunny-app.t8-app .cx-panel[data-collapsed="true"] {
-    order: -1;
-  }
-}
 /* Approval and file rows with their action buttons: at phone width the actions take a full row, so the title is not squeezed. */
 @media (max-width: 720px) {
   .bunny-app.t8-app .ap-row,

@@ -63,6 +63,8 @@ import { ChatHome } from "./chat-home";
 import { Approvals } from "./approvals";
 import { Files } from "./files";
 import { ContextPanel } from "./context-panel";
+import { escapeClosesDrawer, useWorkspaceLayout } from "./workspace-layout";
+import { drawerEdgeFor } from "@/lib/bunny-host/widgets";
 import { DesignPreview } from "./design-preview";
 import { ThemePreviewBar } from "./theme-gallery";
 import { useReconcileItems } from "./reconciliation";
@@ -151,7 +153,30 @@ export function Island() {
     memory: () => store.setSheet("agents"),
     reconcile: () => store.setSheet("approvals"),
   };
-  const widgetLayout = store.shownWidgets().layout;
+  const widgetsPref = store.shownWidgets();
+  const widgetLayout = widgetsPref.layout;
+  // F01: the workspace row allocates from the measured remaining inline size (workspace-layout.ts); demoted columns
+  // open as fixed drawers on the edge away from the Notch — the widget drawer's contract, shell-wide.
+  const splitRef = useRef<HTMLDivElement>(null);
+  const widgetEdge = drawerEdgeFor(widgetsPref.notchEdge);
+  // The demoted widget drawer starts closed on every demotion: on narrow windows the context drawer is already open
+  // on the shared edge, so "one drawer on the edge, one above it" is a deliberate ask, never a surprise.
+  const [widgetsDrawerOpen, setWidgetsDrawerOpen] = useState(false);
+  const widgetToggleRef = useRef<HTMLButtonElement>(null);
+  const widgetsDrawerRef = useRef<HTMLDivElement>(null);
+  const widgetSidebar = widgetLayout === "sidebar";
+  const { placements, contextCollapsed, setContextCollapsed } = useWorkspaceLayout(splitRef, {
+    widgetSidebar,
+    widgetSidebarWidth: widgetsPref.sidebarWidth,
+  });
+  // Focus returns to the dock control after the drawer closes (toggle click or Escape) — never on mount: the
+  // drawer starts closed, so the first run must not steal focus from where the viewer already is.
+  const restoredOnce = useRef(false);
+  useEffect(() => {
+    if (widgetsDrawerOpen) return;
+    if (!restoredOnce.current) { restoredOnce.current = true; return; }
+    widgetToggleRef.current?.focus();
+  }, [widgetsDrawerOpen]);
   const scope = useThemeScope();
   const ambient = useAmbient();
   useDocumentTheme();
@@ -360,7 +385,7 @@ export function Island() {
             {store.syncStatus}
           </p>
         )}
-        <div className="workspace-split">
+        <div className="workspace-split" data-cols={placements.columns} ref={splitRef}>
           <main id="bunny-content" className="workspace-content" tabIndex={-1}>
             {page === "missions" || page === "agentic" ? (
               <AgenticWorkspace />
@@ -412,8 +437,47 @@ export function Island() {
             )}
             {widgetLayout === "board" && page !== "widgets" && <WidgetSurface mode="board" page={page} openers={widgetOpeners} />}
           </main>
-          {widgetLayout === "sidebar" && <WidgetSurface mode="sidebar" page={page} openers={widgetOpeners} />}
-          {page !== "design-preview" && <ContextPanel now={now} />}
+          {widgetSidebar && placements.widgets === "inline" && <WidgetSurface mode="sidebar" page={page} openers={widgetOpeners} />}
+          {widgetSidebar && placements.widgets === "drawer" && page !== "design-preview" && (
+            <>
+              <button
+                ref={widgetToggleRef}
+                type="button"
+                className="wd-drawer-toggle ws-drawer-toggle"
+                data-edge={widgetEdge}
+                data-slot="secondary"
+                aria-expanded={widgetsDrawerOpen}
+                aria-controls="bunny-widgets-drawer"
+                onClick={() => setWidgetsDrawerOpen(!widgetsDrawerOpen)}
+              >
+                {widgetsDrawerOpen ? "Close widgets" : "Widgets"}
+              </button>
+              {widgetsDrawerOpen && (
+                <div
+                  id="bunny-widgets-drawer"
+                  className="ws-drawer"
+                  data-open="true"
+                  data-edge={widgetEdge}
+                  ref={widgetsDrawerRef}
+                  onKeyDown={(event) => {
+                    if (!escapeClosesDrawer(event, widgetsDrawerRef.current?.contains(event.target as Node) ?? false)) return;
+                    event.preventDefault();
+                    setWidgetsDrawerOpen(false);
+                  }}
+                >
+                  <WidgetSurface mode="sidebar" page={page} openers={widgetOpeners} />
+                </div>
+              )}
+            </>
+          )}
+          {page !== "design-preview" && (
+            <ContextPanel
+              now={now}
+              placement={placements.context === "drawer" ? "drawer" : "inline"}
+              collapsed={contextCollapsed}
+              onToggle={() => setContextCollapsed(!contextCollapsed)}
+            />
+          )}
         </div>
         {widgetLayout === "drawer" && <WidgetSurface mode="drawer" page={page} openers={widgetOpeners} />}
         <footer className="workspace-footer">

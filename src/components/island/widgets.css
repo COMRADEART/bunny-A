@@ -143,8 +143,8 @@
 }
 /* Sidebar: its own fixed-width column between the page and the context panel. A percentage width in the split's `auto`
    column let unwrapped card text size the track, which squeezed the page under the widgets and pushed the context panel
-   below the page. */
-.bunny-app.t8-app .workspace-split:has(> .wd-root[data-widget-layout="sidebar"]) { grid-template-columns: minmax(0, 1fr) auto auto; }
+   below the page. How many columns the split has now comes from the measured allocation (workspace-layout.ts →
+   glass.css data-cols); when the sidebar is demoted it opens inside the shared .ws-drawer drawer. */
 [data-ui-theme][data-material] .wd-root[data-widget-layout="sidebar"] {
   width: var(--wd-side, 320px);
   position: sticky;
@@ -153,9 +153,12 @@
   overflow: auto;
 }
 [data-ui-theme][data-material] .wd-root[data-widget-layout="sidebar"]:not(:has(.wd-studio)) { width: auto; }
-@media (max-width: 1180px) {
-  .bunny-app.t8-app .workspace-split:has(> .wd-root[data-widget-layout="sidebar"]) { grid-template-columns: minmax(0, 1fr); }
-  [data-ui-theme][data-material] .wd-root[data-widget-layout="sidebar"] { width: 100%; position: static; max-height: none; }
+[data-ui-theme][data-material] .ws-drawer .wd-root[data-widget-layout="sidebar"] {
+  /* The drawer is the column now: it provides the width, the scroll and the fixed placement. */
+  width: auto;
+  position: static;
+  max-height: none;
+  top: auto;
 }
 [data-ui-theme][data-material] .wd-drawer-anchor[data-open="true"] .wd-studio {
   position: fixed;
@@ -224,10 +227,15 @@
 @media (prefers-reduced-motion: reduce) {
   [data-ui-theme] .wd-card { transition: none; transform: none; }
 }
+/* F05 residual (same-file pass while landing F01): glass.css forces --blur to 0px under the OS limits, which left the
+   card family "computing" a decorative blur(0px). As in glass.css, the OS media queries must compute no filter at all. */
+@media (prefers-reduced-transparency: reduce) {
+  [data-ui-theme] .wd-card { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+}
 @media (forced-colors: active) {
   [data-ui-theme] .wd-card,
   [data-ui-theme] .wd-text,
-  [data-ui-theme] .wd-primary { forced-color-adjust: auto; background: Canvas; color: CanvasText; border: 1px solid CanvasText; box-shadow: none; backdrop-filter: none; }
+  [data-ui-theme] .wd-primary { forced-color-adjust: auto; background: Canvas; color: CanvasText; border: 1px solid CanvasText; box-shadow: none; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 }
 @media (max-width: 900px) {
   [data-ui-theme][data-material] .wd-studio,
