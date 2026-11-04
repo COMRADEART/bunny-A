@@ -26,15 +26,22 @@ test("T13 nav: advanced destinations keep every previous capability off the ever
   assert.deepEqual(NAV_ADVANCED.map((item) => item.label), [
     "Missions",
     "Agentic teams",
+    "Automations",
     "Studio",
     "Widgets",
     "Characters",
     "Files",
     "Approvals",
+    "Safety",
     "Activity",
-    "Telemetry",
+    "Notifications",
+    "Routing",
     "Models",
+    "Providers",
+    "Connected accounts",
+    "Telemetry",
     "Devices",
+    "Server Control",
     "Settings",
   ]);
   for (const item of NAV_ADVANCED) assert.equal(isMainNavSheet(item.sheet), false, `${item.label} is not an everyday destination`);
@@ -42,8 +49,22 @@ test("T13 nav: advanced destinations keep every previous capability off the ever
   assert.equal(isAdvancedNavSheet("studio"), true);
 });
 
+test("E5B F06 nav: every entry maps to an existing surface, and no two entries highlight one surface", () => {
+  for (const item of [...NAV_PRIMARY, ...NAV_ADVANCED]) assert.equal(sheetForView(item.view), item.sheet, `${item.label} routes to its own surface`);
+  const sheets = [...NAV_PRIMARY, ...NAV_ADVANCED].map((item) => item.sheet);
+  assert.equal(new Set(sheets).size, sheets.length, "each nav entry highlights only its own surface");
+  // The Settings-embedded capabilities are real destinations over existing surfaces (never new claims).
+  assert.equal(sheetForView("routing"), "routing", "Routing opens the anchored AI & Models settings surface");
+  assert.equal(sheetForView("providers"), "providers", "Providers opens the anchored Providers settings surface");
+  assert.equal(sheetForView("safety"), "safety", "Safety opens the anchored Privacy and permissions settings surface");
+  assert.equal(sheetForView("automations"), "automations", "Automations opens the existing Proactive surface");
+  assert.equal(sheetForView("accounts"), "accounts", "Connected accounts opens the existing AI account broker");
+  assert.equal(isAdvancedNavSheet("fabric"), true, "Server Control is on the Advanced list");
+  assert.equal(isAdvancedNavSheet("extensions"), true, "Notifications is on the Advanced list");
+});
+
 test("T13 nav: every canonical view resolves to a surface, and the design preview is never a main destination", () => {
-  assert.equal(NAV_VIEWS.length, 18, "E4 added Server Control as a deep-linkable view");
+  assert.equal(NAV_VIEWS.length, 24, "F06 added the Settings-embedded capabilities, Notifications and Connected accounts as deep-linkable views");
   for (const view of NAV_VIEWS) assert.ok(sheetForView(view), `${view} resolves`);
   assert.equal(sheetForView("server"), "fabric", "Server Control resolves to the fabric surface");
   assert.equal(isMainNavSheet("design-preview"), false, "the design preview is deep-link only");
@@ -66,7 +87,7 @@ test("T13 nav: every legacy ?view value keeps working", () => {
   assert.equal(sheetForView("compose"), "compose");
   assert.equal(sheetForView("constellation"), "constellation");
   assert.equal(sheetForView("server"), "fabric", "Server Control (E4) keeps its ?view= link");
-  assert.equal(Object.keys(VIEW_ALIASES).length, 27);
+  assert.equal(Object.keys(VIEW_ALIASES).length, 32);
 });
 
 test("T13 nav: unknown or missing views resolve to nothing so the caller keeps its surface", () => {
@@ -101,6 +122,12 @@ test("T13 nav: ?companion=1 always renders the companion, never the Devices page
 
 test("T13 nav: the active item follows the surface, including drill-down surfaces", () => {
   assert.equal(activeNavView(null), "chat", "the default landing is Home");
+  assert.equal(activeNavView("extensions"), "notifications", "F06: the Notifications entry highlights itself, never Activity");
+  assert.equal(activeNavView("routing"), "routing", "F06: a Routing destination highlights Routing");
+  assert.equal(activeNavView("providers"), "providers", "F06: a Providers destination highlights Providers");
+  assert.equal(activeNavView("safety"), "safety", "F06: a Safety destination highlights Safety");
+  assert.equal(activeNavView("automations"), "automations", "F06: an Automations destination highlights Automations");
+  assert.equal(activeNavView("accounts"), "accounts", "F06: the Connected accounts destination highlights itself");
   assert.equal(activeNavView("decision"), "approvals");
   assert.equal(activeNavView("task"), "tasks");
   assert.equal(activeNavView("tasks"), "tasks");

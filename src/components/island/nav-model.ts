@@ -29,7 +29,15 @@ export type ShellSheet =
   | "decision"
   | "extensions"
   | "compose"
-  | "constellation";
+  | "constellation"
+  // E5B F06: the capabilities that lived only inside Settings (Routing, Providers, Safety) and the
+  // Automations and Connected-accounts surfaces get their own deep-linkable destination sheets. Each
+  // renders an existing surface; nothing here claims a capability the Host does not serve.
+  | "automations"
+  | "routing"
+  | "providers"
+  | "safety"
+  | "accounts";
 
 /** Canonical deep-link view names (`?view=`). */
 export const NAV_VIEWS = [
@@ -44,12 +52,18 @@ export const NAV_VIEWS = [
   "characters",
   "files",
   "approvals",
+  "safety",
   "activity",
-  "telemetry",
+  "notifications",
+  "automations",
+  "routing",
   "models",
+  "providers",
+  "accounts",
+  "telemetry",
   "devices",
-  "settings",
   "server",
+  "settings",
   "design-preview",
 ] as const;
 export type NavView = (typeof NAV_VIEWS)[number];
@@ -64,19 +78,30 @@ export const NAV_PRIMARY: readonly NavItem[] = [
   { view: "agents", sheet: "agents", label: "Agents" },
 ];
 
-/** Capabilities that stay available without sitting on the everyday path. */
+/**
+ * Capabilities that stay available without sitting on the everyday path. E5B F06: the IA table's
+ * entries that were Settings-only (Routing, Providers, Safety), plus Automations, Notifications,
+ * Connected accounts and Server Control, are real navigation entries over existing surfaces.
+ */
 export const NAV_ADVANCED: readonly NavItem[] = [
   { view: "missions", sheet: "missions", label: "Missions" },
   { view: "teams", sheet: "teams", label: "Agentic teams" },
+  { view: "automations", sheet: "automations", label: "Automations" },
   { view: "studio", sheet: "studio", label: "Studio" },
   { view: "widgets", sheet: "widgets", label: "Widgets" },
   { view: "characters", sheet: "characters", label: "Characters" },
   { view: "files", sheet: "files", label: "Files" },
   { view: "approvals", sheet: "approvals", label: "Approvals" },
+  { view: "safety", sheet: "safety", label: "Safety" },
   { view: "activity", sheet: "activity", label: "Activity" },
-  { view: "telemetry", sheet: "system", label: "Telemetry" },
+  { view: "notifications", sheet: "extensions", label: "Notifications" },
+  { view: "routing", sheet: "routing", label: "Routing" },
   { view: "models", sheet: "provider", label: "Models" },
+  { view: "providers", sheet: "providers", label: "Providers" },
+  { view: "accounts", sheet: "accounts", label: "Connected accounts" },
+  { view: "telemetry", sheet: "system", label: "Telemetry" },
   { view: "devices", sheet: "devices", label: "Devices" },
+  { view: "server", sheet: "fabric", label: "Server Control" },
   { view: "settings", sheet: "settings", label: "Settings" },
 ];
 
@@ -103,8 +128,16 @@ export const VIEW_ALIASES: Readonly<Record<string, ShellSheet>> = {
   activity: "activity",
   telemetry: "system",
   devices: "devices",
-  // E4: Server Control (the Device Fabric management surface) — deep-linkable, deliberately off the nav lists.
+  // E4: Server Control (the Device Fabric management surface) — deep-linkable, and E5B F06 puts it
+  // on the Advanced navigation list as well.
   server: "fabric",
+  // E5B F06: the Settings-embedded capabilities and the accounts surface become real destinations;
+  // each opens the existing surface for that capability, never a new claim.
+  routing: "routing",
+  providers: "providers",
+  safety: "safety",
+  automations: "automations",
+  accounts: "accounts",
   projects: "project",
   project: "project",
   files: "files",
@@ -151,8 +184,21 @@ export function activeNavView(sheet: string | null | undefined): NavView {
     case "decision":
       return "approvals";
     case "activity":
-    case "extensions":
       return "activity";
+    // Notifications keeps its legacy sheet id (`extensions`); its highlight is its own entry, never Activity.
+    case "extensions":
+      return "notifications";
+    // E5B F06: each Settings-embedded capability highlights its own entry.
+    case "automations":
+      return "automations";
+    case "routing":
+      return "routing";
+    case "providers":
+      return "providers";
+    case "safety":
+      return "safety";
+    case "accounts":
+      return "accounts";
     case "system":
       return "telemetry";
     case "settings":

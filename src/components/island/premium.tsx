@@ -5,21 +5,27 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { ThemedDialogContent, useAmbient, useDocumentTheme, useThemeScope } from "./theme";
 import {
   Activity,
+  Bell,
   Bot,
+  CalendarClock,
   Cpu,
   FileText,
   Folder,
   Gauge,
   Layers,
   LayoutGrid,
+  Link2,
   ListChecks,
   Menu,
   MessageSquare,
   Moon,
   PenLine,
+  Plug,
   RefreshCw,
+  Route,
   Server,
   Settings2,
+  Shield,
   ShieldCheck,
   Smartphone,
   Sparkles,
@@ -41,6 +47,8 @@ import {
 } from "./ui";
 import { Approval, TaskDetail } from "./task";
 import { TaskRow, Notifications } from "./desktop";
+import { ConnectedAccounts } from "./accounts";
+import { Proactive } from "./proactive";
 import { Projects } from "./projects";
 import { AgenticWorkspace } from "./agentic";
 import { ActivityRow } from "./activity";
@@ -123,12 +131,18 @@ const NAV_ICONS: Record<NavView, LucideIcon> = {
   projects: Folder,
   files: FileText,
   approvals: ShieldCheck,
+  safety: Shield,
   activity: Activity,
-  telemetry: Gauge,
-  settings: Settings2,
+  notifications: Bell,
+  automations: CalendarClock,
+  routing: Route,
   models: Cpu,
+  providers: Plug,
+  accounts: Link2,
   devices: Smartphone,
+  telemetry: Gauge,
   server: Server,
+  settings: Settings2,
   "design-preview": Settings2,
 };
 
@@ -409,6 +423,18 @@ export function Island() {
               <Approvals />
             ) : page === "provider" ? (
               <ModelsWorkspace />
+            ) : page === "routing" ? (
+              // E5B F06: Settings-embedded capabilities become real destinations — the same Settings
+              // surface, anchored to the group that holds the routing controls.
+              <Settings key={page} initialGroup="AI & Models" heading={{ eyebrow: "Routing", title: "How Bunny picks a model for each Task." }} />
+            ) : page === "providers" ? (
+              <Settings key={page} initialGroup="Providers" heading={{ eyebrow: "Providers", title: "The model services this Host can use." }} />
+            ) : page === "safety" ? (
+              <Settings key={page} initialGroup="Privacy and permissions" heading={{ eyebrow: "Safety", title: "What Bunny may do, and what always waits for you." }} />
+            ) : page === "accounts" ? (
+              <ConnectedAccountsWorkspace />
+            ) : page === "automations" ? (
+              <AutomationsWorkspace />
             ) : page === "activity" ? (
               <ActivityWorkspace now={now} />
             ) : page === "settings" ? (
@@ -540,6 +566,43 @@ function ConnectionBanner({ freshness }: { freshness: string }) {
         Reconnect
       </button>
     </div>
+  );
+}
+/**
+ * E5B F06: the Proactive surface (the exact section embedded in Tasks and Server Control) as its own
+ * destination. Copy states only what the Host does: goals, schedules, monitors, and approvals stay real.
+ */
+function AutomationsWorkspace() {
+  return (
+    <>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Automation / Proactive</p>
+          <h1>Automations</h1>
+          <p>Goals, schedules and monitors the Host runs; anything consequential still waits for your approval.</p>
+        </div>
+      </div>
+      <Proactive />
+    </>
+  );
+}
+/**
+ * E5B F06: the Connected Services destination is the existing AI provider account broker
+ * (accounts.tsx). The label states its actual capability — no email, calendar or document services
+ * are claimed, because none exists.
+ */
+function ConnectedAccountsWorkspace() {
+  return (
+    <>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Accounts</p>
+          <h1>Connected accounts</h1>
+          <p>Model provider sign-in, plan and permission controls on this Host. There are no email, calendar or document connections to manage.</p>
+        </div>
+      </div>
+      <ConnectedAccounts />
+    </>
   );
 }
 function ModelsWorkspace() {
