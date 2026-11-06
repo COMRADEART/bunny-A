@@ -499,7 +499,7 @@ export function Island() {
           {page !== "design-preview" && (
             <ContextPanel
               now={now}
-              placement={placements.context === "drawer" ? "drawer" : "inline"}
+              placement={placements.context === "drawer" ? "drawer" : placements.context === "dock" ? "dock" : "inline"}
               collapsed={contextCollapsed}
               onToggle={() => setContextCollapsed(!contextCollapsed)}
             />

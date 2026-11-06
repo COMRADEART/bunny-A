@@ -11,6 +11,8 @@ import { PHONE_PROFILE_QUERY } from "./workspace-layout.ts";
  */
 const glass = readFileSync(fileURLToPath(new URL("./glass.css", import.meta.url)), "utf8");
 const premium = readFileSync(fileURLToPath(new URL("./premium.css", import.meta.url)), "utf8");
+const contextPanel = readFileSync(fileURLToPath(new URL("./context-panel.tsx", import.meta.url)), "utf8");
+const premiumPanel = readFileSync(fileURLToPath(new URL("./premium.tsx", import.meta.url)), "utf8");
 
 const band = (css: string) =>
   /@media \(max-width: 767px\), \(max-height: 500px\) and \(min-width: 768px\) \{[\s\S]*?\n\}/.exec(css);
@@ -40,4 +42,20 @@ test("E5D dock: the phone toast band lifts the notice above the reopen strip and
     "the companion phone surface keeps its own dock zone",
   );
   assert.ok(block[0].includes("bottom: calc(var(--s3) + 52px)"), "the toast stacks above the reopen-control strip");
+});
+
+test("E6A dock: the expanded phone dock joins the drawer's Escape contract and focus return", () => {
+  assert.ok(
+    premiumPanel.includes('placements.context === "dock" ? "dock"'),
+    "premium hands the phone dock's placement to the panel instead of the desktop inline placement",
+  );
+  assert.ok(
+    contextPanel.includes('placement !== "drawer" && placement !== "dock"'),
+    "Escape binds for the expanded dock exactly as for the drawer",
+  );
+  assert.ok(contextPanel.includes('if (collapsed) return;'), "a collapsed dock has no Escape binding — the rail is not an overlay");
+  assert.ok(
+    contextPanel.includes('placement === "drawer" ? "cx-panel ws-drawer" : "cx-panel"'),
+    "the dock keeps the in-flow class shape the glass.css phone band keys on",
+  );
 });

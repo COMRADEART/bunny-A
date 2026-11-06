@@ -132,6 +132,23 @@ async function keyboardFocus(page, targetSelector) {
   return null;
 }
 
+/** E6A: the app applies the persisted 125% scale in a post-hydration pass, so a plain read right
+ * after navigation races it — the definitive matrix lost the scale on 9 of 25 silver landscape
+ * navigations and every one held after the re-apply (only connected-services lost twice in a row).
+ * Measurement waits like a real user's settled page: bounded waitForFunction on the root fontSize,
+ * then the existing single re-apply through the real control, then BLOCK with the measured reason. */
+const textScaleSettled = (page, scale, timeout = 5000) =>
+  page
+    .waitForFunction(
+      (s) => getComputedStyle(document.documentElement).fontSize === `${16 * s}px`,
+      scale,
+      { timeout },
+    )
+    .then(
+      () => true,
+      () => false,
+    );
+
 const browser = await chromium.launch({ headless: true });
 async function capture(kase) {
   const { screen, profile, variant, options } = kase;
@@ -193,14 +210,15 @@ async function capture(kase) {
       )
       .waitFor({ timeout: 25000 });
     if (profile.textScale) {
-      const fontSize = await page.evaluate(
-        () => getComputedStyle(document.documentElement).fontSize,
-      );
-      if (fontSize !== `${16 * profile.textScale}px`) {
-        // Never capture the 125% leg at the wrong scale: re-apply once through the app's real
-        // control path, then verify; a second failure is BLOCKED with the measured reason.
+      if (!(await textScaleSettled(page, profile.textScale))) {
+        // Never capture the 125% leg at the wrong scale: wait for the app's post-hydration scale,
+        // then re-apply once through the app's real control path; a second failure is BLOCKED with
+        // the measured reason.
+        const lost = await page.evaluate(
+          () => getComputedStyle(document.documentElement).fontSize,
+        );
         record.notes.push(
-          `125% text lost on navigation (root fontSize ${fontSize}); re-applying through the Settings control once.`,
+          `125% text not settled after navigation (root fontSize ${lost}); re-applying through the Settings control once.`,
         );
         await page.goto(settingsHref, { waitUntil: "domcontentloaded" });
         await applyTextScale(page, variant, profile.textScale);
@@ -210,13 +228,13 @@ async function capture(kase) {
         await page
           .locator(`.bunny-app[data-theme="${variant}"][data-glass-intensity="${options.intensity ?? 85}"]`)
           .waitFor({ timeout: 25000 });
-        const after = await page.evaluate(
-          () => getComputedStyle(document.documentElement).fontSize,
-        );
-        if (after !== `${16 * profile.textScale}px`) {
+        if (!(await textScaleSettled(page, profile.textScale))) {
+          const after = await page.evaluate(
+            () => getComputedStyle(document.documentElement).fontSize,
+          );
           record.status = "BLOCKED";
           record.notes.push(
-            `125% text-scale could not be applied (root fontSize ${after} even after re-applying through the Settings control); recorded BLOCKED instead of capturing at ${after}.`,
+            `125% text-scale could not be applied (root fontSize ${after} even after settling and re-applying through the Settings control); recorded BLOCKED instead of capturing at ${after}.`,
           );
           return;
         }

@@ -18,12 +18,14 @@ import { escapeClosesDrawer } from "./workspace-layout";
  * Placement comes from the shared workspace allocation model (workspace-layout.ts): "inline" is the sticky panel of the
  * wide shell, "drawer" is the same panel as a fixed drawer at narrow widths — focus moves into it when it opens, Escape
  * closes it and focus returns to the reopen control. The collapsed rail is the owner's own preference either way.
+ * E6A: "dock" is the phone profile's expanded in-flow dock (workspace-layout.ts): it is not an overlay, but Escape from
+ * inside it collapses back to the rail — the same toggle, so focus lands on the reopen control just like the drawer.
  */
 export function ContextPanel({
   now, placement, collapsed, onToggle,
 }: {
   now: number;
-  placement: "inline" | "drawer";
+  placement: "inline" | "drawer" | "dock";
   collapsed: boolean;
   onToggle: () => void;
 }) {
@@ -43,9 +45,11 @@ export function ContextPanel({
     focusToggle.current = true;
     onToggle();
   };
-  // Escape only from inside the drawer (shared guard): the composer and real dialogs keep their own Escape.
+  // Escape only from inside the drawer or the expanded phone dock (shared guard): the composer and real dialogs keep
+  // their own Escape.
   useEffect(() => {
-    if (placement !== "drawer" || collapsed) return;
+    if (placement !== "drawer" && placement !== "dock") return;
+    if (collapsed) return;
     const onKey = (event: KeyboardEvent) => {
       if (!escapeClosesDrawer(event, panelRef.current?.contains(document.activeElement) ?? false)) return;
       event.preventDefault();
