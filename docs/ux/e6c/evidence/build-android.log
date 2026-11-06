@@ -1,0 +1,189 @@
+Java 21.0.12 (policy 21.0.x, x >= 11; CI pins 21.0.11)
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+Note: C:\Users\allam\Documents\new\bunny-A-e6c\android\app\src\main\java\com\routeragent\jev\NativeCompanionActivity.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+3 warnings
+Note: C:\Users\allam\Documents\new\bunny-A-e6c\android\tools\SignApk.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+Android connection policy: 21 checks passed.
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+Android Keystore erasure: 5 checks passed.
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+NativeCookiePolicyTest passed
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+PollPolicyTest: 22 checks passed.
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+A1 connection failure before dispatch
+  PASS connection refused is the one case reported as not sent
+A2 connection lost during the request body
+  PASS reset mid-body: outcome unknown (got 8 Connection interrupted. Bunny A cannot confirm whether this operation completed. It was not automatically retried. Review the current task and Host state before taking another action.)
+  PASS reset mid-body: the original operation id is kept
+  PASS reset mid-body: conservative message, no claim it was not sent
+  PASS the server saw the start of the request exactly once and nothing re-sent it
+A3 answer lost after the server read the whole command
+  PASS RESET_AFTER_BODY: outcome unknown (got 8 Connection interrupted. Bunny A cannot confirm whether this operation completed. It was not automatically retried. Review the current task and Host state before taking another action.)
+  PASS RESET_AFTER_BODY: the original operation id is kept
+  PASS RESET_AFTER_BODY: conservative message, no claim it was not sent
+  PASS RESET_AFTER_BODY: the server received the command exactly once (no silent re-send)
+  PASS CLOSE_AFTER_BODY: outcome unknown (got 8 Connection interrupted. Bunny A cannot confirm whether this operation completed. It was not automatically retried. Review the current task and Host state before taking another action.)
+  PASS CLOSE_AFTER_BODY: the original operation id is kept
+  PASS CLOSE_AFTER_BODY: conservative message, no claim it was not sent
+  PASS CLOSE_AFTER_BODY: the server received the command exactly once (no silent re-send)
+A4 timeout after the server received the command
+  PASS read timeout: outcome unknown (got 8 Connection interrupted. Bunny A cannot confirm whether this operation completed. It was not automatically retried. Review the current task and Host state before taking another action.)
+  PASS read timeout: the original operation id is kept
+  PASS read timeout: conservative message, no claim it was not sent
+  PASS timed-out command reached the server exactly once
+A5-A7 Host answers: refusal, identity, epoch
+  PASS a Host refusal arrives intact as an answer, not a transport failure
+  PASS refusal shown as the Host worded it
+  PASS a different Host's refusal ends the session (identity)
+  PASS a changed epoch is the Host's own pre-execution refusal
+A8 failures that may have partly applied, and unreadable server errors
+  PASS FAILED is 'may have partly applied', not refused
+  PASS HOST_UNAVAILABLE on a command is 'may have partly applied'
+  PASS partial-effect wording
+  PASS unreadable 5xx on a command is outcome unknown
+  PASS still in progress is outcome unknown
+  PASS for a read, 503 is only 'unavailable'
+  PASS the gateway's lost Host answer is outcome unknown
+  PASS a Host the gateway could not reach at all stays 'unavailable'
+A9 accepted but the answer was cut off
+  PASS 2xx cut off: outcome unknown (got 8 Connection interrupted. Bunny A cannot confirm whether this operation completed. It was not automatically retried. Review the current task and Host state before taking another action.)
+  PASS 2xx cut off: the original operation id is kept
+  PASS 2xx cut off: conservative message, no claim it was not sent
+  PASS cut-off command reached the server exactly once
+A10 back in the foreground: reads resume, the uncertain command is not re-sent
+  PASS a fresh state read succeeds after the interrupted command
+  PASS one command plus one read; the command was not sent again
+A11 Stop while a refresh is stalled
+  PASS Stop is answered on its own connection while the refresh is still stalled
+  PASS the stalled refresh and exactly one Stop reached the server
+HostExchangeTest: 37 checks passed.
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+C1 real socket: the Host reads the submit, then the answer is lost
+  PASS starts as Sending with its operation id chosen before dispatch
+  PASS the failure carries the message's own operation id
+  PASS the Host received the submit exactly once
+  PASS R2-G1: the message leaves Sending for Outcome unknown
+  PASS R2-G1: no Sending text remains on the message
+  PASS uncertainty is not worded as 'not sent'
+  PASS R2-G2/G3: operation id, Host and epoch kept
+  PASS R2-G4: Send stays disabled while the outcome is open
+  PASS R2-G5: a read-only check is due
+  PASS R2-G4: nothing re-sent the submit
+C2 reconciliation from the Host's operation record
+  PASS applied + task id: the phone follows that task
+  PASS the model's actual answer and model are shown
+  PASS applied without a task id: confirmed, no invented task or answer
+  PASS refused: the Host's refusal is shown
+  PASS R2-G6: failed reads as 'may have partly applied'
+  PASS in progress stays pending
+  PASS R2-G6: unknown stays unknown, never 'not executed'
+  PASS C: another epoch's answer is not evidence and ends checking
+  PASS C: even 'applied' from another epoch is not accepted
+  PASS another Host's answer is not accepted
+  PASS a Host restart (HOST_EPOCH_CHANGED) leaves it unknown and says why
+  PASS a check that did not reach the Host changes nothing
+C3 what each submit failure proves
+  PASS failure kind 1 -> NOT_SENT
+  PASS failure kind 6 -> NOT_SENT
+  PASS failure kind 5 -> REFUSED
+  PASS failure kind 2 -> REFUSED
+  PASS failure kind 4 -> REFUSED
+  PASS failure kind 9 -> FAILED
+  PASS failure kind 8 -> OUTCOME_UNKNOWN
+  PASS failure kind 0 -> OUTCOME_UNKNOWN
+C4 stable identity: an answer changes only its own message, and only from a state it can follow
+  PASS a failure for one message leaves the other untouched
+  PASS a stray acknowledgment cannot overwrite an unknown outcome
+  PASS a stray failure cannot undo an acknowledgment
+  PASS task updates reach only acknowledged messages
+C5 duplicate prevention and deliberate new message
+  PASS an unresolved message blocks Send
+  PASS after the user's acknowledgment Send unlocks; the message stays unknown
+  PASS a deliberate new message is a new operation, not a replay
+  PASS a provably unsent message does not trap the user
+C6 restore after the process ends (and after a recreated screen)
+  PASS storage holds no message text, answer or credential
+  PASS a completed message is never stored (no persisted success)
+  PASS the four open messages are restored
+  PASS R2-G8: a send cut off by the process end restores as Outcome unknown, not Sending
+  PASS R2-G8: an unknown outcome keeps its id, Host and epoch
+  PASS a followed task resumes without a second approve
+  PASS an exhausted message stays unknown and still needs the user's acknowledgment
+  PASS Send is still blocked after restore
+  PASS a recreated screen turns its predecessor's send into Outcome unknown
+  PASS a damaged state field restores as unknown, never as done
+  PASS following without a task id restores as unknown
+  PASS garbage or nothing restores empty
+C7 following the task
+  PASS waiting for approval is shown as the Host reports it
+  PASS withheld output is not shown as an empty answer
+  PASS running
+  PASS a failed task ends the message
+  PASS a task missing past the limit stops being followed
+ChatTurnTest: 55 checks passed.
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+ManifestLauncherTest passed: launcher opens com.routeragent.jev.NativeCompanionActivity
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+CompanionAppearanceTest: 40 checks passed
+classes.dex SHA-256: 0c38809d1fc594a8a2850fa385197ef0e928fca6cc94bd2b21d22f94948e6542
+Generating 3,072 bit RSA key pair and self-signed certificate (SHA384withRSA) with a validity of 10,000 days
+	for: CN=JEV Local Build
+Verified APK: C:\Users\allam\Documents\new\bunny-A-e6c\releases\Bunny-A-Android-v4.apk
+APK signatures v1=false v2=true v3=true
+Signing certificate SHA-256: 20390c9fce17f67490641c4de5cdacf12b53672bf00436e2f22ce78ebbf04a96
+package: name='com.routeragent.jev' versionCode='4' versionName='2.2' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+minSdkVersion:'26'
+targetSdkVersion:'35'
+uses-permission: name='android.permission.INTERNET'
+application-label:'Bunny-A'
+application-icon-160:'res/drawable-nodpi-v4/jev_icon.png'
+application-icon-65535:'res/drawable-nodpi-v4/jev_icon.png'
+application: label='Bunny-A' icon='res/drawable-nodpi-v4/jev_icon.png'
+feature-group: label=''
+  uses-feature: name='android.hardware.faketouch'
+  uses-implied-feature: name='android.hardware.faketouch' reason='default feature for all apps'
+other-activities
+supports-screens: 'small' 'normal' 'large' 'xlarge'
+supports-any-density: 'true'
+locales: '--_--'
+densities: '160' '65535'
+APK launcher: com.routeragent.jev/.MainActivity (alias) -> com.routeragent.jev.NativeCompanionActivity
+
+
+Algorithm : SHA256
+Hash      : 8522E2EF088C88F25DB4E150F446A4F8ABFF4182964D92F9C90046B188682832
+Path      : C:\Users\allam\Documents\new\bunny-A-e6c\releases\Bunny-A-Android-v4.apk
+
+
+
+APK: C:\Users\allam\Documents\new\bunny-A-e6c\releases\Bunny-A-Android-v4.apk
