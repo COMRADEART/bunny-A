@@ -154,3 +154,4 @@ Write-Output ('AAB SHA-256: ' + $aabHash)
 [IO.File]::WriteAllText($aabOutput + '.sha256', ($aabHash + '  ' + (Split-Path -Leaf $aabOutput) + "`n"))
 Write-Output ('AAB Release Candidate (Unsigned Base): ' + $aabOutput)
 Write-Output 'Note: Base AAB is unsigned. Run scripts/sign-android-aab.ps1 with an owner-approved upload key for release distribution.'
+Write-Output ('AAB Release Candidate: ' + $aabOutput)
