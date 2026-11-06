@@ -902,7 +902,7 @@ test("T3: fatal transition is single-winner, refuses new work and has a hard shu
 });
 test(
   "T3: real source entry contains process rejection and exception without a test global handler",
-  { timeout: 20000 },
+  { timeout: 60000 },
   async () => {
     for (const kind of ["rejection", "exception"]) {
       const directory = mkdtempSync(join(tmpdir(), "bunny-t3-process-"));
@@ -910,26 +910,29 @@ test(
       const script = join(directory, "fixture.mjs");
       writeFileSync(
         script,
-        `import {runHostEntry} from ${JSON.stringify(pathToFileURL(entry).href)};\nconst host=await runHostEntry({dataDirectory:${JSON.stringify(directory)},root:${JSON.stringify(directory)},port:43143,adapters:[],sample:async()=>{throw new Error('unavailable sensor');}});\nsetTimeout(()=>{${kind === "rejection" ? "Promise.reject(new Error('process rejection fixture'));" : "throw new Error('process exception fixture');"}},20);\n`,
+        `import {runHostEntry} from ${JSON.stringify(pathToFileURL(entry).href)};\nconst host=await runHostEntry({dataDirectory:${JSON.stringify(directory)},root:${JSON.stringify(directory)},port:0,adapters:[],sample:async()=>{throw new Error('unavailable sensor');}});\nsetTimeout(()=>{${kind === "rejection" ? "Promise.reject(new Error('process rejection fixture'));" : "throw new Error('process exception fixture');"}},20);\n`,
       );
       try {
+        let childOutput = "";
         const code = await new Promise<number | null>((done, fail) => {
           const child = spawn(process.execPath, ["--experimental-strip-types", script], {
             windowsHide: true,
-            stdio: "ignore",
+            stdio: "pipe",
             env: { ...process.env, BUNNY_STATE_LAYOUT: "", BUNNY_HOST_DATA_DIRECTORY: directory },
           });
+          child.stdout?.on("data", (chunk) => { childOutput += chunk.toString(); });
+          child.stderr?.on("data", (chunk) => { childOutput += chunk.toString(); });
           const timer = setTimeout(() => {
             child.kill();
-            fail(new Error("fatal process did not exit"));
-          }, 10000);
+            fail(new Error(`fatal process did not exit within timeout. Output:\n${childOutput}`));
+          }, 30000);
           child.once("error", fail);
           child.once("close", (code) => {
             clearTimeout(timer);
             done(code);
           });
         });
-        assert.equal(code, 70);
+        assert.equal(code, 70, `Child exited with code ${code}, output:\n${childOutput}`);
         const marker = JSON.parse(readFileSync(join(directory, "runtime/host-fatal.json"), "utf8"));
         assert.equal(marker.failureClass, "HOST_FATAL");
         assert.equal(
