@@ -135,10 +135,10 @@ export function PersistentTasks({ phone = false }: { phone?: boolean }) {
       )}
       {workstation ? (
         <div className="actions" role="group" aria-label="Background task policy">
-          <label className="caption">
+          <label className="caption policy-row">
             <input type="checkbox" checked={policy.background} disabled={!live} onChange={e => setPolicy({ background: e.target.checked })} /> Keep working while Bunny-A's windows are closed (the Host must stay running)
           </label>
-          <label className="caption">
+          <label className="caption policy-row">
             <input type="checkbox" checked={policy.resumeOnStart} disabled={!live} onChange={e => setPolicy({ resumeOnStart: e.target.checked })} /> Continue tasks after Bunny-A restarts
           </label>
         </div>

@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import { createServer as allocate } from "node:net";
 import { join, resolve } from "node:path";
 import { evidenceDir } from "../bunny-host/test-evidence.ts";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { tmpdir } from "node:os";
 import { canonical, within } from "./paths.server.ts";
@@ -13,7 +13,7 @@ import type { AgentSnapshot } from "../bunny-host/agent-types.ts";
 import { sha256 } from "./artifacts.server.ts";
 const evidence = evidenceDir("ma3/t6");
 const save = (name: string, value: unknown) => { mkdirSync(evidence, { recursive: true }); writeFileSync(join(evidence, name), JSON.stringify(value, null, 2)); };
-async function until<T>(fn: () => Promise<T | null>, detail: string): Promise<T> { const end = Date.now() + 100_000; while (Date.now() < end) { const value = await fn(); if (value) return value; await new Promise(r => setTimeout(r, 50)); } throw new Error(`Timeout: ${detail}`); }
+async function until<T>(fn: () => Promise<T | null>, detail: string, budgetMs = 100_000): Promise<T> { const end = Date.now() + budgetMs; while (Date.now() < end) { const value = await fn(); if (value) return value; await new Promise(r => setTimeout(r, 50)); } throw new Error(`Timeout: ${detail}`); }
 async function start(dir: string, root: string) {
   const allocator = allocate(); await new Promise<void>(r => allocator.listen(0, "127.0.0.1", r)); const port = (allocator.address() as { port: number }).port; await new Promise<void>(r => allocator.close(() => r()));
   const child = fork(resolve("scripts/fixtures/cross-app-host-worker.mjs"), [dir, root, String(port)], { execArgv: ["--experimental-strip-types"], stdio: ["ignore", "pipe", "pipe", "ipc"], windowsHide: true });
@@ -35,8 +35,17 @@ const calculatorInstalled = process.platform !== "win32" || execFileSync("powers
 // launch Calculator onto the user's desktop but never observe it, so X53 there is NOT TESTED, never passed or failed.
 const INPUT_DESKTOP_PROBE = "Add-Type -Namespace B -Name D -MemberDefinition '[DllImport(\"user32.dll\")] public static extern System.IntPtr OpenInputDesktop(uint f, bool i, uint a); [DllImport(\"user32.dll\")] public static extern System.IntPtr GetThreadDesktop(uint t); [DllImport(\"kernel32.dll\")] public static extern uint GetCurrentThreadId(); [DllImport(\"user32.dll\", CharSet=CharSet.Unicode)] public static extern bool GetUserObjectInformation(System.IntPtr h, int n, System.Text.StringBuilder b, int l, out int x);'; function N($h) { $s = New-Object System.Text.StringBuilder 256; $x = 0; [void][B.D]::GetUserObjectInformation($h, 2, $s, 512, [ref]$x); $s.ToString() }; $i = [B.D]::OpenInputDesktop(0, $false, 1); if ($i -eq [System.IntPtr]::Zero) { 'no' } elseif ((N ([B.D]::GetThreadDesktop([B.D]::GetCurrentThreadId()))) -eq (N $i)) { 'yes' } else { 'no' }";
 const onInputDesktop = process.platform !== "win32" || execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", INPUT_DESKTOP_PROBE], { encoding: "utf8", windowsHide: true }).trim() === "yes";
+// E6A-X53-A: the Git steps launch through the Windows ownership module, which reads the pretest-built native artifacts
+// (npm run build:ownership) by absolute path. On a checkout without them, step 1 fails ENOENT and the first Host never
+// reaches its stop role — a false FAIL of the mission itself. Same honesty class as the gates above: NOT TESTED, never FAIL.
+const ownershipArtifactsReady = !["native/bunny-owned-process.node", "native/bunny-owned-process.node.json", "native/bunny-owned-process.c"].some(p => !existsSync(resolve(p)));
+// E6A-X53-B: under concurrent production-build load one observed run exceeded the previous whole-leg waits (105.9 s,
+// "Timeout: Integrated Mission completion"; 33 further loaded attempts stayed ≤24 s solo-style). The mission's own per-step
+// contract is 600 s, so the test's completion wait is now 180 s within the mission budget, and a timeout records the last
+// observed agent state (integrated-stall.json) so the next occurrence carries its own evidence instead of silence.
+const COMPLETION_WAIT = 180_000;
 
-test("T6 X53 DISPOSABLE LIVE VERIFIED: filesystem → Git → owned terminal → fresh Host → isolated browser → real Windows UIA → verified artifact", { timeout: 180_000, skip: (!calculatorInstalled && "NOT TESTED: no verified Microsoft Calculator package on this PC (X53 stays a local gate)") || (!onInputDesktop && "NOT TESTED: this test process is not on the interactive input desktop, so real UIA cannot observe Calculator (X53 stays a local gate)") }, async () => {
+test("T6 X53 DISPOSABLE LIVE VERIFIED: filesystem → Git → owned terminal → fresh Host → isolated browser → real Windows UIA → verified artifact", { timeout: 240_000, skip: (!calculatorInstalled && "NOT TESTED: no verified Microsoft Calculator package on this PC (X53 stays a local gate)") || (!onInputDesktop && "NOT TESTED: this test process is not on the interactive input desktop, so real UIA cannot observe Calculator (X53 stays a local gate)") || (!ownershipArtifactsReady && "NOT TESTED: the Windows ownership native build is absent on this checkout — run npx nx run test through npm test (pretest builds it) or npm run build:ownership (X53 stays a local gate)") }, async () => {
   assert.equal(process.platform, "win32", "This acceptance requires real Windows UIA, never simulated OS success.");
   mkdirSync(evidence, { recursive: true }); const parent = canonical(tmpdir()); const dir = mkdtempSync(join(parent, "bunny-t6-disposable-")); const root = join(dir, "project"); mkdirSync(root);
   writeFileSync(join(root, "instruction.txt"), "T6 approved result\n"); writeFileSync(join(root, "result.txt"), "before\n");
@@ -70,7 +79,15 @@ test("T6 X53 DISPOSABLE LIVE VERIFIED: filesystem → Git → owned terminal →
     assert.equal(recovered.missionId, missionId); assert.equal(recovered.authorization!.state, "WAITING_FOR_USER"); const priorAdmissions = recovered.authorization!.admitted;
     save("integrated-restart.json", { classification: "DISPOSABLE LIVE VERIFIED", first: initial, fresh: { pid: host.pid, generation: host.generation }, agentId, missionId, recovered, priorAdmissions, oldTransientAuthorityInactive: true });
     await host.api("agent.authorization.approve", { id: agentId, revision: recovered.authorization!.revision });
-    const final = await until(async () => { const agent = (await host.state()).agents.agents.find(agent => agent.id === agentId); if (agent?.state === "FAILED" || agent?.authorization?.pending.length) throw Error(`Cross-app workflow stopped: ${JSON.stringify(agent)}`); return agent?.state === "COMPLETED" ? agent : null; }, "Integrated Mission completion");
+    // E6A-X53-B: last observed agent on a completion timeout — the evidence a silent stall needs.
+    const stallBox: { current: AgentSnapshot["agents"][number] | null } = { current: null };
+    let final: AgentSnapshot["agents"][number];
+    try {
+      final = await until(async () => { const agent = (await host.state()).agents.agents.find(agent => agent.id === agentId); if (agent?.state === "FAILED" || agent?.authorization?.pending.length) throw Error(`Cross-app workflow stopped: ${JSON.stringify(agent)}`); if (agent?.state !== "COMPLETED") stallBox.current = agent ?? null; return agent?.state === "COMPLETED" ? agent : null; }, "Integrated Mission completion", COMPLETION_WAIT);
+    } catch (error) {
+      const agent = stallBox.current; if (agent) { const description = { id: agent.id, missionId: agent.missionId, state: agent.state, activity: agent.activity ?? null, current: agent.current ?? null, owned: agent.owned ?? null, run: agent.run ?? null }; save("integrated-stall.json", { classification: "DISPOSABLE LIVE VERIFIED", observed: description, output: host.output() }); throw new Error(`${String(error)}; last observed agent: ${JSON.stringify(description)}`); }
+      throw error;
+    }
     assert.equal(final.activity!.completed, 10); assert.equal(readFileSync(join(root, "acceptance.txt"), "utf8"), "All cross-app postconditions verified. Calculator result 2.");
     const db = new DatabaseSync(join(dir, "host.sqlite"), { readOnly: true }); try { const rows = (table: string) => (db.prepare(`SELECT record FROM ${table}`).all() as { record: string }[]).map(row => JSON.parse(row.record)); const runs = rows("capability_runs"); const admissions = rows("agentic_admissions"); assert.equal(runs.filter(run => run.action === "filesystem.write" && run.status === "succeeded").length, 2); assert.equal(runs.filter(run => run.action === "terminal.exec").length, 1); assert.equal(runs.filter(run => run.action === "computer.open_app").length, 1); assert.ok(admissions.every(row => row.outcome === "COMPLETED")); assert.ok(rows("mission_artifacts").every(artifact => artifact.verification === "verified"));
       const bodies = (db.prepare("SELECT record,body FROM mission_artifacts WHERE body IS NOT NULL").all() as { record: string; body: string }[]).map(row => { const artifact = JSON.parse(row.record); assert.equal(sha256(row.body), artifact.sha256); return { artifactId: artifact.id, sha256: artifact.sha256, body: row.body }; });
