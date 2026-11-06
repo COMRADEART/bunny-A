@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  IgnorableNamespaces="uap rescap desktop">
+
+  <Identity
+    Name="BunnyA.Workstation"
+    Publisher="CN=BunnyA-Development"
+    Version="0.5.1.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>Bunny A</DisplayName>
+    <PublisherDisplayName>Bunny A Contributors</PublisherDisplayName>
+    <Logo>Assets\msix\StoreLogo.png</Logo>
+    <Description>Bunny A Desktop Companion for Windows</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="x-generate" />
+  </Resources>
+
+  <Applications>
+    <Application Id="BunnyA"
+      Executable="BunnyA.exe"
+      EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Bunny A"
+        Description="Bunny A Desktop Companion"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\msix\Square150x150Logo.png"
+        Square44x44Logo="Assets\msix\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\msix\Wide310x150Logo.png" Square71x71Logo="Assets\msix\Square71x71Logo.png">
+          <uap:ShowNameOnTiles>
+            <uap:ShowOn Tile="square150x150Logo" />
+          </uap:ShowNameOnTiles>
+        </uap:DefaultTile>
+        <uap:SplashScreen Image="Assets\msix\SplashScreen.png" />
+      </uap:VisualElements>
+      <Extensions>
+        <uap:Extension Category="windows.protocol">
+          <uap:Protocol Name="bunny-a">
+            <uap:DisplayName>Bunny A Protocol</uap:DisplayName>
+          </uap:Protocol>
+        </uap:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>
