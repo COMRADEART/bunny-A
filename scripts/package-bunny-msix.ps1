@@ -1,6 +1,9 @@
 param(
   [string]$Dotnet,
   [string]$OutputDirectory,
+  [string]$MakeAppx,
+  [string]$Version,
+  [string]$Publisher
   [string]$MakeAppx
 )
 $ErrorActionPreference = 'Stop'
@@ -72,6 +75,9 @@ try {
   Copy-Item -Path (Join-Path $assetsSrc '*') -Destination $assetsDest -Recurse -Force
 
   [xml]$manifestXml = Get-Content -LiteralPath (Join-Path $staging 'AppxManifest.xml') -Raw
+  if ($Version) { $manifestXml.Package.Identity.Version = $Version }
+  if ($Publisher) { $manifestXml.Package.Identity.Publisher = $Publisher }
+  $manifestXml.Save((Join-Path $staging 'AppxManifest.xml'))
   $identityName = $manifestXml.Package.Identity.Name
   $version = $manifestXml.Package.Identity.Version
   $msixName = "$identityName-$version.msix"
