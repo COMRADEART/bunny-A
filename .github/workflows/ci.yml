@@ -120,7 +120,7 @@ jobs:
         run: |
           set -euo pipefail
           if git ls-files | grep -E '(^|/)\.env($|\.)' ; then echo "committed .env file"; exit 1; fi
-          if git grep -nE '(sk-[A-Za-z0-9]{20,}|gsk_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)' -- ':!*.test.*' ':!docs/**' ; then echo "possible secret"; exit 1; fi
+          if git grep -nE '(sk-[A-Za-z0-9]{20,}|gsk_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|-----BEGIN [A-Z ]*PRIVATE KEY-----)' -- ':!*.test.*' ':!docs/**' ; then echo "possible secret"; exit 1; fi
       - name: External inference stays disabled by default
         shell: bash
         run: |
