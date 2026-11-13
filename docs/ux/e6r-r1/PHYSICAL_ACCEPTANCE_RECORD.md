@@ -88,10 +88,10 @@ In accordance with release qualification policy:
   - Launcher opens native companion immediately with zero WebView flicker.
 - **Status:** **BLOCKED (Physical Handset Required)**.
 
-### A-ATT-2: QR Pairing, Connection Resiliency & Reconnect
+### A-ATT-2: Code Pairing, Connection Resiliency & Reconnect
 - **Prerequisites:** Host running on workstation; Android handset on same Wi-Fi.
 - **Test Procedure:**
-  1. Scan pairing QR code from workstation dashboard into Android companion.
+  1. On the workstation, create a one-time pairing code; on the phone, type the HTTPS address and the code.
   2. Verify pairing completion and initial state synchronization.
   3. Toggle airplane mode on handset for 10 seconds; turn off airplane mode.
 - **Expected Result:**
@@ -142,7 +142,7 @@ In accordance with release qualification policy:
 | **Windows** | `W-ATT-4` | Acoustic Full-Duplex Voice Interruption | **BLOCKED** | Microphone / audio operator attendance |
 | **Windows** | `W-ATT-5` | Authenticode Package Installation | **BLOCKED** | Operator code signing certificate |
 | **Android** | `A-ATT-1` | APK Physical Install & Upgrade | **BLOCKED** | Physical handset |
-| **Android** | `A-ATT-2` | QR Pairing & Network Interruption | **BLOCKED** | Physical handset |
+| **Android** | `A-ATT-2` | Code Pairing & Network Interruption | **BLOCKED** | Physical handset |
 | **Android** | `A-ATT-3` | Enclave Keystore Erasure Verification | **BLOCKED** | Physical handset |
 | **Android** | `A-ATT-4` | Consequential Approval Phone Refusal | **BLOCKED** | Physical handset |
 | **Android** | `A-ATT-5` | TalkBack & Safe Area Inspection | **BLOCKED** | Physical handset |
