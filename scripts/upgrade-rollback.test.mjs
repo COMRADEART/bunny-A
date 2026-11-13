@@ -61,6 +61,13 @@ test("Upgrade & Rollback Lifecycle Invariants", async (t) => {
     const versionMatch = manifestXml.match(/Version="([^"]+)"/);
     assert.ok(versionMatch, "MSIX Version attribute must exist");
     assert.equal(versionMatch[1], "28.0.0.0", "MSIX version must be 28.0.0.0 matching v28.0.0-beta.1 release pin");
+    // A merge once left two Version attributes (invalid XML) and a duplicated script parameter; first-match missed both.
+    const identity = manifestXml.match(/<Identity[^>]*>/)[0];
+    assert.equal(identity.match(/\sVersion=/g).length, 1, "MSIX Identity must carry exactly one Version attribute");
+    const params = readFileSync(join(workspace, "scripts/package-bunny-msix.ps1"), "utf8").match(/^param\(([\s\S]*?)^\)/m)[1].trim().split("\n");
+    const names = params.map((line) => line.match(/\$(\w+)/)[1]);
+    assert.equal(new Set(names).size, names.length, "package-bunny-msix.ps1 parameters must be unique");
+    assert.ok(params.slice(0, -1).every((line) => line.trimEnd().endsWith(",")), "package-bunny-msix.ps1 parameters must be comma separated");
 
     const pinCandidate = JSON.parse(readFileSync(join(workspace, "install/release-pin.candidate.json"), "utf8"));
     assert.equal(pinCandidate.release, "Bunny-A-Windows-v28-BETA-1");
