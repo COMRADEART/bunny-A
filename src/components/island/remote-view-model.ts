@@ -7,10 +7,10 @@ import type { Uncertain } from "./connection-model.ts";
  * M-A-3 T9 phone presentation decisions. Pure: every verdict here comes from the Host's own projection
  * (`viewer`, `remote`, `remoteOffer`); the phone never re-derives authorization policy.
  */
-export const WORKSTATION_CAPTION = "Available on the Windows Host";
+export const WORKSTATION_CAPTION = "Available on your PC";
 export const APPROVAL_ON_HOST = "Approval required on Windows Host.";
-export const OUTCOME_UNKNOWN = "Outcome unknown — checking the Host…";
-export const RECONNECT_CAPTION = "Reconnect to the Host to use controls.";
+export const OUTCOME_UNKNOWN = "Outcome unknown — checking with your PC…";
+export const RECONNECT_CAPTION = "Controls come back when your PC is reachable.";
 export const TALK_CAPTION =
   "Agent conversation and redirect are not supported by the Host yet. Use regular Bunny chat.";
 
@@ -80,7 +80,7 @@ export function controlCaption(input: {
   uncertain: Pick<Uncertain, "targetId">[];
 }): string | null {
   if (input.uncertain.some((row) => row.targetId === input.targetId)) return OUTCOME_UNKNOWN;
-  if (input.pending[input.targetId]) return "Waiting for the Host…";
+  if (input.pending[input.targetId]) return "Waiting for your PC…";
   if (!input.canAct) return RECONNECT_CAPTION;
   return null;
 }

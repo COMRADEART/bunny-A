@@ -4,7 +4,6 @@ param(
   [string]$MakeAppx,
   [string]$Version,
   [string]$Publisher
-  [string]$MakeAppx
 )
 $ErrorActionPreference = 'Stop'
 $workspace = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path

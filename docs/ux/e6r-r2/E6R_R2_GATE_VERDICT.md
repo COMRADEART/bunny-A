@@ -84,7 +84,7 @@ Neither platform may be promoted to an unconditional **GO** until operator-held 
 | **A-ROB-1** | Lifecycle & Rollback Invariants | `scripts/upgrade-rollback.test.mjs` (versionCode 4 monotonicity) | **PASS** | None |
 | **A-TST-1** | Native Core Journeys & Fault Injections | 8 test suites passed (185+ assertions) | **PASS** | None |
 | **A-ATT-1** | Physical Device Install & Upgrade | `A-ATT-1` physical install test | **BLOCKED** | Physical handset |
-| **A-ATT-2** | Dynamic QR Pairing & Network Faults | `A-ATT-2` physical Wi-Fi interruption test | **BLOCKED** | Physical handset |
+| **A-ATT-2** | Code Pairing & Network Faults | `A-ATT-2` physical Wi-Fi interruption test | **BLOCKED** | Physical handset |
 | **A-ATT-3** | Consequential Approval Refusal | `A-ATT-3` physical workstation delegation check | **BLOCKED** | Physical handset |
 | **A-ATT-4** | TalkBack & Display Cutout Insets | `A-ATT-5` physical screenreader & notch test | **BLOCKED** | Physical handset |
 | **A-STR-1** | Google Play Console Store Submission | Internal Testing Track upload | **BLOCKED** | Operator Play Console account |

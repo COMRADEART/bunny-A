@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
-  COORDINATION_NOT_CONFIGURED, fabricDeviceRows, fabricEvents, fabricLedgerRows, fabricOverview, fabricProfiles, fabricUsageRows,
+  COORDINATION_NOT_CONFIGURED, devicePresenceNotes, fabricDeviceRows, fabricEvents, fabricLedgerRows, fabricOverview, fabricProfiles, fabricUsageRows,
 } from "./fabric-model.ts";
 import type { HostSnapshot } from "../../lib/bunny-host/contracts.ts";
+import { deviceStatusPresentation, projectDeviceDiagnostics } from "../../lib/bunny-host/ma4/native-notifications.ts";
 
 /** E4 truth locks: Server Control renders only served fields; coordination is never shown as live; a cost is known
  *  only where the ledger calls it known; nothing invents a node, percentage or quota. */
@@ -33,20 +34,43 @@ test("device rows label their own truth; revoked beats expiry; newest presence s
       device({ id: "dev-2", expiresAt: now - 1000, lastSeenAt: now - 200_000, revoked: false }),
       device({ id: "dev-1", lastSeenAt: now - 30_000 }),
       device({ id: "dev-3", revoked: true, lastSeenAt: now - 5_000 }),
-      device({ id: "dev-4", lastSeenAt: now - 120_000 }),
+      device({ id: "dev-4", lastSeenAt: now - 130_000 }),
+      device({ id: "dev-5" }),
     ],
     now,
   );
+  // The state and the label come from the Devices page's own rule, so the two lists read the same.
   assert.deepEqual(
-    rows.map((row) => [row.id, row.state]),
+    rows.map((row) => [row.id, row.state, row.label]),
     [
-      ["dev-3", "revoked"],
-      ["dev-1", "active"],
-      ["dev-4", "idle"],
-      ["dev-2", "expired"],
+      ["dev-3", "revoked", "Revoked"],
+      ["dev-5", "idle", "Offline"],
+      ["dev-1", "active", "Connected"],
+      ["dev-4", "idle", "Offline"],
+      ["dev-2", "expired", "Pairing expired"],
     ],
   );
+  for (const row of rows)
+    assert.equal(row.label, deviceStatusPresentation(projectDeviceDiagnostics({ ...row, revoked: row.revoked === true }, now)).label, row.id);
   assert.deepEqual(fabricDeviceRows([], now), [], "an empty registry shows nothing; no sample device is ever drawn");
+});
+
+test("a paired device going offline or coming back is said once, and only for devices still allowed to connect", () => {
+  const phone = (lastSeenAt: number, patch: Partial<AnyDevice> = {}) => device({ id: "phone", name: "Pixel", lastSeenAt, ...patch });
+  const first = devicePresenceNotes(null, [phone(now - 1_000)], now);
+  assert.deepEqual(first, { presence: { phone: true }, notes: [] }, "the first look only seeds");
+  const same = devicePresenceNotes(first.presence, [phone(now - 5_000)], now);
+  assert.deepEqual(same.notes, [], "no change, nothing said");
+  const dropped = devicePresenceNotes(same.presence, [phone(now - 500_000)], now);
+  assert.deepEqual(dropped, { presence: { phone: false }, notes: ["Pixel went offline"] });
+  assert.deepEqual(devicePresenceNotes(dropped.presence, [phone(now - 500_000)], now).notes, [], "said once, not on every snapshot");
+  const back = devicePresenceNotes(dropped.presence, [phone(now - 2_000), device({ id: "new", name: "Laptop", lastSeenAt: now })], now);
+  assert.deepEqual(back.notes, ["Pixel is back online"], "a device seen for the first time says nothing");
+  assert.deepEqual(back.presence, { phone: true, new: true });
+  // Revoked and expired devices are not tracked: their row already says why they are gone.
+  const revoked = devicePresenceNotes(back.presence, [phone(now - 500_000, { revoked: true }), device({ id: "new", name: "Laptop", lastSeenAt: now - 500_000, expiresAt: now - 1 })], now);
+  assert.deepEqual(revoked, { presence: {}, notes: [] });
+  assert.deepEqual(devicePresenceNotes({ phone: true }, [phone(now - 500_000, { name: "  " })], now).notes, ["A paired device went offline"]);
 });
 
 test("the overview counts exactly what the snapshot carries and nothing else", () => {

@@ -14,7 +14,7 @@ A granular audit was performed across Android Java sources, Node.js Host service
 - **Permissions Declared:** Exactly one permission: `android.permission.INTERNET`.
 - **Prohibited Hardware Access:** No camera, no microphone, no location, no contacts, no device storage (`READ_EXTERNAL_STORAGE`), no telephony/IMEI, and no background services.
 - **Network Endpoints:**
-  - `ServerAddress.java` and `HostExchange.java` restrict outbound HTTP/SSE traffic strictly to the user-entered or QR-scanned Bunny Host socket (e.g., `http://192.168.1.x:43119` or user-configured custom tunnel domain).
+  - `ServerAddress.java` and `HostExchange.java` restrict outbound traffic strictly to the one HTTPS address the user types in (their own tunnel or HTTPS domain for the Bunny Host). Plain `http://` and `localhost` are refused (`ServerAddress.normalize`); there is no QR scanner, so pairing is by typed address and one-time code.
   - No connections to analytics services, crash reporting engines (Firebase Crashlytics, Sentry), ad networks, or telemetry trackers.
 - **Local Storage:**
   - Ephemeral session credentials stored in Android hardware KeyStore (`KeystoreErasure.java`).
@@ -40,7 +40,7 @@ Based on the source audit, the official Google Play Data Safety declaration form
 | :--- | :--- | :--- |
 | **Data Collection** | **No data is collected** | The app developer operates zero collector servers; no telemetry, analytics, or user identifiers are collected. |
 | **Data Sharing** | **No data is shared with third parties** | The companion communicates exclusively with the user's private Host. |
-| **Data in Transit** | **Data is encrypted in transit** | HTTPS/WSS supported for remote tunnels; local LAN transmission. |
+| **Data in Transit** | **Data is encrypted in transit** | HTTPS only: `usesCleartextTraffic="false"` and `ServerAddress` refuses any non-HTTPS address. |
 | **Data Deletion** | **Users can request deletion** | Revoking pairing or clearing app storage triggers full Android KeyStore erasure. |
 | **Target Audience** | **Ages 13 and older** | Professional developer and technical companion tool. |
 | **Account Creation** | **No developer account required** | Pairing uses ephemeral challenge-response cryptographic tokens directly with the Host. |

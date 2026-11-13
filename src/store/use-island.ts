@@ -26,6 +26,7 @@ import {
   type ConnectionEvent,
   type Uncertain,
 } from "@/components/island/connection-model";
+import { devicePresenceNotes } from "@/components/island/fabric-model";
 import type { MissionSnapshot } from "@/lib/bunny-missions/types";
 import type { AgentSnapshot } from "@/lib/bunny-host/agent-types";
 import type { PersonalAgentsSnapshot } from "@/lib/bunny-host/personal-agents";
@@ -587,6 +588,8 @@ export const useIsland = create<Island>((set, get) => {
   let requestOrder = 0,
     appliedOrder = 0,
     disconnected = false;
+  /** Which paired devices were online at the last snapshot; null until the first one, which only seeds. */
+  let devicePresence: Record<string, boolean> | null = null;
   let accessGeneration = 0;
   const reconciling = new Set<string>();
   /** The workstation's own choice before any Host theme was saved: the legacy local light/dark setting. */
@@ -831,11 +834,11 @@ export const useIsland = create<Island>((set, get) => {
       hostInstanceId: reconciled.instanceId,
       snapshotRevision: reconciled.revision,
       syncStatus: reconciled.gap
-        ? "Activity history gap. Current state refreshed from the Host."
+        ? "Some activity history was missed. Showing the current state from your PC."
         : reconciled.restarted
-          ? "Host restarted. Current state refreshed; old sessions were not resumed."
+          ? "Bunny on your PC restarted. Showing the current state; old sessions were not resumed."
           : disconnected
-            ? "Reconnected. Current state refreshed from the Host."
+            ? "Reconnected. Showing the current state from your PC."
             : state.syncStatus,
       connectionChecked: true,
     });
@@ -909,6 +912,12 @@ export const useIsland = create<Island>((set, get) => {
         if (event.type === "thermal.warning") continue;
         if (notificationAllowed(event.type, get().voicePersonalization?.preferences.notificationFrequency ?? "all")) deliverNative(event);
       }
+    // A paired device went offline or came back: say so once, by the same rule the Devices page lists it with.
+    if (viewer?.kind === "workstation") {
+      const seen = devicePresenceNotes(devicePresence, snapshot.devices, Date.now());
+      devicePresence = seen.presence;
+      if (seen.notes.length) get().note(seen.notes.join(" · "));
+    }
   };
   /** Revoked, expired or unpaired: stop retrying and drop every protected projection from memory. */
   const enterPairing = (code: string) => {
@@ -1030,7 +1039,7 @@ export const useIsland = create<Island>((set, get) => {
       const caption =
         before.connection.state === "host-changed"
           ? "This is a different Bunny-A Host. Review it before changing anything."
-          : "Reconnect to the Host before changing anything. Nothing was sent.";
+          : "Your PC is not reachable, so nothing was sent. Try again once it reconnects.";
       if (onRefused) onRefused(caption);
       else before.note(caption);
       return null;

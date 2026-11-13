@@ -1,9 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { DEVICE_IDLE_MS, DEVICE_SESSION_MS } from "../../lib/bunny-host/device-authority.server.ts";
 import {
+  agoText,
   backoffMs,
   canAct,
   commandCaption,
+  CONNECTION_LABEL,
   connectionReducer,
   freshnessLabel,
   initialConnection,
@@ -11,6 +14,9 @@ import {
   LIVE_REFRESH_MS,
   mayStream,
   nextRefreshMs,
+  PAIRING_LIFETIME_MS,
+  PAIRING_WARN_MS,
+  pairingEnding,
   pairingReason,
   pollIntervalMs,
   reconcileCaption,
@@ -18,6 +24,7 @@ import {
   SNAPSHOT_FRESH_MS,
   STREAM_READY_MS,
   STREAM_STALE_MS,
+  VISIBLE_RETRY_CAP_MS,
   type Connection,
   type ConnectionEvent,
 } from "./connection-model.ts";
@@ -90,7 +97,7 @@ test("T9 connection: pairing is terminal — no retries, no streams, ignores lat
   assert.equal(c.state, "pairing");
   c = connectionReducer(c, { type: "paired", at: 7 });
   assert.equal(c.state, "connecting");
-  assert.equal(pairingReason("DEVICE_EXPIRED"), "This device's session expired.");
+  assert.equal(pairingReason("DEVICE_EXPIRED"), "This device's pairing has ended.");
   assert.match(pairingReason(null), /pair/);
 });
 test("T9 connection: a different Host blocks every control until the user trusts it", () => {
@@ -119,6 +126,46 @@ test("T9 connection: backoff and polling cadence are bounded", () => {
   assert.equal(nextRefreshMs(live, false), LIVE_REFRESH_MS, "hidden does not slow a live stream's reconcile");
   const failing = run([{ type: "read-ok", at: 0, hostChanged: false }, { type: "read-fail", at: 1 }, { type: "read-fail", at: 2 }, { type: "read-fail", at: 3 }]);
   assert.equal(nextRefreshMs(failing, true), 12_000);
+  // A visible screen is being watched: it never waits out the long backoff, a hidden one still does.
+  const long = { ...failing, readFailures: 9 };
+  assert.equal(nextRefreshMs(long, true), VISIBLE_RETRY_CAP_MS);
+  assert.equal(nextRefreshMs(long, false), 60_000);
+  assert.ok(VISIBLE_RETRY_CAP_MS < 60_000);
+});
+test("connection labels name what the user can act on, never the transport", () => {
+  assert.equal(CONNECTION_LABEL.polling, "Connected");
+  assert.equal(CONNECTION_LABEL.offline, "Offline");
+  for (const label of Object.values(CONNECTION_LABEL)) assert.doesNotMatch(label, /Host|every few seconds/);
+});
+test("relative times read as a person would say them", () => {
+  const MIN = 60_000, HOUR = 60 * MIN, DAY = 24 * HOUR, now = 1_000 * DAY;
+  assert.equal(agoText(null, now), "never");
+  assert.equal(agoText(undefined, now, "—"), "—");
+  assert.equal(agoText(now - 20_000, now), "just now");
+  assert.equal(agoText(now + 5_000, now), "just now", "a clock ahead of this one never reads as the future");
+  assert.equal(agoText(now - MIN, now), "1 minute ago");
+  assert.equal(agoText(now - 59 * MIN, now), "59 minutes ago");
+  assert.equal(agoText(now - HOUR, now), "1 hour ago");
+  assert.equal(agoText(now - 23 * HOUR, now), "23 hours ago");
+  assert.equal(agoText(now - DAY, now), "1 day ago");
+  assert.equal(agoText(now - 59 * DAY, now), "59 days ago");
+  assert.equal(agoText(now - 60 * DAY, now), "2 months ago");
+  assert.equal(agoText(now - 400 * DAY, now), "1 year ago");
+});
+test("a pairing in its last week is called out, with what keeps the device paired", () => {
+  const DAY = 86_400_000, now = 500 * DAY, createdAt = now - 100 * DAY;
+  assert.equal(PAIRING_LIFETIME_MS, DEVICE_SESSION_MS, "the client mirrors the Host's absolute pairing lifetime");
+  assert.ok(PAIRING_WARN_MS < DEVICE_IDLE_MS, "a device in regular use is never warned about its idle limit");
+  assert.equal(pairingEnding({ createdAt, expiresAt: now + 8 * DAY }, now), null, "not yet inside the warning window");
+  assert.equal(pairingEnding({ createdAt }, now), null, "no end time, no warning");
+  assert.equal(pairingEnding({ createdAt, expiresAt: now - 1 }, now), null, "an ended pairing has its own label");
+  // Ended by the idle limit: using the device restarts it.
+  assert.deepEqual(pairingEnding({ createdAt, expiresAt: now + 3 * DAY + 5 }, now), { text: "Pairing ends in 3 days", renew: "use" });
+  assert.deepEqual(pairingEnding({ createdAt, expiresAt: now + DAY }, now), { text: "Pairing ends in 1 day", renew: "use" });
+  assert.deepEqual(pairingEnding({ createdAt, expiresAt: now + 3_600_000 }, now), { text: "Pairing ends today", renew: "use" });
+  // Ended by the absolute lifetime: only a new code helps.
+  const old = now + 2 * DAY - DEVICE_SESSION_MS;
+  assert.deepEqual(pairingEnding({ createdAt: old, expiresAt: old + DEVICE_SESSION_MS }, now), { text: "Pairing ends in 2 days", renew: "pair-again" });
 });
 test("T13 liveness: a healthy live connection never ages its snapshot past the freshness window", () => {
   // The character liveness check (hostLive) reads the snapshot age against SNAPSHOT_FRESH_MS. The schedule itself is
@@ -161,18 +208,18 @@ test("T9 commands: captions come from codes and outcomes, never parsed text", ()
   assert.match(commandCaption({ code: "HOST_EPOCH_CHANGED", message: "Pair this device" }), /Nothing was changed/);
   assert.match(commandCaption({ code: "RATE_LIMITED", message: "" }), /Too many/);
   assert.equal(commandCaption({ code: "WORKSTATION_REQUIRED", message: "Approval required on Windows Host." }), "Approval required on Windows Host.");
-  assert.match(commandCaption({ code: "DEVICE_REVOKED", message: "", pairing: true }), /revoked/);
+  assert.match(commandCaption({ code: "DEVICE_REVOKED", message: "", pairing: true }), /turned off on your PC/);
   assert.match(commandCaption({ code: "HOST_UNREACHABLE", message: "" }), /Nothing was sent/);
 });
 test("T9 commands: a lost acknowledgement resolves only from the Host's own record", () => {
-  assert.equal(reconcileCaption("applied", true), "Confirmed by the Host.");
+  assert.equal(reconcileCaption("applied", true), "Confirmed by your PC.");
   assert.equal(reconcileCaption("refused", true, "Approval required on Windows Host."), "Approval required on Windows Host.");
   assert.match(reconcileCaption("unknown", true), /no record/);
   assert.match(reconcileCaption("applied", false), /restarted/, "a new epoch never confirms an old operation");
   assert.match(reconcileCaption("failed", true), /failure/);
 });
 test("T9 freshness: retained data shows the real time it was last confirmed", () => {
-  assert.equal(freshnessLabel(null, 5, String), "Not yet updated from the Host");
+  assert.equal(freshnessLabel(null, 5, String), "Not yet updated from your PC");
   assert.equal(freshnessLabel(1_000, 2_000, String), "Updated just now");
   assert.equal(freshnessLabel(1_000, 60_000, (ms) => `t${ms}`), "Last updated t1000");
 });

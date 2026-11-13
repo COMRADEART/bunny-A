@@ -29,10 +29,10 @@ test("T4-ANDROID-1: inspectAndroidReleaseArtifact verifies AndroidManifest harde
   delete process.env.BUNNY_ANDROID_RELEASE_KEYSTORE;
   const android = inspectAndroidReleaseArtifact(repoRoot);
   assert.equal(android.packageId, "com.routeragent.jev");
-  assert.equal(android.versionCode, 4);
-  assert.equal(android.versionName, "2.2");
+  assert.equal(android.versionCode, 5);
+  assert.equal(android.versionName, "2.3");
   assert.equal(android.minSdkVersion, 26);
-  assert.equal(android.targetSdkVersion, 35);
+  assert.equal(android.targetSdkVersion, 36); // Google Play: new apps must target API 36 since 2026-08-31
   assert.equal(android.securityHardening.allowBackup, false);
   assert.equal(android.securityHardening.usesCleartextTraffic, false);
   // MA5-S1 removed POST_NOTIFICATIONS with the WebView notification bridge; the companion is internet-only again.

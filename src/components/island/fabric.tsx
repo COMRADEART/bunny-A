@@ -3,6 +3,7 @@ import { Empty } from "./ui";
 import { Telemetry } from "./telemetry";
 import { Proactive } from "./proactive";
 import { shortId } from "./remote-view-model";
+import { agoText } from "./connection-model";
 import {
   COORDINATION_NOT_CONFIGURED, fabricDeviceRows, fabricEvents, fabricLedgerRows, fabricOverview, fabricProfiles, fabricUsageRows,
 } from "./fabric-model";
@@ -23,7 +24,7 @@ export function FabricWorkspace({ now, freshness }: { now: number; freshness: st
   if (viewer === "device") {
     return (
       <div className="fabric">
-        <Empty title="Server Control is a workstation surface." detail="A paired phone reads its devices page only. Controls and decisions live on your Bunny-A Host." />
+        <Empty title="Server Control is a workstation surface." detail="A paired device reads its Devices page only. Controls and decisions live on your PC." />
       </div>
     );
   }
@@ -91,9 +92,9 @@ export function FabricWorkspace({ now, freshness }: { now: number; freshness: st
                 <tr key={row.id}>
                   <td>{row.name}</td>
                   <td className="mono">{short(row.id)}</td>
-                  <td>{when(row.createdAt)}</td>
-                  <td>{when(row.lastSeenAt)}</td>
-                  <td data-state={row.state}>{row.state}</td>
+                  <td title={when(row.createdAt)}>{agoText(row.createdAt, now, "—")}</td>
+                  <td title={when(row.lastSeenAt)}>{agoText(row.lastSeenAt, now, "—")}</td>
+                  <td data-state={row.state}>{row.label}</td>
                 </tr>
               ))}
             </tbody>

@@ -15,7 +15,7 @@ public static class NotchVoice
     /// <summary>A level older than this is not shown: the bar stops instead of freezing on a stale value.</summary>
     public const long LevelFreshMs = 1_500;
 
-    public static VoiceView Disconnected { get; } = new("DISCONNECTED", "Voice disconnected", "⚠️", "idle", (70, 34, 40), null);
+    public static VoiceView Disconnected { get; } = new("DISCONNECTED", "Voice offline", "💤", "idle", (32, 38, 54), null);
 
     public static VoiceView From(JsonElement voice, long nowMs)
     {

@@ -224,13 +224,13 @@ try {
     await host.close();
     const offline = await until("offline notch", async () => { const t = await tree(); const title = t.items.find((i) => i.id === "NotchTitle")?.name; return /Offline/.test(title ?? "") ? t : null; }, 60_000, 1_000);
     const offlineChips = chipsOf(offline).map((c) => c.status);
-    assert.ok(offlineChips.length > 0 && offlineChips.every((s) => s === "Disconnected"), "nothing the Host last said is claimed while it is gone");
+    assert.ok(offlineChips.length > 0 && offlineChips.every((s) => s === "Offline"), "nothing the Host last said is claimed while it is gone");
     const offlineImage = await shot("host-offline");
     host = await startHost({ port: PORT, dataDirectory: hostDir, adapters: defaultAdapters().filter((a) => a.id === "ollama") });
     writeCreds();
     const back = await until("reconnected notch", async () => { const t = await tree(); const title = t.items.find((i) => i.id === "NotchTitle")?.name; return title && !/Offline|Connecting/.test(title) ? t : null; }, 90_000, 1_000);
     const backChips = chipsOf(back).map((c) => c.status);
-    assert.ok(!backChips.includes("Disconnected"), "chips reflect the restarted Host");
+    assert.ok(!backChips.includes("Offline"), "chips reflect the restarted Host");
     assert.ok(host.manager.snapshot().tasks.length <= commandsBefore, "the notch replayed nothing");
     return { live, offlineChips, offlineImage, backChips, reconnectedTitle: back.items.find((i) => i.id === "NotchTitle")?.name };
   });

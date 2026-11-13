@@ -39,6 +39,8 @@ export const POLL_HIDDEN_MS = 30_000;
  */
 export const LIVE_REFRESH_MS = 15_000;
 const BACKOFF = [3_000, 6_000, 12_000, 30_000, 60_000];
+/** A visible screen never waits longer than this between retries: someone is watching for the PC to come back. */
+export const VISIBLE_RETRY_CAP_MS = 15_000;
 
 export const initialConnection = (): Connection => ({
   state: "connecting",
@@ -137,35 +139,44 @@ export function backoffMs(failures: number) {
   return BACKOFF[Math.min(Math.max(failures - 1, 0), BACKOFF.length - 1)];
 }
 export const pollIntervalMs = (visible: boolean) => (visible ? POLL_VISIBLE_MS : POLL_HIDDEN_MS);
-/** Next refresh delay: polling cadence while connected without a live stream, backoff while failing. */
+/** Next refresh delay: polling cadence while connected without a live stream, backoff while failing (capped while visible). */
 export function nextRefreshMs(connection: Pick<Connection, "state" | "readFailures">, visible: boolean): number | null {
   if (!shouldRetry(connection.state)) return null;
-  if (connection.readFailures > 0) return backoffMs(connection.readFailures);
+  if (connection.readFailures > 0) {
+    const wait = backoffMs(connection.readFailures);
+    return visible ? Math.min(wait, VISIBLE_RETRY_CAP_MS) : wait;
+  }
   if (connection.state === "live") return LIVE_REFRESH_MS;
   return pollIntervalMs(visible);
 }
 
 export const CONNECTION_LABEL: Record<ConnectionState, string> = {
-  connecting: "Connecting to Host",
+  connecting: "Connecting to your PC",
   live: "Live",
-  polling: "Updating every few seconds",
+  // Live and polling differ only in how updates arrive; the user needs to know it works, not how.
+  polling: "Connected",
   reconnecting: "Reconnecting…",
   offline: "Offline",
-  pairing: "Pairing required",
-  "host-changed": "Different Bunny-A Host",
+  pairing: "Pairing needed",
+  "host-changed": "Not the PC you paired with",
 };
 const PAIRING_REASON: Record<string, string> = {
-  DEVICE_REVOKED: "This device's access was revoked on the workstation.",
-  DEVICE_EXPIRED: "This device's session expired.",
-  AUTH_REQUIRED: "This device is not paired with this Host.",
-  PAIRING_REQUIRED: "This device is not paired with this Host.",
+  DEVICE_REVOKED: "This device's access was turned off on your PC.",
+  DEVICE_EXPIRED: "This device's pairing has ended.",
+  AUTH_REQUIRED: "This device is not paired with your PC.",
+  PAIRING_REQUIRED: "This device is not paired with your PC.",
 };
 export const pairingReason = (code: string | null) =>
-  PAIRING_REASON[code ?? ""] ?? "This device needs to pair with your workstation.";
+  PAIRING_REASON[code ?? ""] ?? "This device needs to pair with your PC.";
+/** What to do about it. The code can only be created on the PC, so the phone can only say where. */
+export const PAIRING_NEXT_STEP = "On your PC, open Bunny and create a pairing code under Devices, then enter it here.";
+/** What a changed Host identity means and when trusting it is right. */
+export const HOST_CHANGED_DETAIL =
+  "This address is now answered by a different Bunny install. Trust it only if you reinstalled Bunny or moved to a new PC.";
 
 /** "Last updated 14:05" — the time a retained view was last confirmed by the Host. */
 export function freshnessLabel(snapshotAt: number | null, at: number, format: (ms: number) => string) {
-  if (snapshotAt === null) return "Not yet updated from the Host";
+  if (snapshotAt === null) return "Not yet updated from your PC";
   const age = at - snapshotAt;
   if (age < 10_000) return "Updated just now";
   return `Last updated ${format(snapshotAt)}`;
@@ -173,17 +184,17 @@ export function freshnessLabel(snapshotAt: number | null, at: number, format: (m
 
 /** Captions for a refused or uncertain command, chosen by code — never by parsing message text. */
 export function commandCaption(result: { code: string; message: string; outcome?: "refused" | "unknown"; pairing?: boolean }) {
-  if (result.outcome === "unknown") return "Outcome unknown — checking the Host…";
+  if (result.outcome === "unknown") return "Outcome unknown — checking with your PC…";
   if (result.pairing) return pairingReason(result.code);
   switch (result.code) {
     case "HOST_EPOCH_CHANGED":
     case "HOST_IDENTITY_CHANGED":
-      return "The Host changed since this view loaded. Nothing was changed; showing the current state.";
+      return "Bunny on your PC restarted or changed since this view loaded. Nothing was changed; showing the current state.";
     case "RATE_LIMITED":
       return "Too many requests from this device. Wait a moment, then try again.";
     case "HOST_UNREACHABLE":
     case "GATEWAY_REFUSED":
-      return "Bunny-A Host is unreachable. Nothing was sent.";
+      return "Can't reach your PC. Nothing was sent.";
     default:
       return result.message;
   }
@@ -231,10 +242,48 @@ export const isMutating = (action: string) => !READ_ACTIONS.has(action);
 export type Uncertain = { operationId: string; action: string; targetId: string | null; since: number; epoch: string | null };
 /** How a reconciled uncertain operation reads to the user once the Host answers operation.status. */
 export function reconcileCaption(state: string, sameEpoch: boolean, refusal?: string | null) {
-  if (!sameEpoch) return "The Host restarted. Check the current state below before acting again.";
-  if (state === "applied") return "Confirmed by the Host.";
-  if (state === "refused") return refusal ?? "The Host refused this action; nothing was changed.";
-  if (state === "failed") return "The Host reported a failure. Check the current state below before acting again.";
-  if (state === "in_progress") return "The Host is still applying this action.";
-  return "The Host has no record of this action. Check the current state below before acting again.";
+  if (!sameEpoch) return "Bunny on your PC restarted. Check the current state below before acting again.";
+  if (state === "applied") return "Confirmed by your PC.";
+  if (state === "refused") return refusal ?? "Your PC refused this action; nothing was changed.";
+  if (state === "failed") return "Your PC reported a failure. Check the current state below before acting again.";
+  if (state === "in_progress") return "Your PC is still applying this action.";
+  return "Your PC has no record of this action. Check the current state below before acting again.";
+}
+
+const MINUTE = 60_000, HOUR = 60 * MINUTE, DAY = 24 * HOUR;
+const plural = (count: number, unit: string) => `${count} ${unit}${count === 1 ? "" : "s"}`;
+
+/** "5 minutes ago". A missing time reads as `never`; a time ahead of this clock reads as now, not as the future. */
+export function agoText(at: number | null | undefined, now: number, never = "never"): string {
+  if (!at) return never;
+  const age = Math.max(0, now - at);
+  if (age < MINUTE) return "just now";
+  if (age < HOUR) return `${plural(Math.floor(age / MINUTE), "minute")} ago`;
+  if (age < DAY) return `${plural(Math.floor(age / HOUR), "hour")} ago`;
+  if (age < 60 * DAY) return `${plural(Math.floor(age / DAY), "day")} ago`;
+  if (age < 365 * DAY) return `${plural(Math.floor(age / (30 * DAY)), "month")} ago`;
+  return `${plural(Math.floor(age / (365 * DAY)), "year")} ago`;
+}
+
+/** How far ahead a pairing's end is called out. */
+export const PAIRING_WARN_MS = 7 * DAY;
+/** Mirrors the Host's absolute pairing lifetime (device-authority DEVICE_SESSION_MS); a test pins the two together. */
+export const PAIRING_LIFETIME_MS = 365 * DAY;
+
+/**
+ * A warning while a pairing is inside its last week, else null. `renew` says what keeps the device paired: using it
+ * (the Host's idle limit restarts on every use) or, once the absolute lifetime is what ends it, pairing again.
+ */
+export function pairingEnding(
+  device: { createdAt: number; expiresAt?: number | null },
+  now: number,
+): { text: string; renew: "use" | "pair-again" } | null {
+  if (typeof device.expiresAt !== "number") return null;
+  const left = device.expiresAt - now;
+  if (left <= 0 || left > PAIRING_WARN_MS) return null;
+  const days = Math.floor(left / DAY);
+  return {
+    text: days < 1 ? "Pairing ends today" : `Pairing ends in ${plural(days, "day")}`,
+    renew: device.expiresAt >= device.createdAt + PAIRING_LIFETIME_MS ? "pair-again" : "use",
+  };
 }

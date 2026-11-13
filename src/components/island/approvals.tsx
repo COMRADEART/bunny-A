@@ -99,7 +99,7 @@ function ApprovalRow({ item, canAct }: { item: ApprovalItem; canAct: boolean }) 
             <button className="btn secondary" type="button" disabled={!canAct || waiting} onClick={() => void store.respondRequest(item.id, "deny")}>
               Deny
             </button>
-            {waiting && <small className="cx-muted" role="status">Waiting for the Host…</small>}
+            {waiting && <small className="cx-muted" role="status">Waiting for your PC…</small>}
           </>
         )}
         <button className="btn secondary" type="button" onClick={open}>

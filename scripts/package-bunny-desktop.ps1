@@ -219,4 +219,10 @@ try {
     [IO.File]::WriteAllText($zip+'.sha256',$hash+'  '+(Split-Path -Leaf $zip)+"`n")
     [pscustomobject]@{package=$zip;sha256=$hash;sourceCommit=$sourceSha;toolingCommit=$toolingSha}
   } else {[pscustomobject]@{package=$bunnyPackage;sourceCommit=$sourceSha;toolingCommit=$toolingSha}}
-} finally {if($null -ne $lastBuildContent) {[IO.File]::WriteAllText($lastBuildPath,$lastBuildContent)}}
+} finally {
+  if($null -ne $lastBuildContent) {[IO.File]::WriteAllText($lastBuildPath,$lastBuildContent)}
+  # Scratch exports are rebuilt from Git each run. Unlink the node_modules junction first so deleting the export can never reach the workspace's own modules.
+  $modulesLink=Join-Path $bunnyBuild 'node_modules'
+  if((Test-Path -LiteralPath $modulesLink) -and ((Get-Item -LiteralPath $modulesLink -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {[IO.Directory]::Delete($modulesLink,$false)}
+  foreach($scratch in @($bunnyBuild,$bunnyTooling)) {if(Test-Path -LiteralPath $scratch) {cmd /c "rmdir /s /q `"$scratch`"" 2>$null | Out-Null}}
+}

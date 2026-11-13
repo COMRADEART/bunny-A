@@ -13,11 +13,12 @@ public final class PollPolicyTest {
         long previous = 0;
         for (int failures = 1; failures <= 12; failures++) {
             long delay = PollPolicy.backoff(failures, 0);
-            check(delay >= previous && delay <= 60_000, "backoff grows and stays bounded at " + failures);
+            check(delay >= previous && delay <= 5_000, "backoff grows and stays within 5 s at " + failures);
             previous = delay;
         }
         check(PollPolicy.backoff(1, 0) == 2000, "first retry after 2 s");
-        check(PollPolicy.backoff(50, 0) == 60_000, "never more than a minute");
+        check(PollPolicy.backoff(2, 0) == 4000, "second retry after 4 s");
+        check(PollPolicy.backoff(50, 0) == 5_000, "a restored network is noticed within 5 s");
         check(PollPolicy.backoff(1, 7000) == 7000, "Retry-After is honoured");
         check(PollPolicy.backoff(1, 600_000) == 60_000, "Retry-After is still bounded");
 

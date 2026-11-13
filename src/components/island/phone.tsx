@@ -30,7 +30,7 @@ import { basisText, characterLabel, displayState } from "./character-model.ts";
 import { PhoneWidgets } from "./widgets";
 import { BunnyCompanion, WeaponCharacter, usePrefersReducedMotion, useHappyWindow } from "./characters";
 import { appearanceFor } from "./character-style-model";
-import { CONNECTION_LABEL } from "./connection-model.ts";
+import { CONNECTION_LABEL, PAIRING_NEXT_STEP, pairingEnding, pairingReason } from "./connection-model.ts";
 import { companionView, COMPANION_LABEL, levelRingScale } from "./companion-model.ts";
 import { LIVE_MISSION } from "./mission-model.ts";
 import { allowVerdict, controlCaption, missionApproveVerdict, offerVerdict, rightsSummary, shortId } from "./remote-view-model.ts";
@@ -38,6 +38,7 @@ import {
   agentActionAvailability,
   agentRoute,
   animatesFor,
+  canRetry,
   AGENT_STATE_TEXT,
   boundSlots,
   canSend,
@@ -112,7 +113,7 @@ function usePhoneClock(fixed: number | undefined): number {
   return fixed || now;
 }
 
-const STATUS_PILL = { live: "Live", stale: "Last known", offline: "Offline", connecting: "Connecting", pairing: "Pairing", "host-changed": "Other Host" } as const;
+const STATUS_PILL = { live: "Live", stale: "Last known", offline: "Offline", connecting: "Connecting", pairing: "Pairing", "host-changed": "Check PC" } as const;
 
 const TITLE: Record<PhoneTab, string> = { ...PHONE_TAB_LABEL, home: "Bunny A" };
 
@@ -173,6 +174,10 @@ export function Phone({ now: fixedNow }: PhoneProps = {}) {
           <span aria-hidden="true" />
         </header>
         <main className="pc-main">
+          <section className="pc-banner" data-tone="warn" data-status="pairing" role="status" aria-live="polite">
+            <strong>{pairingReason(store.connection.pairingCode)}</strong>
+            <p>{PAIRING_NEXT_STEP}</p>
+          </section>
           <Pairing />
         </main>
       </div>
@@ -203,7 +208,7 @@ export function Phone({ now: fixedNow }: PhoneProps = {}) {
         </span>
       </header>
       <main className="pc-main" id="pc-main">
-        {status !== "live" ? <Banner copy={copy} status={status} onTrust={() => store.trustHost()} /> : null}
+        {status !== "live" ? <Banner copy={copy} status={status} onTrust={() => store.trustHost()} onRetry={store.refreshOllama} /> : null}
         <Body route={route} view={view} />
       </main>
       <nav className="pc-tabs" aria-label="Phone navigation">
@@ -236,14 +241,29 @@ function Body({ route, view }: { route: PhoneRoute; view: View }) {
   return <HomeView view={view} />;
 }
 
-function Banner({ copy, status, onTrust }: { copy: StatusCopy; status: PhoneStatus; onTrust: () => void }) {
+function Banner({ copy, status, onTrust, onRetry }: { copy: StatusCopy; status: PhoneStatus; onTrust: () => void; onRetry: () => Promise<void> }) {
+  const [checking, setChecking] = useState(false);
   return (
     <section className="pc-banner" data-tone={copy.tone} data-status={status} role="status" aria-live="polite">
       <strong>{copy.title}</strong>
       {copy.detail ? <p>{copy.detail}</p> : null}
       {status === "host-changed" ? (
         <button type="button" className="pc-btn" onClick={onTrust}>
-          Trust this Host
+          Trust this PC
+        </button>
+      ) : null}
+      {canRetry(status) ? (
+        <button
+          type="button"
+          className="pc-btn"
+          disabled={checking}
+          onClick={() => {
+            setChecking(true);
+            // The store's own read decides the state; this button only skips the wait for the next automatic retry.
+            void onRetry().finally(() => setChecking(false));
+          }}
+        >
+          {checking ? "Checking…" : "Retry now"}
         </button>
       ) : null}
     </section>
@@ -939,8 +959,8 @@ function ChatView({ view }: { view: View }) {
                 {store.submitting ? "Sending…" : "Send"}
               </button>
             </div>
-            {store.submitting ? <p className="pc-note">Waiting for the Host to accept it. Your words stay here until it does.</p> : null}
-            {!store.canAct() ? <p className="pc-note">Reconnect to the Host to send.</p> : null}
+            {store.submitting ? <p className="pc-note">Waiting for your PC to accept it. Your words stay here until it does.</p> : null}
+            {!store.canAct() ? <p className="pc-note">You can send once your PC is reachable.</p> : null}
           </>
         ) : (
           <p className="pc-note">Chat is not available from this device.</p>
@@ -972,8 +992,9 @@ function ChatView({ view }: { view: View }) {
 // ---------------------------------------------------------------------------------------------------------------
 
 function SettingsView({ view }: { view: View }) {
-  const { store, caps, copy } = view;
+  const { store, caps, copy, now } = view;
   const [confirmOut, setConfirmOut] = useState(false);
+  const ending = store.viewer?.kind === "device" ? pairingEnding({ createdAt: store.viewer.pairedAt, expiresAt: store.viewer.expiresAt }, now) : null;
   const lines = rightsSummary(store.viewer);
   const { appearance } = store;
   return (
@@ -990,14 +1011,19 @@ function SettingsView({ view }: { view: View }) {
             <dd>{CONNECTION_LABEL[store.connection.state]}</dd>
           </div>
           <div>
-            <dt>Host</dt>
-            <dd>{store.hostIdentity ? shortId(store.hostIdentity.hostId) : "Not known yet"}</dd>
+            <dt>PC</dt>
+            <dd>{store.hostIdentity ? `ID ${shortId(store.hostIdentity.hostId)}` : "Not known yet"}</dd>
           </div>
           <div>
-            <dt>Session</dt>
+            <dt>This device</dt>
             <dd>{sessionLine(store.viewer)}</dd>
           </div>
         </dl>
+        {ending ? (
+          <p className="pc-muted" role="status">
+            <strong>{ending.text}.</strong> After that, pair this device again with a new code from your PC.
+          </p>
+        ) : null}
         {lines.length ? (
           <ul className="pc-bullets">
             {lines.map((line) => (
@@ -1100,11 +1126,11 @@ export function Pairing({ compact = false }: { compact?: boolean }) {
       <div className="pairing-title">
         <Smartphone size={26} />
         <p className="eyebrow">Remote access</p>
-        <h2>{companion ? "Bring Bunny with you." : "Your workstation, wherever you are."}</h2>
+        <h2>{companion ? "Bring Bunny with you." : "Your PC, wherever you are."}</h2>
         <p>
           {companion
-            ? "Enter the one-time code from Bunny Island."
-            : "Pair a phone with your workstation’s secure companion."}
+            ? "Enter the one-time code from Bunny on your PC."
+            : "Pair a phone or laptop with this PC."}
         </p>
         <span className="caption">
           <ShieldCheck size={14} />
@@ -1116,8 +1142,8 @@ export function Pairing({ compact = false }: { compact?: boolean }) {
           <div className="pairing-workstation">
             <p className="caption">
               {store.remoteConfigured
-                ? "The Host manages your authorized devices and HTTPS connection."
-                : "Remote access is not configured on this workstation."}
+                ? "This PC manages your paired devices and their secure connection."
+                : "Remote access is not set up on this PC."}
             </p>
             {store.remoteUrl ? (
               <a
@@ -1137,12 +1163,12 @@ export function Pairing({ compact = false }: { compact?: boolean }) {
               onClick={store.createPairCode}
             >
               <Plus size={15} />
-              Create workstation pairing code
+              Create pairing code
             </button>
             {store.pairCode ? (
               <div className="pairing-code-display">
                 <code>{store.pairCode}</code>
-                <small>Single use · expires in 10 minutes. The phone still confirms this code with the Host.</small>
+                <small>Single use · expires in 10 minutes. The device still confirms this code with this PC.</small>
                 {store.remoteUrl ? (
                   <a href={`${store.remoteUrl}/?companion=1#pair=${encodeURIComponent(store.pairCode)}`}>
                     Open the companion with this code filled in
@@ -1172,7 +1198,7 @@ export function Pairing({ compact = false }: { compact?: boolean }) {
               if (paired) {
                 setCode("");
                 setStatus("Paired securely. Reconnecting…");
-              } else setStatus("Pairing failed. Check the one-time code on your workstation.");
+              } else setStatus("Pairing failed. Check the code on your PC: each code works once and lasts 10 minutes.");
             } finally {
               setBusy(false);
             }
@@ -1189,7 +1215,7 @@ export function Pairing({ compact = false }: { compact?: boolean }) {
             />
           </label>
           <label className="field">
-            Workstation code
+            Pairing code
             <input
               placeholder="Enter your one-time code"
               value={code}
@@ -1206,7 +1232,7 @@ export function Pairing({ compact = false }: { compact?: boolean }) {
             {busy ? "Pairing…" : "Pair this device"}
           </button>
           {!secure ? (
-            <p className="caption">Use your workstation’s secure HTTPS address for pairing.</p>
+            <p className="caption">Open Bunny through your PC’s secure HTTPS address to pair.</p>
           ) : null}
           <p className="pair-status" role="status">
             {status}
@@ -1252,7 +1278,7 @@ function PhoneThemeChoice() {
       </select>
       <p className="pc-muted">
         {previewing
-          ? "Previewing in this window. Reconnect to the Host to save it."
+          ? "Previewing in this window. It saves once your PC is reachable."
           : device
             ? origin === "device"
               ? "Kept on this phone only."

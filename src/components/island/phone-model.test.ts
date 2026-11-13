@@ -18,6 +18,7 @@ import {
   recentTaskRows,
   routeFromSearch,
   routeTab,
+  canRetry,
   sessionLine,
   stepProgressText,
   stepSegments,
@@ -32,6 +33,7 @@ import {
   AGENT_ACTION_STATES,
   type PhoneRoute,
 } from "./phone-model.ts";
+import { PAIRING_NEXT_STEP } from "./connection-model.ts";
 import type { SnapshotViewer } from "../../lib/bunny-host/contracts.ts";
 import type { AgentSnapshot, AgentState } from "../../lib/bunny-host/agent-types.ts";
 import type { PersonalAgentView } from "../../lib/bunny-host/personal-agents.ts";
@@ -208,7 +210,7 @@ test("voice shows a microphone only for the workstation and names the PC for dev
 });
 
 test("the session line names the workstation or the paired device", () => {
-  assert.equal(sessionLine(workstation), "This workstation");
+  assert.equal(sessionLine(workstation), "This PC");
   assert.equal(sessionLine(fullDevice), "Paired device · Pixel companion");
   assert.equal(sessionLine(null), "Checking this device");
 });
@@ -239,7 +241,7 @@ test("offline with a retained view is offline with the last known state, never l
   assert.equal(phoneStatus(conn("offline", 1000), 1200), "offline");
   const copy = statusCopy("offline", { snapshotAt: 1000, pairingCode: null, format });
   assert.equal(copy.tone, "danger");
-  assert.equal(copy.title, "Bunny-A Host is unreachable");
+  assert.equal(copy.title, "Can't reach your PC");
   assert.equal(copy.detail, "Showing last known state from T1000. Controls are paused.");
 });
 
@@ -247,23 +249,32 @@ test("offline with nothing retained says so without inventing a time", () => {
   assert.equal(phoneStatus(conn("offline", null), 1200), "offline");
   assert.equal(phoneStatus(conn("connecting", null), 1200), "connecting");
   const copy = statusCopy("offline", { snapshotAt: null, pairingCode: null, format });
-  assert.equal(copy.detail, "Controls are paused until the Host answers.");
+  assert.equal(copy.detail, "Controls are paused until your PC answers.");
 });
 
 test("stale copy names the last confirmed time and says animations are stopped", () => {
   assert.equal(phoneStatus(conn("live", 1000), 99_000), "stale");
   const copy = statusCopy("stale", { snapshotAt: 1000, pairingCode: null, format });
   assert.equal(copy.title, "Showing last known state from T1000");
-  assert.equal(copy.detail, "Animations are stopped. Updates resume when the Host answers.");
+  assert.equal(copy.detail, "Animations are stopped. Updates resume when your PC answers.");
 });
 
 test("pairing and a changed Host are their own states and never look live", () => {
   assert.equal(phoneStatus(conn("pairing", 1000), 1100), "pairing");
   assert.equal(phoneStatus(conn("host-changed", 1000), 1100), "host-changed");
   const pairing = statusCopy("pairing", { snapshotAt: 1000, pairingCode: "DEVICE_REVOKED", format });
-  assert.equal(pairing.title, "Pairing required");
-  assert.equal(pairing.detail, "This device's access was revoked on the workstation.");
-  assert.equal(statusCopy("host-changed", { snapshotAt: 1000, pairingCode: null, format }).tone, "danger");
+  assert.equal(pairing.title, "Pairing needed");
+  // The reason is followed by the next step: a phone that lost its pairing is told where the new code comes from.
+  assert.equal(pairing.detail, `This device's access was turned off on your PC. ${PAIRING_NEXT_STEP}`);
+  assert.match(PAIRING_NEXT_STEP, /On your PC.*pairing code.*enter it here/);
+  const changed = statusCopy("host-changed", { snapshotAt: 1000, pairingCode: null, format });
+  assert.equal(changed.tone, "danger");
+  assert.match(changed.detail ?? "", /Trust it only if/, "a changed PC says when trusting it is right");
+  // A manual retry is offered exactly while the client is still retrying on its own.
+  assert.deepEqual(
+    (["live", "stale", "offline", "connecting", "pairing", "host-changed"] as const).filter(canRetry),
+    ["stale", "offline", "connecting"],
+  );
   assert.equal(statusCopy("live", { snapshotAt: 1000, pairingCode: null, format }).detail, null);
 });
 
@@ -313,13 +324,13 @@ test("controls are disabled with a caption while offline, while waiting for the 
   const offline = act({ action: "pause", canAct: false });
   assert.equal(offline.visible, true);
   assert.equal(offline.enabled, false);
-  assert.equal(offline.caption, "Reconnect to the Host to use controls.");
+  assert.equal(offline.caption, "Controls come back when your PC is reachable.");
   const waiting = act({ action: "pause", pending: { "agent-1": "agent.pause" } });
   assert.equal(waiting.enabled, false);
-  assert.equal(waiting.caption, "Waiting for the Host…");
+  assert.equal(waiting.caption, "Waiting for your PC…");
   const unknown = act({ action: "stop", uncertain: [{ targetId: "agent-1" }] });
   assert.equal(unknown.enabled, false);
-  assert.equal(unknown.caption, "Outcome unknown — checking the Host…");
+  assert.equal(unknown.caption, "Outcome unknown — checking with your PC…");
   // A pending command on a different Agent does not block this one.
   assert.equal(act({ action: "pause", pending: { "agent-2": "agent.pause" } }).enabled, true);
 });
