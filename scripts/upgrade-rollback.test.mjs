@@ -18,9 +18,9 @@ test("Upgrade & Rollback Lifecycle Invariants", async (t) => {
     const versionCode = parseInt(versionCodeMatch[1], 10);
     const versionName = versionNameMatch[1];
 
-    assert.equal(versionCode, 4, "Current Beta versionCode must be 4");
-    assert.equal(versionName, "2.2", "Current Beta versionName must be 2.2");
-    assert.ok(versionCode > 3, "versionCode 4 is strictly greater than v3 (prevents downgrade collisions)");
+    assert.equal(versionCode, 5, "Current Beta versionCode must be 5");
+    assert.equal(versionName, "2.3", "Current Beta versionName must be 2.3");
+    assert.ok(versionCode > 4, "versionCode 5 is strictly greater than the shipped v4 (prevents downgrade collisions)");
     console.log(`[Android Version Audit] Confirmed versionCode=${versionCode}, versionName=${versionName}`);
   });
 

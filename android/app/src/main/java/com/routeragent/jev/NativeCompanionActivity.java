@@ -23,6 +23,7 @@ import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.window.OnBackInvokedDispatcher;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.text.DateFormat;
@@ -69,6 +70,8 @@ public final class NativeCompanionActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state); store=new NativeSessionStore(this);
+        // Targeting API 36, onBackPressed is no longer called on Android 13+: back arrives through this callback.
+        if(Build.VERSION.SDK_INT>=33) getOnBackInvokedDispatcher().registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::handleBack);
         // Rotation recreates the screen: keep the open tab and the unsent draft.
         if(state!=null) { activeTab=state.getInt("tab",0); chatDraft=state.getString("draft",""); }
         chatStore=getSharedPreferences("native_chat_v1",MODE_PRIVATE);
@@ -885,10 +888,16 @@ public final class NativeCompanionActivity extends Activity {
         });
     }
 
-    @Override public void onBackPressed() {
+    @Override public void onBackPressed() { handleBack(); }
+
+    /** Back from another tab returns to the first one; from the first tab it leaves the app as the system would. */
+    private void handleBack() {
         if(session!=null && snapshot!=null && activeTab!=0) {
             activeTab=0;
             renderCurrentTab(true);
+        } else if(Build.VERSION.SDK_INT>=33) {
+            // The registered callback replaces the system's default, so do what it does: a task root goes to the background.
+            if(isTaskRoot()) moveTaskToBack(false); else finish();
         } else {
             super.onBackPressed();
         }
