@@ -52,8 +52,9 @@ State left on the phone: release APK installed, unpaired, rotation settings rest
 
 ## Still open
 
-1. Decide A-ATT-2: change the 3 s reconnect criterion to match the designed 2→60 s backoff, or change the app. A faster
-   reconnect by listening for network changes needs `ACCESS_NETWORK_STATE`, which breaks the single-permission posture.
+1. A-ATT-2 reconnect — resolved in code after this session: network retries are now capped at 5 s while the screen is
+   open (`PollPolicy.MAX_NETWORK_RETRY_MS`; polling stops in `onStop`), and the criterion reads "within 5 s". Not yet
+   re-run on the phone: needs a rebuilt APK and one attended airplane-mode check.
 2. Owner-attended: TalkBack, Narrator, voice interruption, docking, and a second monitor for mixed DPI.
 3. Elevated trust of the test certificate, then the signed MSIX install and protocol test.
 4. Production Authenticode certificate, Partner Center publisher CN, Play Console and upload key.

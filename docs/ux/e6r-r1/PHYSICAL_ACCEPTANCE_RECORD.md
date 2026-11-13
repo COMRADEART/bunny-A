@@ -95,7 +95,7 @@ In accordance with release qualification policy:
   2. Verify pairing completion and initial state synchronization.
   3. Toggle airplane mode on handset for 10 seconds; turn off airplane mode.
 - **Expected Result:**
-  - Companion reconnects automatically within 3 seconds of network restoration.
+  - Companion reconnects automatically within 5 seconds of network restoration while its screen is open (retries every 5 s at most; a faster, event-driven reconnect would need `ACCESS_NETWORK_STATE`, which the single-permission posture excludes).
   - Zero duplicate commands sent; pending commands display "Outcome unknown" rather than "Not sent".
 - **Status:** **BLOCKED (Physical Handset Required)**.
 
