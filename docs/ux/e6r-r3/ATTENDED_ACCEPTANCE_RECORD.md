@@ -59,3 +59,18 @@ State left on the phone: release APK installed, unpaired, rotation settings rest
 3. Elevated trust of the test certificate, then the signed MSIX install and protocol test.
 4. Production Authenticode certificate, Partner Center publisher CN, Play Console and upload key.
 5. Pin promotion, after the above.
+
+## Rebuild after launch-prep changes (2026-11-13, commit `cc22bf9`)
+
+Built with the pinned toolchain in `test-results/native-toolchain` (SDK 8.0.408, runtime 8.0.33):
+
+| Artifact / check | Result |
+|---|---|
+| `BunnyA.Tests` (pinned .NET 8) | ALL PASSED |
+| `BunnyA.OutcomeTests` (pinned .NET 8) | 114/114 |
+| `releases/msix-cc22bf9/BunnyA.Workstation-28.0.0.0.msix` | SHA-256 `2909d574…5ffd`; inner `<Identity>` has one `Version` (`28.0.0.0`), publisher `CN=BunnyA-Development` (test); `BunnyA.dll` carries the new "Voice offline" label |
+| `releases/Bunny-A-Android-v5.apk` | SHA-256 `700fcd56…5f10`; v5 / 2.3, target API 36, `INTERNET` only, signing cert `51b965f3…` (same as v4) |
+| `releases/Bunny-A-Android-v5.aab` | SHA-256 `d2a70828…18bc`; unsigned base, needs the owner's upload key |
+
+The earlier recorded MSIX (`releases/BunnyA.Workstation-28.0.0.0.msix`, `890de990…6012`) was left in place. The candidate
+pin is re-cut after this branch merges, against the merge commit on `main`.
