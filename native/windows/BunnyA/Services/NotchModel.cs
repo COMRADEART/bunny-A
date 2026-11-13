@@ -61,7 +61,7 @@ public static class NotchModel
         NotchState.Completed => "Completed",
         NotchState.Failed => "Failed",
         NotchState.Canceled => "Canceled",
-        NotchState.Disconnected => "Disconnected",
+        NotchState.Disconnected => "Offline",
         _ => "State unknown",
     };
 

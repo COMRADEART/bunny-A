@@ -58,14 +58,13 @@ import { FabricWorkspace } from "./fabric";
 import { Telemetry } from "./telemetry";
 import { useHostStream } from "./host-stream";
 import { filteredActivities, returnFocusTo, type ActivityFilters } from "./workspace-model";
-import { CONNECTION_LABEL, freshnessLabel, pairingReason } from "./connection-model";
+import { agoText, CONNECTION_LABEL, freshnessLabel, HOST_CHANGED_DETAIL, PAIRING_NEXT_STEP, pairingEnding, pairingReason } from "./connection-model";
 import {
   attentionCount,
   attentionLabel,
   isDevice,
   rightsSummary,
   shortId,
-  WORKSTATION_CAPTION,
 } from "./remote-view-model";
 import { ChatHome } from "./chat-home";
 import { Approvals } from "./approvals";
@@ -523,6 +522,10 @@ export function Island() {
 function ConnectionBanner({ freshness }: { freshness: string }) {
   const store = useIsland();
   const state = store.connection.state;
+  // At the PC itself "your PC" would name the machine the reader is sitting at. Until the first answer says who is
+  // looking, "your PC" is the wording that is right on a device and still true at the PC.
+  const device = store.viewer?.kind !== "workstation";
+  const pc = device ? "your PC" : "this PC";
   if (state === "pairing")
     return (
       <div className="connection-banner" data-state="pairing" role="status">
@@ -530,7 +533,7 @@ function ConnectionBanner({ freshness }: { freshness: string }) {
           <WifiOff size={18} />
           <span>
             <strong>This device needs pairing.</strong>
-            <small>{pairingReason(store.connection.pairingCode)} Agents keep running on your Windows Host.</small>
+            <small>{pairingReason(store.connection.pairingCode)} {PAIRING_NEXT_STEP} Agents keep running on your PC.</small>
           </span>
         </div>
         <Pairing compact />
@@ -541,14 +544,14 @@ function ConnectionBanner({ freshness }: { freshness: string }) {
       <div className="offline-banner connection-banner" data-state="host-changed" role="alert">
         <ShieldCheck size={18} />
         <span>
-          <strong>This is a different Bunny-A Host.</strong>
+          <strong>This is not the PC this device was paired with.</strong>
           <small>
-            This device was paired with Host {shortId(store.pinnedHostId)}; the address now answers as Host{" "}
-            {shortId(store.hostIdentity?.hostId)}. Controls stay off until you confirm this is your computer.
+            {HOST_CHANGED_DETAIL} Controls stay off until you decide. (Paired with {shortId(store.pinnedHostId)}, now
+            answering as {shortId(store.hostIdentity?.hostId)}.)
           </small>
         </span>
         <button className="btn secondary" onClick={() => store.trustHost()}>
-          Trust this Host
+          Trust this PC
         </button>
       </div>
     );
@@ -557,13 +560,20 @@ function ConnectionBanner({ freshness }: { freshness: string }) {
     <div className="offline-banner connection-banner" data-state={state} role="status">
       <WifiOff size={18} />
       <span>
-        <strong>{state === "offline" ? "Offline" : "Reconnecting to your Host…"}</strong>
+        <strong>
+          {state === "offline"
+            ? device
+              ? "Can't reach your PC"
+              : "Bunny is not answering on this PC"
+            : `Reconnecting to ${pc}…`}
+        </strong>
         <small>
-          {freshness} — controls are paused. Shown state may be out of date; Agents keep running on the Host.
+          {freshness} — controls are paused. What you see may be out of date
+          {device ? "; Agents keep running on your PC if it is on." : "."}
         </small>
       </span>
       <button className="btn secondary" onClick={() => void store.refreshOllama()}>
-        Reconnect
+        Retry now
       </button>
     </div>
   );
@@ -871,49 +881,56 @@ function DevicesWorkspace() {
   const viewer = store.viewer;
   const when = (ms: number | null | undefined) => (ms ? new Date(ms).toLocaleString() : "Not recorded");
   const identity = store.hostIdentity;
+  const now = Date.now();
+  const ownEnding = viewer?.kind === "device" ? pairingEnding({ createdAt: viewer.pairedAt, expiresAt: viewer.expiresAt }, now) : null;
   return (
     <>
       <div className="page-heading">
         <div>
           <p className="eyebrow">Trusted connections</p>
           <h1>Devices</h1>
-          <p>Who can reach this Host, and what each connection may do.</p>
+          <p>Which devices can reach {viewer?.kind === "device" ? "your PC" : "this PC"}, and what each one may do.</p>
         </div>
       </div>
       <section className="t8-surface current-device">
         <Smartphone size={22} />
         <div>
-          <h2>{viewer?.kind === "device" ? viewer.name : "This workstation"}</h2>
+          <h2>{viewer?.kind === "device" ? viewer.name : "This PC"}</h2>
           <p>
             {CONNECTION_LABEL[store.connection.state]}
-            {viewer?.kind === "device" ? " · Paired device" : viewer ? " · Windows Host owner" : ""}
+            {viewer?.kind === "device" ? " · Paired device" : viewer ? " · Owner" : ""}
           </p>
           <dl className="fact-list">
             <div>
-              <dt>Host</dt>
-              <dd>
+              <dt>{viewer?.kind === "device" ? "Your PC" : "Bunny on this PC"}</dt>
+              <dd title={identity ? new Date(identity.startedAt).toLocaleString() : undefined}>
                 {identity
-                  ? `${shortId(identity.hostId)} · running since ${new Date(identity.startedAt).toLocaleString()}`
-                  : "Unknown until the Host answers"}
+                  ? `Started ${agoText(identity.startedAt, now)} · ID ${shortId(identity.hostId)}`
+                  : "Unknown until your PC answers"}
               </dd>
             </div>
             {viewer?.kind === "device" && (
               <>
                 <div>
                   <dt>Paired</dt>
-                  <dd>{when(viewer.pairedAt)}</dd>
+                  <dd title={when(viewer.pairedAt)}>{agoText(viewer.pairedAt, now)}</dd>
                 </div>
                 <div>
-                  <dt>Session expires</dt>
+                  <dt>Pairing ends</dt>
                   <dd>{when(viewer.expiresAt)}</dd>
                 </div>
                 <div>
-                  <dt>Last seen by the Host</dt>
-                  <dd>{when(viewer.lastSeenAt)}</dd>
+                  <dt>Last seen by your PC</dt>
+                  <dd title={when(viewer.lastSeenAt)}>{agoText(viewer.lastSeenAt, now)}</dd>
                 </div>
               </>
             )}
           </dl>
+          {ownEnding ? (
+            <p className="caption" role="status">
+              <strong>{ownEnding.text}.</strong> After that, pair this device again with a new code from your PC.
+            </p>
+          ) : null}
           {viewer?.kind === "device" && (
             <>
               <h3 className="eyebrow">This device may</h3>
@@ -923,7 +940,7 @@ function DevicesWorkspace() {
                 ))}
               </ul>
               <p className="caption">
-                Creating Agents, first starts, scope changes, pairing and settings are {WORKSTATION_CAPTION.toLowerCase()}.
+                Creating Agents, first starts, scope changes, pairing and settings are available on your PC.
               </p>
               <button
                 className="btn danger"
@@ -932,7 +949,7 @@ function DevicesWorkspace() {
                   setSigningOut(true);
                 }}
               >
-                Sign out this phone
+                Sign out this device
               </button>
             </>
           )}
@@ -945,26 +962,35 @@ function DevicesWorkspace() {
             <section className="t8-surface paired-devices">
               <h2>Paired devices</h2>
               {store.devices.map((device) => {
-                const diag = projectDeviceDiagnostics({ ...device, revoked: device.revoked === true }, Date.now());
+                const diag = projectDeviceDiagnostics({ ...device, revoked: device.revoked === true }, now);
                 const status = deviceStatusPresentation(diag);
+                const ending = status.authority === "active" ? pairingEnding({ createdAt: diag.pairedAt, expiresAt: diag.expiresAt }, now) : null;
                 const guidance = status.label === "Revoked"
-                  ? "This phone can no longer supervise tasks. Pairing again needs a new code."
+                  ? "It can no longer reach this PC. Pairing it again needs a new code."
                   : status.label === "Pairing expired"
-                    ? "The pairing lifetime ended. Create a new code on this PC."
+                    ? "Its pairing ended. Create a new code on this PC to pair it again."
                     : status.label === "Offline"
-                      ? "Bunny-A has not heard from this phone recently. Open the app while this computer is reachable."
+                      ? "It is switched off or out of reach. It reconnects by itself when Bunny is opened on it."
                       : status.label === "Reconnecting"
-                        ? "The phone is trying to reach this Host again."
-                        : "The phone can supervise tasks the Host allows.";
+                        ? "It is trying to reach this PC again."
+                        : "It can supervise the tasks this PC allows.";
                 return (
                 <div className="paired-device-row" key={device.id}>
                   <Smartphone size={16} />
                   <span>
                     <strong className="wrap-anywhere">{diag.name}</strong>
-                    <small>
-                      {status.label} · authority {status.authority} · observed {status.observed} · last seen {when(diag.lastSeenAt)} · pairing ends {when(diag.expiresAt)}
+                    <small title={`Last seen ${when(diag.lastSeenAt)} · paired ${when(diag.pairedAt)} · pairing ends ${when(diag.expiresAt)}`}>
+                      {status.label} · last seen {agoText(diag.lastSeenAt, now)} · paired {agoText(diag.pairedAt, now)}
                     </small>
                     <small>{guidance}</small>
+                    {ending ? (
+                      <small role="status">
+                        <strong>{ending.text}.</strong>{" "}
+                        {ending.renew === "use"
+                          ? "Open Bunny on it before then and it stays paired."
+                          : "After that it needs a new pairing code from this PC."}
+                      </small>
+                    ) : null}
                   </span>
                   {status.label === "Revoked" ? <span className="caption">Revoked</span> : (
                   <button
@@ -989,10 +1015,10 @@ function DevicesWorkspace() {
         <Dialog.Portal>
           <Dialog.Overlay className="t8-overlay" />
           <ThemedDialogContent className="t8-dialog" onCloseAutoFocus={returnFocusTo(dialogOpener)}>
-            <Dialog.Title>Sign out this phone?</Dialog.Title>
+            <Dialog.Title>Sign out this device?</Dialog.Title>
             <Dialog.Description>
-              This phone revokes its own access on the Host and forgets its session. Agents keep running on
-              your Windows Host. Pairing again needs a new code from the workstation.
+              This device gives up its access to your PC and forgets its pairing. Agents keep running on your PC.
+              Pairing again needs a new code from your PC.
             </Dialog.Description>
             <div className="actions">
               <Dialog.Close asChild>

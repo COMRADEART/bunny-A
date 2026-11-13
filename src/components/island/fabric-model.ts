@@ -5,6 +5,7 @@
  * percentage, a health state, a node or a quota. A paired device never sees Server Control at all.
  */
 import type { HostEvent, HostIdentity } from "../../lib/bunny-host/contracts.ts";
+import { deviceStatusPresentation, projectDeviceDiagnostics, type DeviceStatusLabel } from "../../lib/bunny-host/ma4/native-notifications.ts";
 
 /** The input rows are structural (the store projects these fields from the same snapshot pieces). */
 export type DeviceInput = { id: string; name: string; createdAt: number; expiresAt?: number; lastSeenAt?: number | null; revoked?: boolean };
@@ -42,22 +43,47 @@ export function fabricOverview(input: {
   };
 }
 
-export type FabricDeviceRow = DeviceInput & { state: "active" | "revoked" | "expired" | "idle" };
+export type FabricDeviceRow = DeviceInput & { state: "active" | "revoked" | "expired" | "idle"; label: DeviceStatusLabel };
+
+/** The one device status rule, shared with the Devices page so the two lists can never disagree. */
+export const deviceStatus = (device: DeviceInput, now: number) =>
+  deviceStatusPresentation(projectDeviceDiagnostics({ ...device, revoked: device.revoked === true }, now));
 
 /** The registry rows as the fabric shows them: newest presence first, every row labelled with its own truth. */
 export function fabricDeviceRows(devices: readonly DeviceInput[] | null | undefined, now: number): FabricDeviceRow[] {
   return [...(devices ?? [])]
     .sort((a, b) => (b.lastSeenAt ?? b.createdAt) - (a.lastSeenAt ?? a.createdAt))
-    .map((row) => ({
-      ...row,
-      state: row.revoked
-        ? "revoked"
-        : row.expiresAt && row.expiresAt < now
-          ? "expired"
-          : row.lastSeenAt && now - row.lastSeenAt > 90_000
-            ? "idle"
-            : "active",
-    }));
+    .map((row) => {
+      const status = deviceStatus(row, now);
+      return {
+        ...row,
+        state: status.authority !== "active" ? status.authority : status.observed === "offline" ? "idle" : "active",
+        label: status.label,
+      };
+    });
+}
+
+/**
+ * What changed between two looks at the paired devices: "Phone is back online" / "Phone went offline". Only devices
+ * still allowed to connect are tracked, a device seen for the first time says nothing (pairing has its own notice),
+ * and the first look (`previous` null) only seeds.
+ */
+export function devicePresenceNotes(
+  previous: Readonly<Record<string, boolean>> | null,
+  devices: readonly DeviceInput[] | null | undefined,
+  now: number,
+): { presence: Record<string, boolean>; notes: string[] } {
+  const presence: Record<string, boolean> = {};
+  const notes: string[] = [];
+  for (const device of devices ?? []) {
+    const status = deviceStatus(device, now);
+    if (status.authority !== "active") continue;
+    const online = status.observed !== "offline";
+    presence[device.id] = online;
+    if (previous && device.id in previous && previous[device.id] !== online)
+      notes.push(`${device.name.trim() || "A paired device"} ${online ? "is back online" : "went offline"}`);
+  }
+  return { presence, notes };
 }
 
 /** Usage rows from the workstation-only ledger: a cost is shown only where the ledger calls it known (local_device). */

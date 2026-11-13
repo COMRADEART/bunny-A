@@ -86,7 +86,7 @@ test("T9 view: control captions put an unknown outcome before everything else", 
   const base = { canAct: true, targetId: "a1", pending: {}, uncertain: [] as { targetId: string | null }[] };
   assert.equal(controlCaption(base), null);
   assert.equal(controlCaption({ ...base, canAct: false }), RECONNECT_CAPTION);
-  assert.equal(controlCaption({ ...base, pending: { a1: "agent.stop" } }), "Waiting for the Host…");
+  assert.equal(controlCaption({ ...base, pending: { a1: "agent.stop" } }), "Waiting for your PC…");
   assert.equal(controlCaption({ ...base, canAct: false, uncertain: [{ targetId: "a1" }] }), OUTCOME_UNKNOWN);
   assert.equal(controlCaption({ ...base, uncertain: [{ targetId: "other" }] }), null);
 });

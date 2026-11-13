@@ -4,7 +4,7 @@ import { isUserFacingAgent, type PersonalAgentView, type SlotId } from "../../li
 import type { MissionView } from "../../lib/bunny-missions/types.ts";
 import type { OrchTask } from "../../lib/orch/types.ts";
 import { hostLive } from "./character-model.ts";
-import { pairingReason, type Connection } from "./connection-model.ts";
+import { HOST_CHANGED_DETAIL, PAIRING_NEXT_STEP, pairingReason, type Connection } from "./connection-model.ts";
 import { controlCaption, type Verdict } from "./remote-view-model.ts";
 import { LIVE_MISSION, MISSION_LABEL } from "./mission-model.ts";
 
@@ -89,6 +89,9 @@ export function phoneStatus(connection: Pick<Connection, "state" | "snapshotAt">
   return connection.state === "offline" ? "offline" : "stale";
 }
 
+/** A manual retry is offered while the view is not live and the client may still retry on its own. */
+export const canRetry = (status: PhoneStatus) => status === "stale" || status === "offline" || status === "connecting";
+
 /** Loops, one-shots and live levels run only while the Host's view is live. */
 export const animatesFor = (status: PhoneStatus) => status === "live";
 
@@ -109,21 +112,21 @@ export function statusCopy(
     case "stale":
       return {
         tone: "warn",
-        title: known ?? "Connecting to Host",
-        detail: known ? "Animations are stopped. Updates resume when the Host answers." : "Controls stay paused until the Host answers.",
+        title: known ?? "Connecting to your PC",
+        detail: known ? "Animations are stopped. Updates resume when your PC answers." : "Controls stay paused until your PC answers.",
       };
     case "offline":
       return {
         tone: "danger",
-        title: "Bunny-A Host is unreachable",
-        detail: known ? `${known}. Controls are paused.` : "Controls are paused until the Host answers.",
+        title: "Can't reach your PC",
+        detail: known ? `${known}. Controls are paused.` : "Controls are paused until your PC answers.",
       };
     case "connecting":
-      return { tone: "neutral", title: "Connecting to Host", detail: "Controls stay paused until the Host answers." };
+      return { tone: "neutral", title: "Connecting to your PC", detail: "Controls stay paused until your PC answers." };
     case "pairing":
-      return { tone: "warn", title: "Pairing required", detail: pairingReason(input.pairingCode) };
+      return { tone: "warn", title: "Pairing needed", detail: `${pairingReason(input.pairingCode)} ${PAIRING_NEXT_STEP}` };
     case "host-changed":
-      return { tone: "danger", title: "Different Bunny-A Host", detail: "Review it before changing anything." };
+      return { tone: "danger", title: "Not the PC you paired with", detail: HOST_CHANGED_DETAIL };
   }
 }
 
@@ -203,7 +206,7 @@ export function voiceEntry(viewer: SnapshotViewer | null | undefined): { availab
 /** A short line naming who this screen is for. */
 export function sessionLine(viewer: SnapshotViewer | null | undefined): string {
   if (!viewer) return "Checking this device";
-  return viewer.kind === "workstation" ? "This workstation" : `Paired device · ${viewer.name}`;
+  return viewer.kind === "workstation" ? "This PC" : `Paired device · ${viewer.name}`;
 }
 
 // ---------------------------------------------------------------------------------------------------------------

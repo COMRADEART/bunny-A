@@ -135,7 +135,7 @@ export const COMPANION_LABEL: Record<CompanionState, string> = {
   PERMISSION: "Needs you",
   MUTED: "Muted",
   ERROR: "Voice error",
-  DISCONNECTED: "Disconnected",
+  DISCONNECTED: "Offline",
   HAPPY: "Result verified",
   UNKNOWN: "Voice unknown",
 };
