@@ -106,6 +106,10 @@ Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'j
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.WavTest')
 Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/VoiceGate.java'),(Join-Path $workspace 'android/tests/VoiceGateTest.java'))
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.VoiceGateTest')
+# On-device voice: the pinned model, its file states, and the resumable download (real loopback HTTP server).
+Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/ModelSource.java'),(Join-Path $sourceDirectory 'java/com/routeragent/jev/ModelFile.java'),(Join-Path $sourceDirectory 'java/com/routeragent/jev/ModelDownload.java'),(Join-Path $workspace 'android/tests/ModelFileTest.java'),(Join-Path $workspace 'android/tests/ModelDownloadTest.java'))
+Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.ModelFileTest')
+Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.ModelDownloadTest')
 # MA5-S1R1: command dispatch against injected network faults (real loopback sockets, no Android runtime).
 Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/HostExchange.java'),(Join-Path $workspace 'android/tests/HostExchangeTest.java'))
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.HostExchangeTest')
