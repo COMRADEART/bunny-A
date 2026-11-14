@@ -110,6 +110,10 @@ Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.VoiceGateTest')
 Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/ModelSource.java'),(Join-Path $sourceDirectory 'java/com/routeragent/jev/ModelFile.java'),(Join-Path $sourceDirectory 'java/com/routeragent/jev/ModelDownload.java'),(Join-Path $workspace 'android/tests/ModelFileTest.java'),(Join-Path $workspace 'android/tests/ModelDownloadTest.java'))
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.ModelFileTest')
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.ModelDownloadTest')
+# On-device voice: the state machine and the prompts.
+Run-Checked 'javac' @('--release','8','-encoding','UTF-8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/Wav.java'),(Join-Path $sourceDirectory 'java/com/routeragent/jev/VoiceSession.java'),(Join-Path $sourceDirectory 'java/com/routeragent/jev/VoicePrompt.java'),(Join-Path $workspace 'android/tests/VoiceSessionTest.java'),(Join-Path $workspace 'android/tests/VoicePromptTest.java'))
+Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.VoiceSessionTest')
+Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.VoicePromptTest')
 # MA5-S1R1: command dispatch against injected network faults (real loopback sockets, no Android runtime).
 Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/HostExchange.java'),(Join-Path $workspace 'android/tests/HostExchangeTest.java'))
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.HostExchangeTest')
