@@ -121,3 +121,7 @@ Reading: with the Zira voice the model transcribes the sentence exactly; with th
 ### Owner decision needed
 
 Choose one of: (a) accept the result, since every speed, memory and loading criterion passed with a wide margin and the miss is voice-dependent, and resume at Task 2; (b) re-run the gate with a human-spoken dictation clip in an attended session; (c) pick approach D (platform `SpeechRecognizer`) for dictation only. The agent did not choose among these.
+
+### Owner decision (2026-11-14)
+
+The gate verdict stands as written: **criterion 3 FAILED** (the specified dictation clip transcribed as "check the bill", not "check the build"). The owner was shown the measurements and the miss, which happened with the default synthetic voice only; the other synthetic voice was transcribed exactly, and no human voice was tested. The owner chose option (a): accept the result and continue the build from Task 2 through Task 8. Reason given: every speed and memory limit passed with a wide margin, and a dictated message always lands in the message box for review before Send. A human-voice dictation check stays **NOT RUN** for the attended session.
