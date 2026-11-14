@@ -88,6 +88,13 @@ foreach ($library in $toolchain.libraries) {
 }
 if ($libraryJars.Count -eq 0 -or @(Get-ChildItem -LiteralPath $nativeLibraries -Filter '*.so').Count -eq 0) { throw 'The voice libraries were not unpacked.' }
 $compileClasspath = (@($platformJar) + $libraryJars) -join ';'
+# On-device voice: the engine and recorder wrappers hold audio and model text; they must never reach network or Host code.
+foreach ($voiceFile in @('VoiceRecorder.java','VoiceEngine.java')) {
+  $voiceSource = Get-Content -LiteralPath (Join-Path $sourceDirectory ('java/com/routeragent/jev/' + $voiceFile)) -Raw
+  foreach ($forbidden in @('java.net.','NativeCompanionClient','HostExchange')) {
+    if ($voiceSource.Contains($forbidden)) { throw ($voiceFile + ' must not reference ' + $forbidden + '.') }
+  }
+}
 
 # 1. Compile resources with aapt2
 Run-Checked $aapt @('compile','--dir',(Join-Path $sourceDirectory 'res'),'-o',$compiled)

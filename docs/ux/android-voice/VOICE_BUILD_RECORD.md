@@ -137,3 +137,26 @@ The gate verdict stands as written: **criterion 3 FAILED** (the specified dictat
 ### Phone (Step 8)
 
 `adb install -r releases/Bunny-A-Android-v6.apk` over v5 → `Success`; `dumpsys package` changed from `versionCode=5`/`versionName=2.3` to `versionCode=6`/`versionName=2.4`. After launch, `uiautomator dump` showed `Pair with Windows`, `Workstation HTTPS Gateway Address`, `One-Time 10-Minute Pairing Code` and `Pair Securely`. `adb logcat` held no `FATAL`, no `UnsatisfiedLinkError` and no app exception; the only `AndroidRuntime` lines came from the `uiautomator` shell process. **PASS.**
+
+## Task 6 — engine and recorder wrappers (2026-11-14)
+
+`VoiceEngine` calls the API as read with `javap`: `new EngineConfig(path, new Backend.GPU(), null, new Backend.CPU(), 4096, null, cacheDir)`, with the same config using `Backend.CPU()` when GPU `initialize()` throws; `new ConversationConfig(Contents.Companion.of(system))`; `sendMessageAsync(Contents.Companion.of(new Content.AudioBytes(wav)), MessageCallback)`; cancel through `Conversation.cancelProcess()` plus a generation ticket, so a cancelled request never reaches its listener. `LIBRARY_MIN_SDK = 24`. Both build scripts fail if `VoiceRecorder.java` or `VoiceEngine.java` contains `java.net.`, `NativeCompanionClient` or `HostExchange`.
+
+### On-device check of the real `VoiceEngine` class (throwaway harness, removed afterwards)
+
+A throwaway APK (`com.routeragent.jev.spike`, throwaway key) compiled the app's own `VoiceEngine.java`, `Wav.java`, `VoicePrompt.java` and `VoiceSession.java` with the same D8 inputs as the app build: the 8 verified libraries, and **no `META-INF/services` or `.kotlin_builtins` resources**. The model was pushed into its own folder. TALK used `VoicePrompt.system(TALK, ["Nightly build — running", "Update the docs — waiting for approval"], true)`. Lines copied from `adb logcat -s BunnyHarness`; "ms" is ask → done in a fresh process and includes the engine load:
+
+| Clip | Mode | ms | Raw output |
+|---|---|---|---|
+| question (David) | TALK | 15467 (first load for this package) | `Two plus two equals four. This is a basic arithmetic problem. The answer is four.` |
+| "What is running on the workstation right now?" (David) | TALK | 5281 | `The nightly build is currently running on the workstation. There is also a task to update the documentation that is waiting for approval.` |
+| dictation (David) | DICTATE | 5292 | `Remind the workstation to check the bill tomorrow morning.` |
+| diag2 (Zira) | DICTATE | 5155 | `Remind the workstation to check the bill tomorrow morning.` |
+
+Cancel: `cancel()` 200 ms and 2,600 ms after `ask`. Neither cancelled request called its listener, and in both cases a second `ask` 3 s later completed (`after-cancel done ms=693` and `ms=833`, both `Two plus two equals four. …`), so the worker thread did not hang. `dumpsys meminfo` afterwards: `TOTAL PSS: 2329631` kB. The log does not show whether the 2,600 ms cancel landed during generation or just after it finished.
+
+Findings:
+- **Library Java resources are not needed** for this call path: the engine loads, conversations open with a system instruction, audio is accepted and answers stream with none of the jars' resources packaged. The APK therefore carries none.
+- **Dictation accuracy is not established.** With any system instruction set, the Zira clip also comes back as "check the bill" (also confirmed with the Task 1 spike APK: system = the DICTATE text, plus user text `Transcribe the audio exactly.` or the full DICTATE text). Task 1's "build" result for Zira happened only with no system instruction. The word is ambiguous in synthetic speech; a human-voice check remains NOT RUN.
+
+`adb uninstall com.routeragent.jev.spike` → `Success`; its folder (with the pushed model and clips) is gone.
