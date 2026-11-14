@@ -52,9 +52,7 @@ State left on the phone: release APK installed, unpaired, rotation settings rest
 
 ## Still open
 
-1. A-ATT-2 reconnect — resolved in code after this session: network retries are now capped at 5 s while the screen is
-   open (`PollPolicy.MAX_NETWORK_RETRY_MS`; polling stops in `onStop`), and the criterion reads "within 5 s". Not yet
-   re-run on the phone: needs a rebuilt APK and one attended airplane-mode check.
+1. ~~A-ATT-2 reconnect~~ — closed: re-run on the phone with v5 on 2026-11-14, **PASS** 3/3 (see below).
 2. Owner-attended: TalkBack, Narrator, voice interruption, docking, and a second monitor for mixed DPI.
 3. Elevated trust of the test certificate, then the signed MSIX install and protocol test.
 4. Production Authenticode certificate, Partner Center publisher CN, Play Console and upload key.
@@ -74,3 +72,33 @@ Built with the pinned toolchain in `test-results/native-toolchain` (SDK 8.0.408,
 
 The earlier recorded MSIX (`releases/BunnyA.Workstation-28.0.0.0.msix`, `890de990…6012`) was left in place. The candidate
 pin is re-cut after this branch merges, against the merge commit on `main`.
+
+## A-ATT-2 reconnect re-run on v5 (2026-11-14)
+
+Owner present with the phone (SM-S948U) on USB; owner approved the quick tunnel for this test. `releases/Bunny-A-Android-v5.apk`
+(`700fcd56…5f10`, v5 / 2.3, target API 36) installed over adb. Rig: disposable Host (`BUNNY_HOST_DATA_DIRECTORY` in a
+scratch folder, port 43771), vite on loopback 8090, cloudflared quick tunnel (hash-pinned binary). QUIC to the Cloudflare
+edge timed out on this network, so the tunnel ran with `--protocol http2`. The owner paired the phone by address and
+one-time code; the Host listed "Bunny Android Native Companion".
+
+Method: airplane mode toggled from the PC (`adb shell cmd connectivity airplane-mode enable|disable`), held ~13 s as in
+R3. After disable, a loop took a screenshot about every 0.4 s and pinged 1.1.1.1 from the phone until the first reply
+("network restored"). Recovery = first screenshot where the offline banner is replaced by "Updated … • refreshes every
+5.0 s while open" (banner detected by its yellow pixels; frames at the boundary checked by eye). Criterion: reconnect
+within 5 s of network restoration while the screen is open.
+
+| Run | Airplane held | Network restored after disable | Banner last seen | Live data first seen | Recovery after network restored | Result |
+|---|---|---|---|---|---|---|
+| 1 | 13.18 s | 3.08 s | 7.61 s | 7.95 s | 4.5–4.9 s | PASS |
+| 2 | 13.14 s | 3.08 s | 7.31 s | 7.67 s | 4.2–4.6 s | PASS |
+| 3 | 13.11 s | 3.83 s | 7.44 s | 7.83 s | 3.6–4.0 s | PASS |
+
+**A-ATT-2 reconnect: PASS (3/3)** against the 5 s criterion, with little margin (worst 4.9 s). The ping gives an upper
+bound for when the network came back (screenshot loop granularity ~0.4 s), so true recovery may be slightly longer.
+R3 measured 19 s on v4.
+
+Observed, not part of the criterion: while offline the banner read "retrying in 4 s" in every frame (at 4.2 s and 11.6 s
+of airplane mode and up to 7.6 s after restore); the countdown text did not change between frames.
+
+Teardown: tunnel, Host and vite stopped; the public URL returned 530 afterwards; `src/routeTree.gen.ts` reverted. The
+phone still holds a pairing for the now-deleted test Host. Screenshots are in the session scratch folder, not committed.
