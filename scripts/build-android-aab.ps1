@@ -117,6 +117,11 @@ Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'j
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.NativeCookiePolicyTest')
 Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/PollPolicy.java'),(Join-Path $workspace 'android/tests/PollPolicyTest.java'))
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.PollPolicyTest')
+# On-device voice: WAV framing and the device gate.
+Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/Wav.java'),(Join-Path $workspace 'android/tests/WavTest.java'))
+Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.WavTest')
+Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/VoiceGate.java'),(Join-Path $workspace 'android/tests/VoiceGateTest.java'))
+Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.VoiceGateTest')
 Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/HostExchange.java'),(Join-Path $workspace 'android/tests/HostExchangeTest.java'))
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.HostExchangeTest')
 Run-Checked 'javac' @('--release','8','-encoding','UTF-8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/HostExchange.java'),(Join-Path $sourceDirectory 'java/com/routeragent/jev/ChatTurn.java'),(Join-Path $workspace 'android/tests/HostExchangeTest.java'),(Join-Path $workspace 'android/tests/ChatTurnTest.java'))
