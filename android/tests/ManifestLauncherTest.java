@@ -80,11 +80,16 @@ public final class ManifestLauncherTest {
         Element app = (Element) manifest.getElementsByTagName("application").item(0);
         if (!"false".equals(app.getAttributeNS(NS, "usesCleartextTraffic")) || !"false".equals(app.getAttributeNS(NS, "allowBackup")))
             throw new AssertionError("Cleartext traffic and backup must stay off.");
+        // On-device voice: the permission set is exactly network + microphone.
+        java.util.Set<String> permissions = new java.util.TreeSet<>();
         NodeList perms = manifest.getElementsByTagName("uses-permission");
         for (int i = 0; i < perms.getLength(); i++) {
             String p = ((Element) perms.item(i)).getAttributeNS(NS, "name");
-            if (!"android.permission.INTERNET".equals(p)) throw new AssertionError("Unexpected permission: " + p);
+            if (!permissions.add(p)) throw new AssertionError("Duplicate permission: " + p);
         }
+        java.util.Set<String> expected = new java.util.TreeSet<>(java.util.Arrays.asList("android.permission.INTERNET", "android.permission.RECORD_AUDIO"));
+        if (!permissions.equals(expected)) throw new AssertionError("Permissions must be exactly " + expected + ", found " + permissions);
+        if (!"6".equals(manifest.getAttributeNS(NS, "versionCode"))) throw new AssertionError("versionCode must be 6.");
 
         // The MA4 shape (WebView MainActivity as launcher) and other wrong shapes are rejected.
         refuses("legacy WebView launcher", "<activity android:name=\".NativeCompanionActivity\" android:exported=\"false\"/><activity android:name=\".MainActivity\" android:exported=\"true\">" + FILTER + "</activity>");

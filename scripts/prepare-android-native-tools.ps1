@@ -41,4 +41,15 @@ foreach($item in $items) {
 }
 New-Item -ItemType Directory -Force -Path $tools,(Join-Path $tools 'aapt2') | Out-Null
 foreach($item in $items) { if(-not (Test-Path -LiteralPath $item.destination)) { Copy-Item -LiteralPath $item.source -Destination $item.destination } }
+# On-device voice: LiteRT-LM and its runtime jars, pinned by SHA-256. The build scripts re-verify them and unpack the AAR themselves.
+$libs=Join-Path $tools 'libs'
+New-Item -ItemType Directory -Force -Path $libs | Out-Null
+foreach($library in $lock.libraries) {
+  $destination=Join-Path $libs $library.name
+  if (Test-Path -LiteralPath $destination) {
+    if ((Get-FileHash -Algorithm SHA256 -LiteralPath $destination).Hash.ToLowerInvariant() -ne $library.sha256) { throw ('Existing Android library differs from lock; left unchanged: '+$destination) }
+    continue
+  }
+  Copy-Item -LiteralPath (Get-Verified $library.url $library.name $library.sha256) -Destination $destination
+}
 Write-Output 'Verified Android preview build tools are staged. Download files remain in the isolated test-results directory.'

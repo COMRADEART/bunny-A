@@ -3,7 +3,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.zip.*;
 
-/** Store APK resources at 4-byte boundaries before APK v2/v3 signing. */
+/**
+ * Store APK resources and dex files at 4-byte boundaries before APK v2/v3 signing.
+ * Usage: PackageApk resources.apk (classes.dex | dex-directory) output.apk [arm64-v8a-native-library-directory]
+ */
 public final class PackageApk {
     private static final class CountingStream extends FilterOutputStream {
         long count;
@@ -49,7 +52,16 @@ public final class PackageApk {
                     }
                 }
             }
-            put(output, counter, "classes.dex", java.nio.file.Files.readAllBytes(new File(args[1]).toPath()));
+            for (File dex : com.routeragent.jev.tools.PackageModule.dexFiles(new File(args[1]))) put(output, counter, dex.getName(), java.nio.file.Files.readAllBytes(dex.toPath()));
+            // Native libraries are DEFLATED; the manifest sets extractNativeLibs="true", so no page alignment inside the zip is needed.
+            for (File library : com.routeragent.jev.tools.PackageModule.nativeLibraries(args, 3)) {
+                ZipEntry entry = new ZipEntry("lib/arm64-v8a/" + library.getName());
+                entry.setMethod(ZipEntry.DEFLATED);
+                entry.setTime(1609459200000L);
+                output.putNextEntry(entry);
+                output.write(java.nio.file.Files.readAllBytes(library.toPath()));
+                output.closeEntry();
+            }
         }
     }
 }
