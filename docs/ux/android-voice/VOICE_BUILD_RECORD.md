@@ -160,3 +160,102 @@ Findings:
 - **Dictation accuracy is not established.** With any system instruction set, the Zira clip also comes back as "check the bill" (also confirmed with the Task 1 spike APK: system = the DICTATE text, plus user text `Transcribe the audio exactly.` or the full DICTATE text). Task 1's "build" result for Zira happened only with no system instruction. The word is ambiguous in synthetic speech; a human-voice check remains NOT RUN.
 
 `adb uninstall com.routeragent.jev.spike` → `Success`; its folder (with the pushed model and clips) is gone.
+
+## Task 7 — voice card and System row (2026-11-14)
+
+`NativeCompanionActivity` gains:
+
+- the "🎤 Voice on this phone" card, between the message list and the message box;
+- the download, verification, recording, answer and speech flows;
+- the lifecycle hooks:
+  - `onStop` discards the recording, cancels generation and speech, and pauses the download;
+  - leaving the Chat tab does the same, except that the download keeps running;
+  - `onDestroy` shuts down TTS and, when finishing, closes the engine;
+  - `onTrimMemory` at `TRIM_MEMORY_RUNNING_CRITICAL` or above closes an idle engine;
+- the System-tab "Voice model" row with "Remove voice model".
+
+A grep of the voice section shows no call to `sendChat`, `runCommand`, `client.`, `commands.` or `reads.`. The only match is the comment saying voice never calls `sendChat`. The card cannot be seen on the phone without pairing to a Host, so its rendering on a device is **NOT RUN** (see below).
+
+## Task 8 — device checks without a person or a Host, disclosure, results (2026-11-14)
+
+### Artifacts (final build)
+
+| Artifact | Bytes | SHA-256 |
+|---|---|---|
+| `releases/Bunny-A-Android-v6.apk` | 16,462,394 | `cc6b938cf1507dd7f05d6e6757835b8f277619746d5ec52744c7bd00e93cc793` |
+| `releases/Bunny-A-Android-v6.aab` | 12,138,909 | `fe287c9a35794235538d70033105cb20eeeccf3b09c037f3c5df199e9accf4a0` |
+| `classes.dex` (the only dex) | 6,496,356 | `3c20cf1c038b106e115bdc719bcd5cffb141cf4c4b3b2c1b9086ef4cecd2061f` |
+
+- The APK signing certificate SHA-256 is `51b965f39ad64cc2b593c5d5a90fe307f368e19511338a163f90bf4310152dd7`, the existing local build key, unchanged. The AAB base is unsigned, as before.
+- The APK hash was identical in the Task 7 build and the final build.
+- v5 for comparison: APK 111,084 bytes, AAB 57,926 bytes.
+- `releases/Bunny-A-Android-v5.*` do not exist in this worktree. The copies in the main checkout were only read: APK `700fcd56722c0e94ab56e565c44c81a38917e6b6ccd81404620c674fd17c5f10`, AAB `d2a708287a80043b521a24140f2e56cfaccb16113a996ff11bb82b93d97918bc`, timestamps 2026-11-13 16:51, before this work.
+
+Final JVM test lines from both scripts:
+
+- New: `WavTest: 12`, `VoiceGateTest: 8`, `ModelFileTest: 13`, `ModelDownloadTest: 10`, `VoiceSessionTest: 24`, `VoicePromptTest: 15`, `ElfAlignTest: 5`, `ManifestLauncherTest passed`.
+- Existing: `ChatTurnTest: 55`, `HostExchangeTest: 37`, `PollPolicyTest: 23`, `CompanionAppearanceTest: 40`, connection policy 21, Keystore erasure 5, `NativeCookiePolicyTest`.
+- `bundletool validate: PASSED`.
+
+### Phone (SM-S948U, Android 17)
+
+- **Install and smoke test — PASS.** `adb install -r releases/Bunny-A-Android-v6.apk` → `Success`; cold launch `Status: ok`; `uiautomator dump` showed `Pair with Windows`. `adb logcat` held no `FATAL`, no `UnsatisfiedLinkError` and no `AndroidRuntime` error. The app process logged only platform graphics lines (`Adreno-AppProfiles: QSPM AIDL service doesn't exist`, `Unable to open libpenguin.so`).
+- **Permissions: the APK declares exactly two.** `aapt2 dump permissions` lists `android.permission.INTERNET` and `android.permission.RECORD_AUDIO`, and `dumpsys package com.routeragent.jev` shows `RECORD_AUDIO: granted=false`.
+  - **`dumpsys` also lists a third requested permission, `android.permission.ACCESS_LOCAL_NETWORK`** (`granted=true`, flag `REVOKE_WHEN_REQUESTED`). It is not in the APK; Android 17 adds it by itself. This differs from the plan's expectation of "exactly the two".
+- **Model staged over USB — DONE.**
+  - The verified PC copy (SHA-256 `181938105e…a63c`) was pushed to `/sdcard/Android/data/com.routeragent.jev/files/models/gemma-4-E2B-it.litertlm` (`48.2 MB/s (2588147712 bytes in 51.215s)`).
+  - `adb shell sha256sum` on the phone printed `181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c`.
+  - The app hashes the file again ("Checking the model file…") the first time the Chat tab opens.
+
+### Results
+
+| Check | Result |
+|---|---|
+| Library pinning, prepare script, hash re-verification in both builds | PASS |
+| 16 KB alignment of `liblitertlm_jni.so` (`ElfAlign`) | PASS (16384) |
+| All JVM tests in `build-android.ps1` and `build-android-aab.ps1` | PASS |
+| v6 installs over v5, launches, shows the pairing screen, no crash or link error | PASS |
+| APK permission set = INTERNET + RECORD_AUDIO; RECORD_AUDIO not granted | PASS (platform-added `ACCESS_LOCAL_NETWORK` noted above) |
+| Real `VoiceEngine` on the phone: load, TALK answer, task-list answer, cancel, no jar resources needed (Task 6 harness) | PASS |
+| Dictation of the synthetic "check the build" clip | **FAIL**, as in Task 1 ("check the bill"); the owner chose to proceed |
+| Model staged on the phone for the attended session | DONE |
+| Microphone permission prompt | NOT RUN (the Chat tab needs a paired Host, which needs a tunnel the owner approves, and a person) |
+| Talk to phone end to end with a spoken question | NOT RUN (paired Host and a person) |
+| Dictate into the message box (human voice) | NOT RUN (paired Host and a person) |
+| The spoken answer is audible and intelligible | NOT RUN (a person listening) |
+| Cancel and Home mid-recording | NOT RUN (paired Host and a person) |
+| Rotation mid-answer | NOT RUN (paired Host and a person) |
+| TalkBack reading the new controls | NOT RUN (paired Host and a person) |
+| In-app download on Wi-Fi | NOT RUN (this PC has no working IPv4, so Hugging Face's CDN is unreachable from here, and the phone is on mobile data; the logic is covered by the loopback `ModelDownloadTest`) |
+| Remove voice model | NOT RUN (paired Host and a person) |
+| Voice card rendering on the device | NOT RUN (the Chat tab exists only while paired) |
+
+### Deviations from the plan
+
+1. **Model source (Task 1).** The model came from the owner's own phone (Edge Gallery's folder) by `adb pull`, because the Hugging Face CDN is IPv4-only and this PC has no working IPv4. Its SHA-256 equals the pinned one, and the owner knows how it was obtained.
+2. **The API as it really is.**
+   - From Java the call is `Contents.Companion.of(...)`, not `Contents.of(...)`.
+   - The real `@JvmOverloads` constructors were used: `new EngineConfig(path, backend, visionBackend, audioBackend, maxNumTokens, maxNumImages, cacheDir)` and `new ConversationConfig(Contents)`.
+   - Cancel uses `Conversation.cancelProcess()`.
+   - `LIBRARY_MIN_SDK = 24`.
+3. **`uses-native-library`.** The AAR declares none. The app declares `libOpenCL.so` and `libvndksupport.so` with `required="false"`, as the LiteRT-LM guide asks for GPU, and keeps a CPU fallback.
+4. **Only `arm64-v8a`** native code is packaged; the AAR's `x86_64` library is left out.
+5. **The build scripts unpack the AAR.** They extract it from the hash-verified AAR into each build directory, instead of the prepare script extracting it once beside the AAR. The build therefore never uses an unverified extracted file. The prepare script only downloads and verifies.
+6. **No `proguard.txt`** exists in the AAR, so D8 runs without shrinking, as planned. D8 emitted one `classes.dex` and no `classes2.dex`.
+7. **No library Java resources** (`META-INF/services`, `.kotlin_builtins`) are packaged; the Task 6 on-phone harness showed they are not needed.
+8. **`<uses-feature android:name="android.hardware.microphone" android:required="false">` was added.** Without it, `RECORD_AUDIO` implies a *required* microphone (`aapt2` showed `uses-implied-feature … microphone`). That would hide the app from phones without a microphone, which contradicts the plan's goal that the app still installs on phones that cannot use voice.
+9. **Shared packager helpers.** `PackageModule`, which is in a named package, holds `dexFiles` and `nativeLibraries`, and `PackageApk`, in the default package, calls them. Java does not allow the reverse.
+10. **Card copy for missing storage.** When `getExternalFilesDir(null)` returns null, the card says "This phone's storage is not available right now." This line is not in the plan.
+11. **Empty TALK answer.** `VoiceSession.answered` returns to IDLE with "I didn't catch anything. Try again." instead of speaking nothing. The plan specified this only for DICTATE.
+12. **`workLines()`** also includes the chat tasks the Tasks tab lists, as `Chat: <prompt> — <state>`, besides missions and persistent tasks, because the plan says "the same items `showTasksTab()` lists".
+13. **`THIRD_PARTY_NOTICES.md`** is generated by `scripts/third-party-notices.mjs`. The Android section was added to the generator template and to the file with identical text. The generator was not re-run, because this worktree has no `node_modules`.
+14. **`pwsh`** is not installed; the scripts ran unchanged under Windows PowerShell 5.1 (`powershell -ExecutionPolicy Bypass -File`).
+15. **Dictation prompt layout.** The DICTATE system instruction plus an audio-only user turn is kept as planned. Adding a text instruction to the user turn did not change the "bill" result (Task 6).
+
+### Owner decisions awaiting
+
+- **`AGENTS.md` rule 4** says "the Android app stays HTTPS-only with a single permission", but v6 has two (`INTERNET`, `RECORD_AUDIO`). `AGENTS.md` was not edited. Proposed wording: "the Android app stays HTTPS-only with exactly two permissions, Internet and the microphone (used only on-device, while the screen is open and after a mic button is tapped); no telemetry leaves the device."
+- **A second network destination.** After a confirmation dialog, the in-app download contacts `huggingface.co` and its CDN (currently `us.aws.cdn.hf.co`). This is disclosed in `PRIVACY.md`.
+- **LiteRT-LM native notices.** The AAR ships a 2.25 MB `THIRD_PARTY_NOTICE.txt` for its native code. The APK does not carry it; `THIRD_PARTY_NOTICES.md` names the component and licence. Decide whether to ship or publish that file with the Android release.
+- **The platform-added `ACCESS_LOCAL_NETWORK`** on Android 17 (see the phone checks above), if the "two permissions" wording is meant to cover what Android shows rather than what the APK declares.
+- **Dictation accuracy** on synthetic speech ("bill" for "build") needs a human-voice check in the attended session.
