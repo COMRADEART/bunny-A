@@ -183,3 +183,25 @@ rewrites any other IPv4-mapped literal to its plain IPv4 form, and refuses bare-
 The pairing screen blocks screenshots, so the field's error text was **not read**; the results come from `uiautomator`
 dumps, the process list and `logcat` (0 `FATAL EXCEPTION` lines). Afterwards the worktree was reverted, its v6 artifact
 restored and the original v6 APK reinstalled (hash `cc6b938c…`, app data 2.4 GB). No built APK contains these fixes.
+
+## Rebuild after security and Android fixes (2026-11-18, commit `5435cd1`)
+
+Built after committing the Android pairing-address crash guard, 48 dp pairing-field minimum height, paired-device
+approval provenance, and Host/Mission hardening (`bf23b0c`, `b2e2cc6`, `5435cd1`):
+
+| Artifact / check | Result |
+|---|---|
+| `npm run typecheck` & `npm run lint` | PASS (0 type errors; 0 lint errors, 41 pre-existing warnings) |
+| `npm run test:ui` | 480 / 480 PASS |
+| `npm test` (full Host, Missions, scripts, MA4) | PASS (exit 0) |
+| `npm run build` | PASS (`src/routeTree.gen.ts` reverted afterwards) |
+| `BunnyA` WPF build + `BunnyA.Tests` (pinned .NET 8) | 0 warnings, 0 errors; ALL PASSED |
+| `BunnyA.OutcomeTests` (pinned .NET 8) | 114 / 114 |
+| Android JVM suites (via `build-android.ps1` / `build-android-aab.ps1`) | ALL PASSED (`ServerAddressTest` 31, `HostExchangeTest` 38, `ChatTurnTest` 55, `CompanionAppearanceTest` 40, `PollPolicyTest` 23, `KeystoreErasure` 5, cookie & launcher checks) |
+| `releases/msix-5435cd1/BunnyA.Workstation-28.0.0.0.msix` | SHA-256 `e7d39f5b…3737`; Version `28.0.0.0`, Publisher `CN=BunnyA-Development` (test) |
+| `releases/Bunny-A-Android-v5.apk` | SHA-256 `86b0c2d4…bcb5`; `classes.dex` `7247ef17…0146`; v5 / 2.3, target API 36, `INTERNET` only, signing cert `51b965f3…` |
+| `releases/Bunny-A-Android-v5.aab` | SHA-256 `d8a79645…7cd7`; unsigned base (`bundletool validate` & split generation PASS), needs the owner's upload key |
+
+The earlier recorded MSIX (`releases/BunnyA.Workstation-28.0.0.0.msix`, `890de990…6012`) and active production pin
+(`install/release-pin.json`) were left untouched. The newly built v5 APK/AAB now include the 48 dp pairing-field height
+and IPv4-mapped IPv6 crash fixes.
