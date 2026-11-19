@@ -23,8 +23,10 @@ public partial class NotchWindow : Window
     private bool expanded;
     private string? lastAvatar;
     private IntPtr previousForeground;
-    // While the user drags, Host updates that resize the notch must not pull it back to its old edge.
+    // While the user drags or snaps between monitors, Host updates and WM_DPICHANGED must not pull the notch back.
     private bool dragging;
+    private bool placing;
+    private NotchWorkArea? pinnedWorkArea;
     private POINT? restoreAt;
 
     public string CurrentEdge => currentEdge;
@@ -102,38 +104,72 @@ public partial class NotchWindow : Window
     private RECT WindowRect() { GetWindowRect(Hwnd, out var r); return r; }
 
     /// <summary>The work area (taskbar excluded) of the monitor under the notch's centre, in physical pixels.</summary>
-    private RECT WorkAreaPx()
+    private NotchWorkArea WorkAreaPx()
     {
         var r = WindowRect();
         return WorkAreaAt((r.Left + r.Right) / 2, (r.Top + r.Bottom) / 2);
     }
 
-    private static RECT WorkAreaAt(int x, int y)
+    private static NotchWorkArea WorkAreaAt(int x, int y)
     {
         var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
         GetMonitorInfo(MonitorFromPoint(new POINT { X = x, Y = y }, MONITOR_DEFAULTTONEAREST), ref info);
-        return info.rcWork;
+        return new NotchWorkArea(info.rcWork.Left, info.rcWork.Top, info.rcWork.Right, info.rcWork.Bottom);
     }
 
     private void MoveTo(int x, int y) => SetWindowPos(Hwnd, IntPtr.Zero, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 
     public void ApplyEdgePlacement(string edge) => ApplyEdgePlacement(edge, 0.5);
 
-    public void ApplyEdgePlacement(string edge, double ratio)
+    public void ApplyEdgePlacement(string edge, double ratio) => ApplyEdgePlacement(edge, ratio, targetWork: null);
+
+    private void ApplyEdgePlacement(string edge, double ratio, NotchWorkArea? targetWork)
     {
         var changed = edge != currentEdge;
         currentEdge = edge;
         offsetRatio = Math.Clamp(ratio, 0, 1);
-        var horizontal = edge is "Top" or "Bottom";
-        HorizontalLayout.Visibility = horizontal ? Visibility.Visible : Visibility.Collapsed;
-        VerticalLayout.Visibility = horizontal ? Visibility.Collapsed : Visibility.Visible;
-        NotchBorder.CornerRadius = NotchPlate.CornerRadius = new CornerRadius(horizontal ? 24 : 20);
-        chipSignature = "";
-        RenderChips(chips);
-        UpdateLayout(); // ActualWidth/Height must describe the new layout, not the previous orientation.
-        Place();
-        Save();
-        RequestSnapshot();
+        placing = true;
+        try
+        {
+            if (targetWork is { } target)
+            {
+                pinnedWorkArea = target;
+                // Move inside the target monitor before measuring DPI/layout so cross-DPI drops measure the destination monitor.
+                MoveTo(target.Left + Math.Min(16, target.Width / 2), target.Top + Math.Min(16, target.Height / 2));
+            }
+            var horizontal = edge is "Top" or "Bottom";
+            HorizontalLayout.Visibility = horizontal ? Visibility.Visible : Visibility.Collapsed;
+            VerticalLayout.Visibility = horizontal ? Visibility.Collapsed : Visibility.Visible;
+            NotchBorder.CornerRadius = NotchPlate.CornerRadius = new CornerRadius(horizontal ? 24 : 20);
+            chipSignature = "";
+            RenderChips(chips);
+            FitContent();
+            UpdateLayout(); // ActualWidth/Height must describe the new layout, not the previous orientation.
+            PlaceCore(targetWork);
+            Save();
+            RequestSnapshot();
+        }
+        finally { placing = false; }
+
+        if (targetWork is { } settleTarget)
+        {
+            // If crossing monitors queued an async WM_DPICHANGED resize, re-settle once on the target monitor.
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
+            {
+                if (!dragging && !placing)
+                {
+                    placing = true;
+                    try { PlaceCore(settleTarget); Save(); }
+                    finally { placing = false; }
+                }
+                pinnedWorkArea = null;
+            });
+        }
+        else
+        {
+            pinnedWorkArea = null;
+        }
+
         if (changed)
         {
             EdgeChanged?.Invoke(edge);
@@ -150,17 +186,22 @@ public partial class NotchWindow : Window
     /// <summary>Puts the notch on its edge at its saved offset, inside the current monitor's work area.</summary>
     private void Place()
     {
-        if (dragging) return;
+        if (dragging || placing) return;
+        placing = true;
+        try { PlaceCore(targetWork: null); }
+        finally { placing = false; }
+    }
+
+    private void PlaceCore(NotchWorkArea? targetWork)
+    {
         FitContent();
         if (ActualWidth <= 0 || ActualHeight <= 0) return;
-        var w = restoreAt is POINT saved ? WorkAreaAt(saved.X, saved.Y) : WorkAreaPx();
+        var w = targetWork ?? pinnedWorkArea ?? (restoreAt is POINT saved ? WorkAreaAt(saved.X, saved.Y) : WorkAreaPx());
         restoreAt = null;
         var dpi = VisualTreeHelper.GetDpi(this);
         int width = (int)Math.Round(ActualWidth * dpi.DpiScaleX), height = (int)Math.Round(ActualHeight * dpi.DpiScaleY);
-        if (currentEdge is "Top" or "Bottom")
-            MoveTo(w.Left + (int)Math.Round(offsetRatio * Math.Max(0, w.Right - w.Left - width)), currentEdge == "Top" ? w.Top : w.Bottom - height);
-        else
-            MoveTo(currentEdge == "Left" ? w.Left : w.Right - width, w.Top + (int)Math.Round(offsetRatio * Math.Max(0, w.Bottom - w.Top - height)));
+        var (x, y) = NotchPlacement.PositionOnEdge(w, currentEdge, offsetRatio, width, height);
+        MoveTo(x, y);
     }
 
     /// <summary>
@@ -182,27 +223,15 @@ public partial class NotchWindow : Window
     }
 
     /// <summary>
-    /// After a drag, the notch snaps to the nearest edge of the monitor it was dropped on, keeping its offset. The drop
-    /// point comes from the cursor and the grip offset: Windows may already have moved a window that straddled monitors of
-    /// different DPI by the time DragMove returns.
+    /// After a drag, the notch snaps to the nearest edge of the monitor under the drop cursor, keeping its offset.
+    /// Using the cursor position directly avoids DPI-scale drift when moving between mixed-DPI displays.
     /// </summary>
-    private void SnapToNearestEdge(POINT grip, int width, int height)
+    private void SnapToNearestEdge()
     {
         GetCursorPos(out var cursor);
-        double cx = cursor.X - grip.X + width / 2.0, cy = cursor.Y - grip.Y + height / 2.0;
-        var w = WorkAreaAt((int)cx, (int)cy);
-        // Bring the window onto the chosen monitor first, so placement measures that monitor.
-        MoveTo((int)(cx - width / 2.0), (int)(cy - height / 2.0));
-        var distances = new (string edge, double d)[]
-        {
-            ("Top", Math.Abs(cy - w.Top)), ("Bottom", Math.Abs(w.Bottom - cy)),
-            ("Left", Math.Abs(cx - w.Left)), ("Right", Math.Abs(w.Right - cx)),
-        };
-        var edge = distances.OrderBy(x => x.d).First().edge;
-        var ratio = edge is "Top" or "Bottom"
-            ? (cx - w.Left) / Math.Max(1, w.Right - w.Left)
-            : (cy - w.Top) / Math.Max(1, w.Bottom - w.Top);
-        ApplyEdgePlacement(edge, ratio);
+        var target = WorkAreaAt(cursor.X, cursor.Y);
+        var (edge, ratio) = NotchPlacement.SnapFromDrop(cursor.X, cursor.Y, target);
+        ApplyEdgePlacement(edge, ratio, target);
     }
 
     // ==========================================
@@ -754,18 +783,17 @@ public partial class NotchWindow : Window
 
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (e.ChangedButton != MouseButton.Left || e.ButtonState != MouseButtonState.Pressed) return;
         if (e.ClickCount == 2)
         {
             OpenWindow();
             return;
         }
-        var start = WindowRect();
-        GetCursorPos(out var at);
-        var grip = new POINT { X = at.X - start.Left, Y = at.Y - start.Top };
         dragging = true;
         try { DragMove(); }
+        catch (InvalidOperationException) { return; }
         finally { dragging = false; }
-        SnapToNearestEdge(grip, start.Right - start.Left, start.Bottom - start.Top);
+        SnapToNearestEdge();
         RestoreForeground();
     }
 

@@ -269,5 +269,28 @@ Check("skins: a damaged block is empty and silent", CharacterArt.Appearances(J("
 var brokenRow = CharacterArt.Appearances(J("""{"characterAppearance":{"schema":"bunny-a.character-appearance.v1","slots":[{"slot":1},{"slot":2,"appearance":{"style":"comic"}},{"slot":"3","appearance":{"style":"comic"}},[1,2,3]]}}"""));
 Check("skins: a damaged row only drops itself", brokenRow.Count == 1 && brokenRow[2].Style == "comic");
 
+// Cross-monitor mixed-DPI notch placement (150% primary right of 100% secondary with negative coordinates).
+var primaryWork = new NotchWorkArea(0, 0, 3200, 1928);
+var secondaryWork = new NotchWorkArea(-1280, -164, 0, 812);
+var snapToPrimary = NotchPlacement.SnapFromDrop(180, 40, primaryWork);
+Eq("placement: drop near top of primary stays on primary Top", "Top", snapToPrimary.Edge);
+Check("placement: primary drop ratio is in (0, 0.2)", snapToPrimary.Ratio > 0.0 && snapToPrimary.Ratio < 0.2);
+var posOnPrimary = NotchPlacement.PositionOnEdge(primaryWork, snapToPrimary.Edge, snapToPrimary.Ratio, 900, 96);
+Check("placement: primary position stays strictly inside primary work area (never straddles negative seam)", posOnPrimary.X >= primaryWork.Left && posOnPrimary.X + 900 <= primaryWork.Right && posOnPrimary.Y == primaryWork.Top);
+
+var snapToSecondary = NotchPlacement.SnapFromDrop(-640, -140, secondaryWork);
+Eq("placement: drop near top of secondary snaps to Top", "Top", snapToSecondary.Edge);
+Eq("placement: drop at horizontal center of secondary gives ratio 0.5", 0.5, snapToSecondary.Ratio);
+var posOnSecondary = NotchPlacement.PositionOnEdge(secondaryWork, "Top", 0.5, 600, 72);
+Eq("placement: secondary centered top position", (-940, -164), posOnSecondary);
+
+var snapRightSecondary = NotchPlacement.SnapFromDrop(-30, 320, secondaryWork);
+Eq("placement: drop near right edge of secondary snaps to Right", "Right", snapRightSecondary.Edge);
+var posRightSecondary = NotchPlacement.PositionOnEdge(secondaryWork, "Right", snapRightSecondary.Ratio, 88, 360);
+Check("placement: right-docked secondary stays flush inside secondary work area", posRightSecondary.X == secondaryWork.Right - 88 && posRightSecondary.Y >= secondaryWork.Top && posRightSecondary.Y + 360 <= secondaryWork.Bottom);
+
+var oversizedPos = NotchPlacement.PositionOnEdge(secondaryWork, "Bottom", 1.0, 2000, 1200);
+Eq("placement: oversized window clamps to target monitor origin instead of spilling across seam", (secondaryWork.Left, secondaryWork.Top), oversizedPos);
+
 Console.WriteLine(failures == 0 ? "ALL PASSED" : $"{failures} FAILED");
 return failures;
