@@ -53,7 +53,7 @@ State left on the phone: release APK installed, unpaired, rotation settings rest
 ## Still open
 
 1. ~~A-ATT-2 reconnect~~ — closed: re-run on the phone with v5 on 2026-11-14, **PASS** 3/3 (see below).
-2. Owner-attended: TalkBack, Narrator, voice interruption, docking, and a second monitor for mixed DPI.
+2. Owner-attended: TalkBack listening (automated check done 2026-11-14, see below), Narrator, voice interruption, docking, and a second monitor for mixed DPI.
 3. Elevated trust of the test certificate, then the signed MSIX install and protocol test.
 4. Production Authenticode certificate, Partner Center publisher CN, Play Console and upload key.
 5. Pin promotion, after the above.
@@ -102,3 +102,84 @@ of airplane mode and up to 7.6 s after restore); the countdown text did not chan
 
 Teardown: tunnel, Host and vite stopped; the public URL returned 530 afterwards; `src/routeTree.gen.ts` reverted. The
 phone still holds a pairing for the now-deleted test Host. Screenshots are in the session scratch folder, not committed.
+
+## A-ATT-5 TalkBack, rotation and cutouts on v5 (2026-11-14)
+
+Same phone and rig recipe as the A-ATT-2 re-run (fresh disposable Host, new quick tunnel approved by the owner, HTTP/2).
+The phone was paired from the PC with `adb shell input`.
+
+**TalkBack listening: NOT RUN.** TalkBack was enabled over adb and bound, but its first-run tutorial took the screen; it
+was then switched off on the phone, and re-enabling it over adb three times did not bind the service again. Nobody
+listened to announcements. The owner chose an automated check instead; it is recorded below and is not an attended
+TalkBack pass.
+
+**Automated accessibility check (`uiautomator dump` of every screen).** TalkBack reads a control's content description,
+or its text when there is none. Checked: every clickable or editable node has one; tap targets are at least 48 dp (180 px
+at 600 dpi); hierarchy order matches the visual order.
+
+| Screen | Controls and accessible names (hierarchy order) | Result |
+|---|---|---|
+| Pairing | "Workstation HTTPS address" (edit), "One-time pairing code" (edit), "Pair Securely", "Close" | All named; both edit fields 163 px tall (~43 dp) |
+| Tasks | "Refresh Now", "Tasks tab, selected", "Chat tab", "System tab" | All named |
+| Chat | "Message" (edit), "Send", "Stop", tabs | All named |
+| System | "Appearance System, follows this phone's dark mode, selected", "Appearance Light", "Appearance Dark", "Glass intensity 85 percent of 100" (slider), "Sync Now", "Unpair & Revoke This Phone", tabs | All named; "Unpair & Revoke" shows 174 px because the scroll viewport clips it (see below) |
+
+Tabs announce their selected state; the slider announces its value. Tasks and Chat were in their empty states ("No
+missions or tasks", "No messages yet"), so populated lists were not checked.
+
+**Rotation and safe area.** Rotation was locked from the PC (portrait, landscape 90°, landscape 270°) and restored to
+auto-rotate afterwards. Safe areas came from `dumpsys window displays` (non-decor frame excludes the camera cutout and
+gesture bar): portrait `[0,139]–[1440,3064]`, 90° `[139,0]–[3120,1384]`, 270° `[0,0]–[2981,1384]`. Every visible app
+node on all three tabs, in all three orientations, lies inside the safe area. The landscape screenshot shows content clear
+of the cutout on the left and the tab bar above the gesture bar. In landscape the System tab scrolls (`scrollable=true`)
+to reach "Sync Now" and "Unpair & Revoke".
+
+| Part | Result |
+|---|---|
+| TalkBack announces all controls | Automated: all controls named (PASS); attended listening **NOT RUN** |
+| Rotation portrait ↔ landscape | **PASS** (both landscape orientations) |
+| No overlap with cutout or gesture bar | **PASS** |
+| Tap targets ≥ 48 dp | **2 below**: the two pairing edit fields (~43 dp). Fixed in source, see below |
+
+**Tap-target follow-up (2026-11-14, no phone).** "Unpair & Revoke This Phone" is not undersized: in the portrait dump its
+bounds are `[75,2649][1365,2823]` and the scrollable container ends at 2823, so the dump reports the clipped part of a
+button that sits at the bottom edge of the viewport. It is built by the same helper as "Sync Now", which measures 180 px
+(48 dp). The two pairing fields were really 163 px; `NativeCompanionActivity` now gives both a 48 dp minimum height. The
+change compiles (`javac --release 8` against the pinned `android.jar`). It is **not** in the v5 APK.
+
+**Re-measured on the phone the same day.** The phone held the v6 build from `feat/android-on-device-voice`
+(versionCode 6, 2.4 GB of app data), so a v5 build could not be installed over it without a downgrade. The same
+two-line change was applied temporarily in that worktree, built with `scripts/build-android.ps1`, and installed with
+`adb install -r`. `uiautomator dump` of the pairing screen: before, both fields 163 px; after, "Workstation HTTPS
+address" 180 px and "One-time pairing code" 180 px (48 dp at 600 dpi), "Pair Securely" and "Close" 180 px. **PASS**,
+measured on a v6-line build, not on a v5 build. Afterwards the worktree was reverted, its v6 artifact restored, and the
+original v6 APK reinstalled (installed SHA-256 `cc6b938c…` matches the artifact; app data still 2.4 GB).
+
+Teardown: Host, vite and tunnel stopped (old URL returned 530); TalkBack off; rotation restored; the app's data was
+cleared so it no longer holds the test pairing. Dumps and screenshots are in the session scratch folder, not committed.
+
+## Pairing-address crash found and fixed on the phone (2026-11-15)
+
+Found while checking the address guard on the phone (USB/adb, no Host and no tunnel; the pairing screen needs neither).
+
+**Defect.** On the installed v6 build (`cc6b938c…`), typing `https://[::ffff:127.0.0.1]` and any code, then "Pair
+Securely", **crashed the app**: `FATAL EXCEPTION … java.lang.AssertionError at com.android.okhttp.HttpUrl$Builder.canonicalizeHost`,
+reached from `HostExchange.send`. Android's built-in HTTP stack throws an unchecked error on an IPv4-mapped IPv6 literal,
+and the app caught only `Exception`. The same code is in the v5 APK; v5 was not run for this.
+
+**Fix (source only).** `ServerAddress.normalize` now treats `[::]`, `[::1]` and IPv4-mapped loopback as this phone,
+rewrites any other IPv4-mapped literal to its plain IPv4 form, and refuses bare-number and hex spellings of an address.
+`HostExchange.send` reports an unchecked error from `connect()` as "not sent". JVM tests: `ServerAddressTest` 31 checks,
+`HostExchangeTest` 38 checks.
+
+**Re-check on the phone** (the same changes built temporarily on the v6 line, installed with `adb install -r`):
+
+| Address typed | Result |
+|---|---|
+| `https://[::ffff:127.0.0.1]` | App stays on the pairing screen, no connection attempt, no crash |
+| `https://2130706433` | App stays on the pairing screen, no connection attempt, no crash |
+| `https://[::ffff:192.0.2.1]` | "Verifying pairing with workstation…", then "The workstation could not be reached…"; no crash |
+
+The pairing screen blocks screenshots, so the field's error text was **not read**; the results come from `uiautomator`
+dumps, the process list and `logcat` (0 `FATAL EXCEPTION` lines). Afterwards the worktree was reverted, its v6 artifact
+restored and the original v6 APK reinstalled (hash `cc6b938c…`, app data 2.4 GB). No built APK contains these fixes.
