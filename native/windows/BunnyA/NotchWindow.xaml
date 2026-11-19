@@ -131,8 +131,12 @@
         <Border x:Name="NotchSheen" Background="{DynamicResource NotchHighlight}" CornerRadius="20" Margin="-10,-5,-10,0" IsHitTestVisible="False"/>
 
         <Grid x:Name="NotchLayoutGrid">
-          <!-- Horizontal Notch Layout (Top / Bottom): agent chips sit to the LEFT -->
+          <!-- Horizontal Notch Layout (Top / Bottom): drag grip + agent chips sit to the LEFT -->
           <StackPanel x:Name="HorizontalLayout" Orientation="Horizontal" VerticalAlignment="Center">
+            <Border x:Name="HorizontalDragGrip" Background="Transparent" Padding="4,6" Margin="0,0,6,0" VerticalAlignment="Center"
+                    Cursor="SizeAll" ToolTip="Drag to any screen edge or monitor">
+              <TextBlock Text="⋮⋮" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource NotchMuted}" Opacity="0.7" IsHitTestVisible="False"/>
+            </Border>
             <StackPanel x:Name="HorizontalAgentsPanel" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0"
                         AutomationProperties.Name="Agents" KeyboardNavigation.TabNavigation="Continue"/>
 
@@ -163,8 +167,12 @@
             </StackPanel>
           </StackPanel>
 
-          <!-- Vertical Notch Layout (Left / Right): agent chips sit ABOVE -->
+          <!-- Vertical Notch Layout (Left / Right): drag grip + agent chips sit ABOVE -->
           <StackPanel x:Name="VerticalLayout" Orientation="Vertical" HorizontalAlignment="Center" Visibility="Collapsed">
+            <Border x:Name="VerticalDragGrip" Background="Transparent" Padding="6,4" Margin="0,0,0,6" HorizontalAlignment="Center"
+                    Cursor="SizeAll" ToolTip="Drag to any screen edge or monitor">
+              <TextBlock Text="⋯" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource NotchMuted}" Opacity="0.7" IsHitTestVisible="False"/>
+            </Border>
             <StackPanel x:Name="VerticalAgentsPanel" Orientation="Vertical" HorizontalAlignment="Center" Margin="0,0,0,8"
                         AutomationProperties.Name="Agents" KeyboardNavigation.TabNavigation="Continue"/>
 
