@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { authorizeBridge, mayClearLocalPairing } from "./host-bridge.server.ts";
+import { authorizeBridge, clientKey, mayClearLocalPairing } from "./host-bridge.server.ts";
 
 const req = (url: string, headers: Record<string, string> = {}) => new Request(url, { headers });
 test("T13.2 preview recovery clears only a local stale pairing and never admits relayed or remote access", () => {
@@ -77,4 +77,14 @@ test("non-loopback hosts never get workstation access", () => {
     { local: false, token: "abc" },
   );
   delete process.env.BUNNY_REMOTE_ORIGIN;
+});
+
+test("the pairing rate-limit key is the relay-appended address, not one the caller chose", () => {
+  const key = (headers: Record<string, string>) => clientKey(new Request("https://bunny.example/api/bunny-pair", { headers }), "127.0.0.1");
+  // A relay appends the real peer; whatever the caller put first must not change the key.
+  assert.equal(key({ "x-forwarded-for": "198.51.100.1, 203.0.113.9" }), "remote:203.0.113.9");
+  assert.equal(key({ "x-forwarded-for": "anything-at-all, 203.0.113.9" }), "remote:203.0.113.9");
+  assert.equal(key({ "x-forwarded-for": "203.0.113.9", "cf-connecting-ip": "198.51.100.1" }), "remote:203.0.113.9");
+  assert.equal(key({ "cf-connecting-ip": "203.0.113.9" }), "remote:203.0.113.9");
+  assert.equal(key({}), "remote:127.0.0.1");
 });

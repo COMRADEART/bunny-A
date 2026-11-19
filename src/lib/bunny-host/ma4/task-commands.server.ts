@@ -63,7 +63,12 @@ export async function ptaskCommand(rt: PersistentTaskRuntime, action: string, da
         return rt.reconcile(id(data.id), data.decision, actor);
       }
       case "ptask.policy": return rt.setPolicy(data.policy, actor);
-      case "ptask.notification.ack": return { acknowledged: rt.acknowledge(String(data.key ?? "").slice(0, 200)) };
+      case "ptask.notification.ack": {
+        const key = String(data.key ?? "").slice(0, 200), kind = rt.store.notificationKind(key);
+        // A device clears its own news, never a prompt that waits on the owner's decision (the inbox.ack rule).
+        if (!isTrustedLocalActor(actor) && (kind === "approval_required" || kind === "recovery_blocked")) throw new WorkstationRequiredError("Prompts that wait on your decision are cleared by answering them on the Windows workstation.");
+        return { acknowledged: rt.acknowledge(key) };
+      }
       case "ptask.output": return rt.store.output(id(data.id), id(data.stepId));
       case "action.approve": return rt.approveAction(id(data.id), actionId(data.actionId), hash(data.payloadSha256), actor, { ttlMs: typeof data.ttlMs === "number" ? data.ttlMs : undefined });
       case "action.deny": return rt.denyAction(id(data.id), actionId(data.actionId), actor);

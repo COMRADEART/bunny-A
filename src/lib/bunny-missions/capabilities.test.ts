@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { HostDatabase } from "../bunny-host/persistence.server.ts";
 import { startHost } from "../bunny-host/http.server.ts";
@@ -17,6 +17,8 @@ import { realGit, resolveCommand } from "./capabilities/process.server.ts";
 import { SkillLibrary } from "./skills.server.ts";
 import { communicationConnectors } from "./capabilities/connectors.server.ts";
 import { envelopeFrom, scopeFor } from "./authorization.server.ts";
+import { canonical, networkPath, scopedPath, within } from "./paths.server.ts";
+import { regularPath } from "../bunny-host/project-paths.server.ts";
 
 function harness() {
   const dir = mkdtempSync(join(tmpdir(), "bunny-cap-"));
@@ -339,4 +341,20 @@ test("MA1: git resolves past the Git for Windows cmd launcher so a Host crash ca
       finally { process.env.PATH = saved; }
     }
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("network and device paths are refused before the scope check touches the filesystem", { skip: process.platform !== "win32" && "Windows path grammar" }, () => {
+  const root = tmpdir();
+  // Loopback admin share: reachable on most Windows machines, so the old code resolved it over SMB before answering.
+  for (const unc of ["//127.0.0.1/C$/Windows/win.ini", "\\\\127.0.0.1\\C$\\Windows\\win.ini", "\\\\?\\C:\\Windows\\win.ini"]) {
+    assert.equal(networkPath(unc), true);
+    assert.equal(canonical(unc, () => { throw new Error("probed the network path"); }), resolve(unc));
+    assert.equal(within(root, unc), false);
+    assert.equal(within(unc, unc), false, "a network path is never an approved scope");
+    assert.throws(() => scopedPath(root, unc, [root]), /outside the approved scope/);
+    assert.throws(() => regularPath(unc), /unsupported/);
+  }
+  assert.equal(resolveCommand("//127.0.0.1/C$/Windows/System32/whoami.exe", root), null);
+  assert.equal(networkPath(join(root, "ordinary.txt")), false);
+  assert.equal(within(root, join(root, "ordinary.txt")), true);
 });

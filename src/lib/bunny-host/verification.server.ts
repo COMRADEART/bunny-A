@@ -3,6 +3,7 @@ import { delimiter, join, relative, isAbsolute, sep } from "node:path";
 import { execOwnedFile } from "./owned-processes.server.ts";
 import { runWindowsOwnedProcess } from "./owned-process-group.server.ts";
 import type { OrchTask, VerifySpec } from "../orch/types.ts";
+import { CommandRefusedError } from "./failure.server.ts";
 const inside=(root:string,path:string)=>{const rel=relative(root,path);return rel===""||(!(rel===".."||rel.startsWith(".."+sep))&&!isAbsolute(rel));};
 const canonical=(path:string)=>{try {return realpathSync(path);} catch {return path;}};
 /**
@@ -52,20 +53,20 @@ export async function verifyTask(task:OrchTask,kind:string):Promise<{passed:bool
 /** Shape rules for a verification request; anything else is refused before a task is created. */
 export function validateVerifySpec(value: unknown): VerifySpec | null {
   if (value == null) return null;
-  if (typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid verification request.");
+  if (typeof value !== "object" || Array.isArray(value)) throw new CommandRefusedError("Invalid verification request.");
   const input = value as Record<string, unknown>;
   const name = input.name, expected = input.expected;
-  if (typeof name !== "string" || !/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,79}$/.test(name) || name.includes("..")) throw new Error("Verification file must be a plain file name inside the project folder.");
+  if (typeof name !== "string" || !/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,79}$/.test(name) || name.includes("..")) throw new CommandRefusedError("Verification file must be a plain file name inside the project folder.");
   if (input.kind === "file") {
-    if (typeof expected !== "string" || !expected.length || expected.length > 2000) throw new Error("Expected file contents are required (up to 2,000 characters).");
+    if (typeof expected !== "string" || !expected.length || expected.length > 2000) throw new CommandRefusedError("Expected file contents are required (up to 2,000 characters).");
     return { kind: "file", name, expected };
   }
   if (input.kind === "python") {
-    if (!/\.py$/.test(name)) throw new Error("Python verification needs a .py file.");
-    if (typeof expected !== "string" || !/^[A-Za-z0-9_ .:-]{1,80}$/.test(expected)) throw new Error("Expected stdout must be plain text (letters, digits, spaces and _ . : -).");
+    if (!/\.py$/.test(name)) throw new CommandRefusedError("Python verification needs a .py file.");
+    if (typeof expected !== "string" || !/^[A-Za-z0-9_ .:-]{1,80}$/.test(expected)) throw new CommandRefusedError("Expected stdout must be plain text (letters, digits, spaces and _ . : -).");
     return { kind: "python", name, expected };
   }
-  throw new Error("Unsupported verification kind.");
+  throw new CommandRefusedError("Unsupported verification kind.");
 }
 
 /**

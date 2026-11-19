@@ -405,6 +405,21 @@ test("T3-M5 (adv 15) no cross-project leakage between monitors, schedules, goals
 
 // ── authority, crashes and resources ─────────────────────────────────────────────────────────────────────────────────
 
+test("a paired phone cannot clear the prompts that wait on the owner's decision", () => withRig(async p => {
+  // Proactive store: the goal's approval prompt. Dismissing or snoozing it from a phone would hide it on the workstation too.
+  p.engine.goalCreate({ spec: goal() }, WS);
+  await p.at(p.clock.t + 1000);
+  const prompts = () => p.engine.snapshot().notifications.filter(n => n.category === "approval_required" && !n.dismissed);
+  const [prompt] = prompts();
+  assert.ok(prompt, "goal.create raised an approval prompt");
+  await assert.rejects(proactiveCommand(p.engine, "proactive.notification.dismiss", { key: prompt.key }, PHONE), WorkstationRequiredError);
+  await assert.rejects(proactiveCommand(p.engine, "proactive.notification.snooze", { key: prompt.key, minutes: 600 }, PHONE), WorkstationRequiredError);
+  assert.equal(prompts().length, 1, "still shown on the workstation");
+  assert.equal(p.engine.store.notification(prompt.key)!.snoozedUntil ?? null, null, "not snoozed");
+  // The owner clears it.
+  assert.deepEqual(await proactiveCommand(p.engine, "proactive.notification.dismiss", { key: prompt.key }, WS), { dismissed: true });
+}));
+
 test("T3-A1 (adv 16) a paired phone cannot create, approve, change or link anything", () => withRig(async p => {
   const s = p.engine.scheduleCreate({ spec: schedule() }, WS);
   const refused: [string, Record<string, unknown>][] = [["schedule.create", { spec: schedule() }], ["schedule.approve", { id: s.id }], ["schedule.update", { id: s.id, spec: schedule() }], ["monitor.create", { spec: monitor() }],

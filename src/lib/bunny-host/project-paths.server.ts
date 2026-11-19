@@ -13,7 +13,7 @@ export function regularPath(path: string): string {
     throw new Error("Invalid workspace path.");
   if (
     process.platform === "win32" &&
-    (/^\\\\/.test(path) ||
+    (/^[\\/]{2}/.test(path) ||
       path.slice(2).includes(":") ||
       /(^|[\\/])(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|[\\/]|$)/i.test(path) ||
       path.split(/[\\/]/).some((part) => /[. ]$/.test(part) && part !== "." && part !== ".."))

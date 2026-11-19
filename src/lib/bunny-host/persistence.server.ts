@@ -35,7 +35,18 @@ export class HostDatabase {
     if (!eventColumns.has("mission_id")) this.db.exec("ALTER TABLE events ADD COLUMN mission_id TEXT");
     this.db.exec("CREATE INDEX IF NOT EXISTS events_mission ON events(mission_id, sequence)");
   }
-  tasks(): OrchTask[] { return (this.db.prepare("SELECT record FROM tasks").all() as { record: string }[]).map(row => JSON.parse(row.record) as OrchTask).sort((a,b) => b.createdAt-a.createdAt); }
+  /** Ids of task rows whose record is not a task; startup reports them instead of the Host refusing to boot on one bad row. */
+  unreadableTasks = new Set<string>();
+  tasks(): OrchTask[] {
+    const tasks: OrchTask[] = [];
+    for (const row of this.db.prepare("SELECT id,record FROM tasks").all() as { id: string; record: string }[]) {
+      let task: Partial<OrchTask> | null = null;
+      try { task = JSON.parse(row.record); } catch { /* reported below */ }
+      if (task && typeof task === "object" && task.id === row.id && typeof task.createdAt === "number") tasks.push(task as OrchTask);
+      else this.unreadableTasks.add(row.id);
+    }
+    return tasks.sort((a,b) => b.createdAt-a.createdAt);
+  }
   projects(): Project[] { return (this.db.prepare("SELECT record FROM projects").all() as { record: string }[]).map(row => JSON.parse(row.record) as Project); }
   get(id: string): OrchTask { const row = this.db.prepare("SELECT record FROM tasks WHERE id=?").get(id) as { record: string } | undefined; if (!row) throw new Error("Unknown task."); return JSON.parse(row.record) as OrchTask; }
   inserted = 0;

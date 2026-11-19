@@ -14,6 +14,8 @@ import { TASK_NEXT, TASK_STATES, taskCanTransition, displayState, type Envelope,
 import { StaleLeaseError, TaskStore } from "./ma4/task-store.server.ts";
 import { PersistentTaskRuntime, SimulatedCrash, type Executor, type FaultPoint, type RuntimeDeps } from "./ma4/task-runtime.server.ts";
 import type { ModelCall } from "./ma4/coding-workflow.server.ts";
+import { ptaskCommand } from "./ma4/task-commands.server.ts";
+import { WorkstationRequiredError } from "./device-authority.server.ts";
 
 const HOUR = 3_600_000;
 const T0 = 1_800_000_000_000;
@@ -525,6 +527,11 @@ test("T1-16 notifications are local, respect settings and are never duplicated b
     e = await restart(e, { resumeOnStart: true });
     const kinds = () => e.store.notifications().filter(n => n.taskId === t.id).map(n => n.kind).sort();
     assert.deepEqual(kinds(), ["approval_required", "recovery_blocked"], "one each across four Host lives");
+    // A paired phone clears its own news, never a prompt that waits on the owner's decision.
+    for (const n of e.store.notifications().filter(n => n.taskId === t.id)) {
+      await assert.rejects(ptaskCommand(e.rt, "ptask.notification.ack", { key: n.key }, "device:phone-1"), WorkstationRequiredError, n.kind);
+      assert.equal(e.store.notifications().find(x => x.key === n.key)!.acknowledged, n.acknowledged, n.kind);
+    }
     e.rt.reconcile(t.id, "happened", "workstation"); await settle(e);
     await e.rt.recover(false); await settle(e);
     assert.deepEqual(kinds(), ["approval_required", "completed", "recovery_blocked"]);
