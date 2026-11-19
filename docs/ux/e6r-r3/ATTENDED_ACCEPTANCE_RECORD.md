@@ -53,10 +53,11 @@ State left on the phone: release APK installed, unpaired, rotation settings rest
 ## Still open
 
 1. ~~A-ATT-2 reconnect~~ — closed: re-run on the phone with v5 on 2026-11-14, **PASS** 3/3 (see below).
-2. Owner-attended: TalkBack listening (automated check done 2026-11-14, see below), Narrator, voice interruption, docking, and a second monitor for mixed DPI.
-3. Elevated trust of the test certificate, then the signed MSIX install and protocol test.
-4. Production Authenticode certificate, Partner Center publisher CN, Play Console and upload key.
-5. Pin promotion, after the above.
+2. ~~W-ATT-1 docking & W-ATT-3 mixed-DPI multi-monitor~~ — closed: verified on dual mixed-DPI displays (150% ↔ 100%) on 2026-11-19 after fixing cross-monitor drop snapping, **PASS** (see below).
+3. Owner-attended still open: TalkBack listening (automated check done 2026-11-14), Narrator listening (automated UIA check done 2026-11-19, see below), and `W-ATT-4` acoustic voice interruption.
+4. Elevated trust of the test certificate, then the signed MSIX install and protocol test (`W-ATT-5`).
+5. Production Authenticode certificate, Partner Center publisher CN, Play Console and upload key.
+6. Pin promotion, after the above.
 
 ## Rebuild after launch-prep changes (2026-11-13, commit `cc22bf9`)
 
@@ -205,3 +206,42 @@ approval provenance, and Host/Mission hardening (`bf23b0c`, `b2e2cc6`, `5435cd1`
 The earlier recorded MSIX (`releases/BunnyA.Workstation-28.0.0.0.msix`, `890de990…6012`) and active production pin
 (`install/release-pin.json`) were left untouched. The newly built v5 APK/AAB now include the 48 dp pairing-field height
 and IPv4-mapped IPv6 crash fixes.
+
+## Windows W-ATT-1 / W-ATT-3 attended check & W-ATT-2 automated UIA check (2026-11-18–19)
+
+Rig: disposable Host on an isolated scratch folder (`BUNNY_HOST_DATA_DIRECTORY`, port `43779`, `operationalState: healthy`)
+and `BunnyA.exe` with isolated `BUNNY_HOST_CREDENTIALS_FILE` and `BUNNY_CONFIG_DIRECTORY`. The owner's installed Host,
+settings, and audio configuration were not touched; the disposable Host was stopped afterwards.
+
+Monitors observed via `PerMonitorV2` (`EnumDisplayMonitors` + `GetDpiForMonitor`):
+- `\\.\DISPLAY1` (Primary): `(0,0)–(3200,2000)`, work `(0,0)–(3200,1928)`, **144 DPI (150%)**
+- `\\.\DISPLAY21` (Secondary): `(-1280,-164)–(0,860)`, work `(-1280,-164)–(0,812)`, **96 DPI (100%)**
+
+**Defect found during attended drag across mixed-DPI displays (`W-ATT-1` / `W-ATT-3`).**
+Docking within a single screen worked, and the first move onto the secondary display worked, but moving the notch back
+between the 150% and 100% displays got stuck on the previous monitor:
+1. `NotchWindow.SnapToNearestEdge` computed the drop center from the pre-drag window size and grip offset measured at
+   the old monitor's DPI, pulling the drop point back across the monitor seam.
+2. `dragging` was cleared before `SnapToNearestEdge` ran, letting `WM_DPICHANGED` / `SizeChanged` invoke `Place()`
+   mid-snap against the old edge/monitor.
+3. Vertical mode (`Left`/`Right`) contained only `Button` controls (which consume `MouseLeftButtonDown`), leaving no
+   dedicated drag grip.
+
+**Fix.** Extracted pure physical-pixel drop/edge math into `native/windows/BunnyA/Services/NotchPlacement.cs` (target
+monitor chosen from the drop cursor and clamped strictly inside the destination work area; 9 new unit checks in
+`BunnyA.Tests`), guarded `ApplyEdgePlacement` with a `placing` lock and a post-DPI-settle pass in
+`NotchWindow.xaml.cs`, and added an always-visible drag grip (`⋮⋮` horizontal / `⋯` vertical) in `NotchWindow.xaml`.
+
+| Case | Observed | Result |
+|---|---|---|
+| W-ATT-1 edge docking & multi-monitor drag | Owner re-tested rebuilt `BunnyA.exe` after the fix: four-edge docking and dragging between both monitors worked cleanly; scratch `config.json` confirmed settled drop back on primary (`NotchEdge: Top`, `NotchOffsetRatio: 0.6128125`, `NotchLeft: 1409`, `NotchTop: 0`) | **PASS** |
+| W-ATT-3 mixed-DPI multi-monitor scaling | Verified live across 150% (`DISPLAY1`) ↔ 100% (`DISPLAY21`) with `PerMonitorV2` active | **PASS** |
+| W-ATT-2 UIA accessibility & keyboard control | **Automated UIA check** against the disposable Host with a seeded `waiting_for_approval` task (`368d0125…`): **0 unlabelled keyboard-focusable buttons** across `Bunny Island Notch` (8 buttons, canonical agent order `AgentGada → AgentSpear → AgentChakra → AgentSword`) and `Bunny A — Native Workstation` (14 nav/header buttons). Invoking `ApprovalBadge` (`Open the Approval Center`) via UIA `InvokePattern` opened Approval Center (`1` list item), exposed focusable `ApproveActionButton` (`✓ Approve`) and `DenyActionButton` (`✗ Deny`), and invoking `DenyActionButton` moved the task to `stopped`. **Attended Narrator listening: NOT RUN** | **Automated UIA: PASS; Narrator listening: NOT RUN** |
+| W-ATT-4 full-duplex acoustic voice interruption | Owner opted out of voice testing in this session | **BLOCKED** |
+| W-ATT-5 signed MSIX install & `bunny-a://` | Non-elevated session; test-cert trust or production signing not run | **BLOCKED** |
+
+**Rebuilt artifacts & checks after notch fix:**
+- `native/windows/build.ps1` (`BunnyA` WPF + `BunnyA.Tests` incl. 9 placement tests): 0 warnings, 0 errors; **ALL PASSED**
+- `BunnyA.OutcomeTests`: **114 / 114 PASS**
+- `scripts/upgrade-rollback.test.mjs`: **6 / 6 PASS**
+- `releases/msix-watt-notch-fix/BunnyA.Workstation-28.0.0.0.msix`: SHA-256 `88b34e8d…4e06` (v28.0.0.0, `CN=BunnyA-Development`)
