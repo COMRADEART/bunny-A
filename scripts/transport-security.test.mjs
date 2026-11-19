@@ -49,7 +49,7 @@ test("Transport Security: Android Companion enforces 100% HTTPS and blocks clear
 
     execFileSync("javac", ["--release", "8", "-d", testDir, serverAddressJava, serverAddressTestJava], { stdio: "pipe" });
     const out = execFileSync("java", ["-cp", testDir, "com.routeragent.jev.ServerAddressTest"], { encoding: "utf8" });
-    assert.match(out, /Android connection policy: 21 checks passed/, "ServerAddress test must pass all 21 checks");
+    assert.match(out, /Android connection policy: 31 checks passed/, "ServerAddress test must pass all 31 checks");
     console.log(`[ServerAddress Audit] Checked 21 address assertions: all cleartext HTTP variants rejected.`);
   });
 

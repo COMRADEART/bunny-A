@@ -51,6 +51,8 @@ final class HostExchange {
         try { c.connect(); }
         catch (SSLHandshakeException e) { throw new Failure(Failure.IDENTITY, "The workstation's HTTPS certificate was not trusted. Nothing was sent.", null, 0); }
         catch (IOException e) { throw new Failure(Failure.NETWORK, "The workstation could not be reached. Nothing was sent.", null, 0); }
+        // The platform HTTP stack rejects some addresses with an unchecked error; that must not take the app down.
+        catch (RuntimeException | AssertionError e) { throw new Failure(Failure.NETWORK, "This address could not be used. Nothing was sent.", null, 0); }
         int status;
         try {
             try (OutputStream out = c.getOutputStream()) { out.write(body); }

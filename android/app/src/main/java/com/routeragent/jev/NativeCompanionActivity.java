@@ -449,6 +449,7 @@ public final class NativeCompanionActivity extends Activity {
         address.setHintTextColor(MUTED);
         address.setHint("https://your-workstation.example");
         address.setPadding(dp(14),dp(12),dp(14),dp(12));
+        address.setMinHeight(dp(48));
         address.setBackground(surface(PANEL));
         address.setContentDescription("Workstation HTTPS address");
         // The WebView build saved this address; reuse it once so an upgraded phone does not retype it.
@@ -464,6 +465,7 @@ public final class NativeCompanionActivity extends Activity {
         code.setHintTextColor(MUTED);
         code.setHint("Code shown on Windows");
         code.setPadding(dp(14),dp(12),dp(14),dp(12));
+        code.setMinHeight(dp(48));
         code.setBackground(surface(PANEL));
         code.setContentDescription("One-time pairing code");
         add(body,code,6);

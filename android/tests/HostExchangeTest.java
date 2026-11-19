@@ -109,6 +109,15 @@ public final class HostExchangeTest {
         HostExchange.Failure f = sendExpectingFailure(post(closedPort), command("a1", 0), "a1");
         check(f != null && f.kind == HostExchange.Failure.NETWORK && f.getMessage().contains("Nothing was sent"), "connection refused is the one case reported as not sent");
 
+        System.out.println("A1b the platform HTTP stack rejects the address with an unchecked error");
+        HttpURLConnection rejecting = new HttpURLConnection(new URL("http://127.0.0.1:1/")) {
+            @Override public void connect() { throw new AssertionError(); }
+            @Override public void disconnect() {}
+            @Override public boolean usingProxy() { return false; }
+        };
+        f = sendExpectingFailure(rejecting, command("a1b", 0), "a1b");
+        check(f != null && f.kind == HostExchange.Failure.NETWORK && f.getMessage().contains("Nothing was sent"), "an address the HTTP stack refuses is reported as not sent, not a crash");
+
         try (FaultServer server = new FaultServer()) {
             System.out.println("A2 connection lost during the request body");
             server.mode = Mode.RESET_MID_BODY;
