@@ -42,6 +42,10 @@ test("T13 approvals: a task waiting for approval outside a Mission is one ask, a
   assert.equal(items[0].title, "Codex task needs approval");
 });
 
+test("a task a paired phone queued says so in its approval title", () => {
+  const [item] = run({ tasks: [task("t1", "waiting_for_approval", { submittedBy: { deviceId: "d1", name: "Pixel" } })], viewer: "workstation" } as Input);
+  assert.equal(item.title, "Codex task from paired device “Pixel” needs approval");
+});
 test("T13 approvals: a task inside a Mission is not listed here; the Mission owns its ask", () => {
   const items = run({ tasks: [task("t1", "waiting_for_approval", { mission: { missionId: "m1" } })], viewer: "workstation" } as Input);
   assert.equal(items.length, 0);

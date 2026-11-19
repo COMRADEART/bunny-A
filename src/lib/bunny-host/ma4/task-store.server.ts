@@ -237,6 +237,7 @@ export class TaskStore {
     return (this.db.prepare("SELECT key,task_id AS taskId,kind,text,at,delivered,acknowledged FROM ma4_task_notifications ORDER BY at DESC,key LIMIT ?").all(limit) as (Omit<Notification, "delivered" | "acknowledged"> & { delivered: number; acknowledged: number })[])
       .map(n => ({ ...n, delivered: !!n.delivered, acknowledged: !!n.acknowledged }));
   }
+  notificationKind(key: string): NotificationKind | null { return (this.db.prepare("SELECT kind FROM ma4_task_notifications WHERE key=?").get(key) as { kind: NotificationKind } | undefined)?.kind ?? null; }
   acknowledge(key: string): boolean { return this.db.prepare("UPDATE ma4_task_notifications SET acknowledged=1 WHERE key=?").run(key).changes === 1; }
 
   recordOutcome(outcome: ExecutionOutcomeRecord): void {

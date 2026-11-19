@@ -111,35 +111,36 @@ function voiceMissionFact(mission: { id: string; title: string; state: string; u
 }
 
 const PROVIDERS: ProviderId[]=["codex","claude","ollama","opencode","cline","cursor","openrouter"];
-function record(value: unknown): Record<string,unknown> {if(!value || typeof value!=="object" || Array.isArray(value)) throw new Error("Expected an object.");return value as Record<string,unknown>;}
-function text(value: unknown,max=100000): string {if(typeof value!=="string" || !value.trim() || value.length>max) throw new Error("Invalid or oversized text.");return value;}
-function provider(value: unknown): ProviderId {if(!PROVIDERS.includes(value as ProviderId)) throw new Error("Unknown provider.");return value as ProviderId;}
+// Input validators: bad input executed nothing, so each failure is a refusal ("REFUSED"), never a Host failure.
+function record(value: unknown): Record<string,unknown> {if(!value || typeof value!=="object" || Array.isArray(value)) throw new CommandRefusedError("Expected an object.");return value as Record<string,unknown>;}
+function text(value: unknown,max=100000): string {if(typeof value!=="string" || !value.trim() || value.length>max) throw new CommandRefusedError("Invalid or oversized text.");return value;}
+function provider(value: unknown): ProviderId {if(!PROVIDERS.includes(value as ProviderId)) throw new CommandRefusedError("Unknown provider.");return value as ProviderId;}
 export function validateConstraints(value: unknown): TaskConstraints {
   if(value===undefined) return {};
   const input=record(value);const output:TaskConstraints={};
   for(const key of ["localOnly","offlineOnly","requiresFilesystem","requiresTerminal","requiresGit","requiresGPU","cloudOnly","privacyLocal","sensitive","requiresAudio",
-  ] as const) if(input[key]!==undefined) {if(typeof input[key]!=="boolean") throw new Error("Invalid constraint.");output[key]=input[key];}
+  ] as const) if(input[key]!==undefined) {if(typeof input[key]!=="boolean") throw new CommandRefusedError("Invalid constraint.");output[key]=input[key];}
   if(input.workingDirectory!==undefined) output.workingDirectory=text(input.workingDirectory,2000);
-  if(input.routingMode!==undefined) {if(!ROUTING_MODES.includes(input.routingMode as never)) throw new Error("Unknown routing mode.");output.routingMode=input.routingMode as TaskConstraints["routingMode"];}
-  if(input.dataCategory!==undefined) {if(!DATA_CATEGORIES.includes(input.dataCategory as never)) throw new Error("Unknown data category.");output.dataCategory=input.dataCategory as TaskConstraints["dataCategory"];}
+  if(input.routingMode!==undefined) {if(!ROUTING_MODES.includes(input.routingMode as never)) throw new CommandRefusedError("Unknown routing mode.");output.routingMode=input.routingMode as TaskConstraints["routingMode"];}
+  if(input.dataCategory!==undefined) {if(!DATA_CATEGORIES.includes(input.dataCategory as never)) throw new CommandRefusedError("Unknown data category.");output.dataCategory=input.dataCategory as TaskConstraints["dataCategory"];}
   if(input.language!==undefined) output.language=text(input.language,40);
-  if (input.maxCostUsd !== undefined) { if (typeof input.maxCostUsd !== "number" || !Number.isFinite(input.maxCostUsd) || input.maxCostUsd < 0 || input.maxCostUsd > 10) throw new Error("Invalid task cost budget."); output.maxCostUsd = input.maxCostUsd; }
-  for (const key of ["contextTokens", "outputTokens"] as const) if (input[key] !== undefined) { if (!Number.isSafeInteger(input[key]) || Number(input[key]) < 1 || Number(input[key]) > 1000000) throw new Error("Invalid token budget."); output[key] = Number(input[key]); }
-  if (input.responseFormat !== undefined) { if (input.responseFormat !== "json") throw new Error("Only JSON response format is supported through this API."); output.responseFormat = { type: "object" }; }
-  for(const key of ["providerAllowlist","providerDenylist"] as const) if(input[key]!==undefined) {if(!Array.isArray(input[key]) || input[key].length>6) throw new Error("Invalid provider constraint.");output[key]=input[key].map(provider);}
+  if (input.maxCostUsd !== undefined) { if (typeof input.maxCostUsd !== "number" || !Number.isFinite(input.maxCostUsd) || input.maxCostUsd < 0 || input.maxCostUsd > 10) throw new CommandRefusedError("Invalid task cost budget."); output.maxCostUsd = input.maxCostUsd; }
+  for (const key of ["contextTokens", "outputTokens"] as const) if (input[key] !== undefined) { if (!Number.isSafeInteger(input[key]) || Number(input[key]) < 1 || Number(input[key]) > 1000000) throw new CommandRefusedError("Invalid token budget."); output[key] = Number(input[key]); }
+  if (input.responseFormat !== undefined) { if (input.responseFormat !== "json") throw new CommandRefusedError("Only JSON response format is supported through this API."); output.responseFormat = { type: "object" }; }
+  for(const key of ["providerAllowlist","providerDenylist"] as const) if(input[key]!==undefined) {if(!Array.isArray(input[key]) || input[key].length>6) throw new CommandRefusedError("Invalid provider constraint.");output[key]=input[key].map(provider);}
   // M-A-3 T3 §27 model-level user constraints; exact pins are honored only where a real model surface exists (§9).
   if(input.modelExact!==undefined) output.modelExact=text(input.modelExact,200);
   if(input.modelAllowlist!==undefined) {if(!Array.isArray(input.modelAllowlist) || input.modelAllowlist.length>6 || input.modelAllowlist.some((entry) =>typeof entry!=="string" || !entry.trim() || entry.length>200,
-      )) throw new Error("Invalid model constraint.");output.modelAllowlist=input.modelAllowlist.map((entry) =>String(entry));}
-  if(input.maxRuntimeMs!==undefined) {if(!Number.isInteger(input.maxRuntimeMs) || Number(input.maxRuntimeMs)<1000 || Number(input.maxRuntimeMs)>3600000) throw new Error("Runtime must be 1–3600 seconds.");output.maxRuntimeMs=Number(input.maxRuntimeMs);}
-  for(const key of Object.keys(input)) if(!(key in output)) throw new Error(`Unsupported constraint: ${key}`);
+      )) throw new CommandRefusedError("Invalid model constraint.");output.modelAllowlist=input.modelAllowlist.map((entry) =>String(entry));}
+  if(input.maxRuntimeMs!==undefined) {if(!Number.isInteger(input.maxRuntimeMs) || Number(input.maxRuntimeMs)<1000 || Number(input.maxRuntimeMs)>3600000) throw new CommandRefusedError("Runtime must be 1–3600 seconds.");output.maxRuntimeMs=Number(input.maxRuntimeMs);}
+  for(const key of Object.keys(input)) if(!(key in output)) throw new CommandRefusedError(`Unsupported constraint: ${key}`);
   return output;
 }
 export function validateSubmit(value: unknown) {
   const input = record(value);
   const mode = input.mode;
   if (!["fast", "balanced", "deep"].includes(String(mode)))
-    throw new Error("Unknown routing mode.");
+    throw new CommandRefusedError("Unknown routing mode.");
   const projectId = input.projectId == null ? null : text(input.projectId, 200);
   const override =
     input.override === undefined || input.override === "auto"
@@ -202,12 +203,27 @@ function equal(a: string, b: string) {
   return aa.length === bb.length && timingSafeEqual(aa, bb);
 }
 async function body(request: IncomingMessage) {
-  let data = "";
-  for await (const chunk of request) {
-    data += String(chunk);
-    if (Buffer.byteLength(data) > 4_000_000) throw new Error("Request too large.");
-  }
-  return record(JSON.parse(data));
+  // Decoded once, from all the bytes: decoding chunk by chunk turns a character split across two chunks into U+FFFD.
+  const bytes = await new Promise<Buffer>((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    request.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size <= 4_000_000) return void chunks.push(chunk);
+      // Stop reading without destroying the socket, so the caller receives the 413 instead of a connection reset.
+      request.pause();
+      request.removeAllListeners("data");
+      reject(new CodedRefusal("REQUEST_TOO_LARGE", "Request too large.", 413));
+    });
+    request.on("end", () => resolve(Buffer.concat(chunks)));
+    request.on("error", reject);
+    // A caller that hangs up mid-body must not leave this waiting; after "end" this is a no-op.
+    request.on("close", () => reject(new CommandRefusedError("The request ended before its body was complete.")));
+  });
+  let parsed: unknown;
+  // Input that never parsed executed nothing: a refusal, not a Host failure.
+  try { parsed = JSON.parse(bytes.toString("utf8")); } catch { throw new CommandRefusedError("The request body is not valid JSON."); }
+  return record(parsed);
 }
 // charset is explicit: Windows PowerShell 5.1 (the native Island) otherwise decodes JSON as Latin-1.
 /** Responses addressed to an authenticated paired device (M-A-3 T9R-F01 review-listing redaction). */
@@ -394,9 +410,14 @@ async function openHost(
   const dataDirectory = paths.data;
   if (!paths.installed) mkdirSync(dataDirectory, { recursive: true });
   const credentialPath = paths.credentials;
-  const saved = existsSync(credentialPath)
-    ? (JSON.parse(readFileSync(credentialPath, "utf8")) as { token: string })
-    : null;
+  let saved: { token: string } | null = null;
+  if (existsSync(credentialPath)) {
+    // A damaged credential must stop the start with the file named: started anyway, every request answers 500 (a
+    // non-string token) or the Host silently mints a token no client holds (a missing one).
+    try { saved = JSON.parse(readFileSync(credentialPath, "utf8")) as { token: string }; } catch { saved = null; }
+    if (!saved || typeof saved.token !== "string" || !/^\S+$/.test(saved.token))
+      throw new Error(`The Host credential file is damaged: ${credentialPath}. Restore it from a backup before starting the Host.`);
+  }
   const token = saved?.token ?? randomBytes(32).toString("base64url");
   const containment =
     options.containment ??
@@ -1190,7 +1211,7 @@ async function openHost(
     let began = false;
     try {
       const after = Number(path.searchParams.get("after") ?? 0);
-      if (!Number.isSafeInteger(after) || after < 0) throw new Error("Invalid event cursor.");
+      if (!Number.isSafeInteger(after) || after < 0) throw new CommandRefusedError("Invalid event cursor.");
       if (local && (path.pathname === "/state" || path.pathname === "/events")) workstationClients.seen = Date.now();
       if (req.method === "GET" && path.pathname === "/state") return json(res, viewFor(after, principal));
       if (req.method === "GET" && path.pathname === "/events") {
@@ -1428,7 +1449,8 @@ async function openHost(
               try { decisionAssistance = await manager.assistDecision(submitted, dropped.signal); }
               finally { res.off("close", onClose); }
             }
-            task = manager.submit({ ...submitted, decisionAssistance });
+            // The owner must see, at approval time, that a phone queued this and not they themselves.
+            task = manager.submit({ ...submitted, decisionAssistance, ...(device ? { submittedBy: { deviceId: device.id, name: device.name } } : {}) });
             break;
           }
           case "ma4.configure":
@@ -2134,6 +2156,9 @@ async function openHost(
             if (!local) throw new Error("Pairing can only be initiated on the workstation.");
             pairCode = randomBytes(12).toString("base64url");
             pairing = { codeHash: hash(pairCode), expiresAt: Date.now() + 600000 };
+            // Earlier failures were guesses at a code that no longer exists; they must not lock the fresh code out.
+            clientAttempts.entries.clear();
+            globalAttempts.entries.clear();
             manager.emit(
               db.event(
                 "pairing.created",

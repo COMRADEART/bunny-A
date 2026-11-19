@@ -331,9 +331,11 @@ public partial class MainWindow : Window
             if (state == "waiting_for_approval" && !isStep)
             {
                 var cwd = task.Json("cwd");
+                // A task a paired phone queued must never read as one the owner typed.
+                var queuedBy = task.JsonObj("submittedBy").ValueKind == JsonValueKind.Object ? task.JsonObj("submittedBy").Json("name") : null;
                 approvals.Add(new PendingApprovalItem(
                     TaskId: id, TaskTitle: title, ActionId: id, OperationKind: "task.approve",
-                    Summary: $"Launch {provider} · {model}",
+                    Summary: queuedBy is null ? $"Launch {provider} · {model}" : $"Queued from paired device “{queuedBy}” — launch {provider} · {model}",
                     PayloadSha256: "-", Category: "task_launch", Reversible: true, ExpiresAt: 0,
                     Scope: cwd is { Length: > 0 } ? $"Working folder: {cwd}" : "No working folder (tool-free conversation)",
                     ProposedDiff: task.Json("prompt") ?? "",

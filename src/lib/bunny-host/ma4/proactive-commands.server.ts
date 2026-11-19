@@ -24,11 +24,17 @@ const version = (value: unknown) => typeof value === "number" ? value : undefine
 
 export async function proactiveCommand(engine: ProactiveEngine, action: string, data: Record<string, unknown>, actor: string): Promise<unknown> {
   if (WORKSTATION_ONLY.has(action) && !isTrustedLocalActor(actor)) throw new WorkstationRequiredError("Goals, schedules and monitors are created and approved on the Windows workstation.");
+  // A device clears its own news, never the workstation's pending-approval prompts (the inbox.ack rule, M-A-3 T9R-F01).
+  const notice = (value: unknown) => {
+    const key = String(value ?? "").slice(0, 200);
+    if (!isTrustedLocalActor(actor) && engine.store.notification(key)?.category === "approval_required") throw new WorkstationRequiredError("Pending approvals are cleared by answering them on the Windows workstation.");
+    return key;
+  };
   try {
     switch (action) {
       case "proactive.list": return engine.snapshot();
-      case "proactive.notification.dismiss": return engine.dismiss(String(data.key ?? "").slice(0, 200));
-      case "proactive.notification.snooze": return engine.snooze(String(data.key ?? "").slice(0, 200), typeof data.minutes === "number" ? data.minutes : 60);
+      case "proactive.notification.dismiss": return engine.dismiss(notice(data.key));
+      case "proactive.notification.snooze": return engine.snooze(notice(data.key), typeof data.minutes === "number" ? data.minutes : 60);
       case "proactive.prefs": return engine.setPrefs(data.prefs, actor);
       case "proactive.policy": return engine.setPolicy(data.policy, actor);
       case "proactive.away.ack": return engine.awayAck();

@@ -28,7 +28,7 @@ export type ApprovalItem = {
 };
 
 export type ApprovalInput = {
-  tasks: (Pick<OrchTask, "id" | "state" | "provider" | "title" | "createdAt"> & { mission?: unknown })[];
+  tasks: (Pick<OrchTask, "id" | "state" | "provider" | "title" | "createdAt" | "submittedBy"> & { mission?: unknown })[];
   missions: Pick<MissionView, "id" | "title" | "requests">[];
   agents: Pick<AgentSnapshot["agents"][number], "id" | "name" | "state" | "missionId" | "authorization">[];
   viewer: "workstation" | "device";
@@ -56,7 +56,8 @@ export function pendingApprovalItems(input: ApprovalInput): ApprovalItem[] {
     items.push({
       id: task.id,
       kind: "task",
-      title: `${providerName(task.provider)} task needs approval`,
+      // A task a phone queued must never read as one the owner typed.
+      title: task.submittedBy ? `${providerName(task.provider)} task from paired device “${task.submittedBy.name}” needs approval` : `${providerName(task.provider)} task needs approval`,
       detail: task.title,
       target: { sheet: "decision", taskId: task.id },
       // A device's real gate is the Task's own decision view (local models only), so the list does not claim it here.

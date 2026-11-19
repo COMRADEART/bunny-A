@@ -230,6 +230,8 @@ export type OrchTask = {
   provider: ProviderId;
   model: string;
   decision: RouteDecision;
+  /** The paired device that queued this task; absent when the owner queued it on the workstation. Shown wherever it is approved. */
+  submittedBy?: { deviceId: string; name: string };
   manual: boolean;
   createdAt: number;
   startedAt: number | null;

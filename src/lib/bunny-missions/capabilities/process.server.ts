@@ -4,6 +4,7 @@ import { delimiter, dirname, extname, join, resolve } from "node:path";
 import { trackOwnedChild } from "../../bunny-host/owned-processes.server.ts";
 import { runWindowsOwnedProcess, type ProcessOwner, type OwnedProcessRecord } from "../../bunny-host/owned-process-group.server.ts";
 import { systemTool } from "../../bunny-host/system-tools.server.ts";
+import { networkPath } from "../paths.server.ts";
 
 /** How a command is actually launched: always a real executable plus argv, never a shell string. */
 export type Resolved = { file: string; prefix: string[]; display: string; owned?: boolean };
@@ -37,6 +38,7 @@ export function resolveCommand(command: string, cwd = process.cwd()): Resolved |
   }
   if (/[\\/]/.test(name)) {
     const path = resolve(cwd, name);
+    if (networkPath(path)) return null;
     return existsSync(path) && statSync(path).isFile() && (process.platform !== "win32" || /\.(exe|com)$/i.test(name)) ? { file: realpathSync(path), prefix: [], display: name, owned: /[\\/]git(?:\.exe)?$/i.test(path) } : null;
   }
   const found = onPath(name);

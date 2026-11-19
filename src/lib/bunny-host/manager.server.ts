@@ -294,7 +294,10 @@ export class TaskManager {
     this.bus.setMaxListeners(100);
     // UI reconnect never calls this. A new Host instance genuinely cannot attach
     // to an old non-interactive pipe; keep session/PID evidence without killing it.
-    for (const task of db.tasks())
+    const loaded = db.tasks();
+    // The row stays in the database for inspection; it is named here so the loss is never silent.
+    for (const id of db.unreadableTasks) this.emit(db.event("state.task_unreadable", null, `Task row ${id.slice(0, 80)} holds no readable task record and was left out. The row is kept in the Host database.`));
+    for (const task of loaded)
       if (
         [
           "launching",
@@ -1449,6 +1452,7 @@ export class TaskManager {
         ? { mission: { missionId: delegated.missionId, stepId: delegated.stepId } }
         : {}),
       title: input.prompt.trim().split("\n")[0].slice(0, 80),
+      ...(input.submittedBy ? { submittedBy: input.submittedBy } : {}),
       prompt: input.prompt,
       mode: input.mode,
       projectId: project?.id ?? null,
@@ -1540,7 +1544,7 @@ export class TaskManager {
       routing,
       { state: "waiting_for_approval", activity: "Waiting for approval", proposedRoute:this.connections.bind(routing.provider,routing.model,"workstation",routing.projectId,routing.mission?routing.constraints?.providerAllowlist??[]:[]) },
       "approval.required",
-      decision.reason,
+      task.submittedBy ? `Queued from paired device “${task.submittedBy.name}”. ${decision.reason}` : decision.reason,
     );
   }
   /** §5/§27: the user's explicit provider (and exact model) selection outranks routing, then the pipeline resolves model+effort on the same eligibility; impossible selections fail clearly. */

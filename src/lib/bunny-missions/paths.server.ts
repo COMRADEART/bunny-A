@@ -7,6 +7,8 @@ import { dirname, isAbsolute, relative, resolve, basename, join } from "node:pat
  */
 export function canonical(path: string, real: (path: string) => string = realpathSync): string {
   let current = resolve(path); const tail: string[] = [];
+  // Probing a network path opens an SMB session to a host the caller named, before any scope answer.
+  if (networkPath(current)) return current;
   while (!existsSync(current)) {
     const parent = dirname(current);
     if (parent === current) return resolve(path);
@@ -15,8 +17,12 @@ export function canonical(path: string, real: (path: string) => string = realpat
   return join(real(current), ...tail);
 }
 
+/** UNC and device grammars (`\\host\share`, `//host/share`, `\\?\C:\`): never touched on disk and never inside a scope. */
+export function networkPath(path: string): boolean { return process.platform === "win32" && (/^[\\/]{2}/.test(path) || /^[\\/]{2}/.test(resolve(path))); }
+
 /** True when `path` is `root` or inside it after canonicalization. */
 export function within(root: string, path: string): boolean {
+  if (networkPath(root) || networkPath(path)) return false;
   // Also compare the OS's final paths: both forms follow links, but only .native expands 8.3 short names, so a short
   // and a long spelling of one folder (an approved root vs. a path Git reports) still nest (MA4-S1R3-CI2).
   return nested(canonical(root), canonical(path)) || nested(canonical(root, realpathSync.native), canonical(path, realpathSync.native));

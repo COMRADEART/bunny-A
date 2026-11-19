@@ -100,14 +100,17 @@ export function authorizeBridge(
   return { local: false, token };
 }
 
-/** Stable identifier for rate limiting remote callers; prefers the gateway-supplied client IP. */
+/**
+ * Stable identifier for rate limiting remote callers. The last X-Forwarded-For entry is the one the nearest relay
+ * appended; earlier entries are whatever the caller sent, so keying on them lets one caller pose as many.
+ */
 export function clientKey(
   request: Request,
   remoteAddress: string | undefined = peerAddress(),
 ): string {
   const forwarded =
-    request.headers.get("cf-connecting-ip") ??
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+    request.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() ||
+    request.headers.get("cf-connecting-ip");
   return `remote:${(forwarded || remoteAddress || "unknown").slice(0, 64)}`;
 }
 /** Capability-reducing recovery only: clears a stale device cookie on a verified workstation origin. */

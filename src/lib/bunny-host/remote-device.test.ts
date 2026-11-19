@@ -622,3 +622,116 @@ test("T9 operation ledger bounds include in-progress commands without evicting t
   assert.throws(() => ledger.begin("device:c", "op-active-c", "agent.stop", 2), /still being confirmed/);
   assert.equal(ledger.entries.size, 2);
 });
+
+test("a task queued from a paired phone carries that device to the owner's approval", async () => {
+  const f = await fixture();
+  try {
+    const device = await f.pair("Kitchen phone");
+    // The body cannot claim a different origin: the Host sets the field from the authenticated device.
+    const forged = await f.api("submit", { prompt: "Fix the build", mode: "fast", override: "claude", submittedBy: { deviceId: "x", name: "Owner" } }, device.token);
+    const queued = await f.api("submit", { prompt: "Fix the build, then install the helper", mode: "fast", override: "claude" }, device.token);
+    assert.equal(queued.status, 200);
+    const seen = (await f.state()).body.tasks.filter((task) => task.state === "waiting_for_approval");
+    assert.ok(seen.length >= 1);
+    for (const task of seen) assert.deepEqual(task.submittedBy, { deviceId: device.deviceId, name: "Kitchen phone" }, `forged submit answered ${forged.status}`);
+    // The owner's own task carries no device.
+    const own = await f.api("submit", { prompt: "Mine", mode: "fast", override: "claude" });
+    assert.equal((own.body.task as { submittedBy?: unknown }).submittedBy, undefined);
+  } finally {
+    await f.close();
+  }
+});
+
+test("failed guesses made before a pairing code exists do not lock the owner's fresh code out", async () => {
+  const f = await fixture();
+  try {
+    const guess = (code: string, client: string) =>
+      fetch(`${f.base}/pair`, { method: "POST", headers: { "content-type": "application/json", "x-bunny-pair-client": client }, body: JSON.stringify({ code, name: "phone" }) });
+    let last = 0;
+    for (let i = 0; i < 100; i++) last = (await guess("wrong", `remote:198.51.100.${i}`)).status;
+    assert.equal(last, 403);
+    assert.equal((await guess("wrong", "remote:203.0.113.1")).status, 429, "the global cap is reached");
+    const code = (await f.api("pairing.create")).body.pairCode as string;
+    assert.equal((await guess(code, "remote:203.0.113.77")).status, 200, "a fresh code starts a fresh guess budget");
+  } finally {
+    await f.close();
+  }
+});
+
+test("a request body is decoded whole, and input that never ran is refused rather than reported as a failure", async () => {
+  const f = await fixture();
+  try {
+    const port = Number(new URL(f.base).port);
+    // A multi-byte character split across two chunks, as TCP segmentation does on a real network.
+    const send = (parts: Buffer[]) => new Promise<{ status: number; body: Body }>((resolve, reject) => {
+      const request = httpRequest({ host: "127.0.0.1", port, path: "/command", method: "POST", headers: { authorization: `Bearer ${f.host.token}`, "content-type": "application/json" } }, (response) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk: Buffer) => chunks.push(chunk));
+        response.on("end", () => resolve({ status: response.statusCode ?? 0, body: JSON.parse(Buffer.concat(chunks).toString("utf8")) as Body }));
+      });
+      request.on("error", reject);
+      request.write(parts[0], () => setTimeout(() => request.end(parts[1]), 50));
+    });
+    for (const text of ["pre 😀 post", "pre 中文 post"]) {
+      const bytes = Buffer.from(JSON.stringify({ action: "submit", data: { prompt: text, mode: "fast", override: "claude" } }), "utf8");
+      const cut = bytes.indexOf(Buffer.from(text.slice(4, 6), "utf8")) + 1;
+      const sent = await send([bytes.subarray(0, cut), bytes.subarray(cut)]);
+      assert.equal(sent.status, 200);
+      assert.equal((sent.body.task as { prompt: string }).prompt, text);
+    }
+    // Bad input executed nothing: REFUSED, never FAILED (which a client reads as "may have partly applied").
+    for (const [label, init] of [
+      ["missing mode", { body: JSON.stringify({ action: "submit", data: { prompt: "hello" } }) }],
+      ["constraints as an array", { body: JSON.stringify({ action: "submit", data: { prompt: "hello", mode: "fast", constraints: [] } }) }],
+      ["not JSON", { body: "{" }],
+    ] as const) {
+      const response = await fetch(`${f.base}/command`, { method: "POST", headers: { authorization: `Bearer ${f.host.token}`, "content-type": "application/json" }, ...init });
+      const answer = (await response.json()) as Body;
+      assert.equal(response.status, 400, label);
+      assert.equal(answer.code, "REFUSED", label);
+    }
+    const cursor = await fetch(`${f.base}/state?after=NaN`, { headers: { authorization: `Bearer ${f.host.token}` } });
+    assert.equal(((await cursor.json()) as Body).code, "REFUSED");
+    // An oversized body is named as such.
+    const huge = await fetch(`${f.base}/command`, { method: "POST", headers: { authorization: `Bearer ${f.host.token}`, "content-type": "application/json" }, body: JSON.stringify({ action: "submit", data: { prompt: "x".repeat(4_100_000), mode: "fast" } }) });
+    assert.equal(huge.status, 413);
+    assert.equal(((await huge.json()) as Body).code, "REQUEST_TOO_LARGE");
+  } finally {
+    await f.close();
+  }
+});
+
+test("damaged state: one unreadable task row is reported and skipped; a damaged credential file stops the start by name", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "bunny-damaged-state-"));
+  const root = join(directory, "project");
+  mkdirSync(root);
+  const start = async () => startHost({ dataDirectory: directory, root, port: await freePort(), adapters: [fakeAdapter("claude", "claude-test").adapter],
+    sample: async () => ({ at: Date.now(), cpu: { utilization: null, clockMhz: null, temperatureC: null }, memory: { usedBytes: 0, availableBytes: 1, totalBytes: 1 }, gpus: [], notes: ["disposable"] }) });
+  try {
+    let host = await start();
+    const token = host.token;
+    await host.close();
+    const sqlite = new DatabaseSync(join(directory, "host.sqlite"));
+    for (const [id, record] of [["row-null", "null"], ["row-number", "5"], ["row-other-id", JSON.stringify({ id: "someone-else", createdAt: 1 })]]) sqlite.prepare("INSERT INTO tasks(id,record) VALUES(?,?)").run(id, record);
+    sqlite.close();
+    host = await start();
+    try {
+      assert.equal(host.token, token);
+      const state = await fetch(`http://127.0.0.1:${host.port}/state`, { headers: { authorization: `Bearer ${host.token}` } });
+      assert.equal(state.status, 200);
+      assert.deepEqual(((await state.json()) as Snapshot).tasks, []);
+    } finally { await host.close(); }
+    const after = new DatabaseSync(join(directory, "host.sqlite"));
+    const reported = (after.prepare("SELECT detail FROM events WHERE type='state.task_unreadable'").all() as { detail: string }[]).map((row) => row.detail).join(" ");
+    const kept = (after.prepare("SELECT COUNT(*) n FROM tasks").get() as { n: number }).n;
+    after.close();
+    for (const id of ["row-null", "row-number", "row-other-id"]) assert.match(reported, new RegExp(id));
+    assert.equal(kept, 3, "the rows stay for inspection");
+    for (const damaged of ['{"token":5}', "{}", "{"]) {
+      writeFileSync(join(directory, "credentials.json"), damaged);
+      await assert.rejects(start(), /credential file is damaged: .*credentials\.json/, damaged);
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  }
+});
