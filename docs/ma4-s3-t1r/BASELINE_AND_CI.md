@@ -39,7 +39,7 @@ Left running. Not stopped, and its directory was not used as a workspace.
 
 - Driver PID 6840, started 2026-10-24 11:06 local, `scripts/ma4-s2t3r/soak.mjs --hours 24`. Still running at qualification close.
 - Host was recorded as PID 37540. At close the process listening for that soak is PID 9076 on port 43192 (`soak-host.mjs` in the soak worktree). It was not stopped by this pass.
-- Evidence directory: `C:\Users\allam\AppData\Local\Bunny-S2T3R1-Soak`
+- Evidence directory: `C:\Users\<user>\AppData\Local\Bunny-S2T3R1-Soak`
 - Last sampled state before this work: `working: 0`, health `healthy`
 
 ## Held constant for the live sample

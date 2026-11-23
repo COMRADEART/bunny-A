@@ -2,7 +2,7 @@
 
 Branch `ma0-mission-architecture`, baseline `ea0e803`. Companion documents: [compatibility](MA0_COMPATIBILITY.md), [security](MA0_SECURITY_MODEL.md), [capabilities](MA0_CAPABILITY_MODEL.md), [state machine](MA0_MISSION_STATE_MACHINE.md).
 
-Updated for Review 0 remediation M-A-0R; the original architecture and router remain in place. Finding evidence: [remediation report](../MA0_REMEDIATION_REPORT.md).
+Updated for Review 0 remediation M-A-0R; the original architecture and router remain in place. Finding evidence: [remediation report](reports/MA0_REMEDIATION_REPORT.md).
 
 ## 1. Old architecture (unchanged, still first-class)
 

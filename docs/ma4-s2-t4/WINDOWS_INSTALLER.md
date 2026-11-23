@@ -30,7 +30,7 @@
 | Check | Result on `Bunny-A-Windows-S2T3R1-6-TEST` (`448ca6b`) | Evidence |
 |---|---|---|
 | **No developer checkout dependency** | `importClosure()` verified `454` files (`extra: 0, missing: 0, changed: 0`); runs with repo unmounted | [`../ma4-s2-t3r1/evidence/installed/lifecycle.json`](../ma4-s2-t3r1/evidence/installed/lifecycle.json) |
-| **Non-administrator user scope** | Installed under `C:\Users\allam\AppData\Local\Bunny-S2T3R-Install\r1\Bunny-A` without UAC elevation | `lifecycle.json` (`steps[0].install`) |
+| **Non-administrator user scope** | Installed under `C:\Users\<user>\AppData\Local\Bunny-S2T3R-Install\r1\Bunny-A` without UAC elevation | `lifecycle.json` (`steps[0].install`) |
 | **Data directory ownership** | State stored in `<InstallRoot>\data\host-state.sqlite` + `ma4-tasks.sqlite`, separated from immutable `<InstallRoot>\releases\<ReleaseId>\` | [`install/Bunny-State.ps1`](../../install/Bunny-State.ps1) |
 | **No automatic Windows startup** | Startup folder items and `HKCU:\Software\Microsoft\Windows\CurrentVersion\Run` verified unchanged (`startupItemsUnchanged: true`, `runKeysUnchanged: true`) | [`../ma4-s2-t3r1/evidence/installed/cleanup.json`](../ma4-s2-t3r1/evidence/installed/cleanup.json) |
 | **Repeated installation & upgrade** | Upgraded across `S2T3R1-1-TEST` -> `S2T3R1-6-TEST` while preserving `host-state.sqlite` and `ma4-tasks.sqlite` | [`../ma4-s2-t3r1/INSTALLED_RELEASE_RECHECK.md`](../ma4-s2-t3r1/INSTALLED_RELEASE_RECHECK.md) |

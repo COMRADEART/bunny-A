@@ -8,7 +8,7 @@
 
 ## 1. Release Architecture & Packaging Integrity
 
-The Windows release packaging is orchestrated by [`scripts/package-bunny-desktop.ps1`](file:///C:/Users/allam/Documents/new/bun-router-s2-remediation/scripts/package-bunny-desktop.ps1) and [`scripts/bunny-release.mjs`](file:///C:/Users/allam/Documents/new/bun-router-s2-remediation/scripts/bunny-release.mjs):
+The Windows release packaging is orchestrated by [`scripts/package-bunny-desktop.ps1`](file:///C:/Users/<user>/Documents/new/bun-router-s2-remediation/scripts/package-bunny-desktop.ps1) and [`scripts/bunny-release.mjs`](file:///C:/Users/<user>/Documents/new/bun-router-s2-remediation/scripts/bunny-release.mjs):
 
 - **Target Path:** `<InstallRoot>\releases\<ReleaseId>\`
 - **Release Manifest:** `release-manifest.json` (`schema: "bunny-release-manifest/1"`)

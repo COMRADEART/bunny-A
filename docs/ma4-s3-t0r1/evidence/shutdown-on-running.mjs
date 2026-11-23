@@ -1,10 +1,10 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 
-const creds = JSON.parse(readFileSync("C:/Users/allam/AppData/Local/Bunny-S3T0R1-Install/state/credentials/credentials.json", "utf8"));
+const creds = JSON.parse(readFileSync("C:/Users/<user>/AppData/Local/Bunny-S3T0R1-Install/state/credentials/credentials.json", "utf8"));
 const base = `http://127.0.0.1:${creds.port}`;
 const headers = { authorization: `Bearer ${creds.token}` };
-const out = "C:/Users/allam/Documents/new/bun-router-s3t0/docs/ma4-s3-t0r1/evidence/shutdown-on-running.json";
+const out = "C:/Users/<user>/Documents/new/bun-router-s3t0/docs/ma4-s3-t0r1/evidence/shutdown-on-running.json";
 
 function identity(pid) {
   const script = `$p = Get-CimInstance Win32_Process -Filter 'ProcessId=${Number(pid)}'; if (-not $p) { 'MISSING' } else { ($p.CommandLine -replace '\\s+',' ') }`;

@@ -4,7 +4,7 @@
 **Repository:** https://github.com/COMRADEART/bunny-A  
 **Milestone:** MA4-S3-T5 (Integrated Consumer Experience & Beta Preflight)  
 **Priority:** P0 — Consumer Experience and Release Qualification  
-**Active Worktree:** `C:\Users\allam\Documents\new\bun-router-s3t5`  
+**Active Worktree:** `C:\Users\<user>\Documents\new\bun-router-s3t5`  
 **Active Branch:** `ma4-s3-t5-integrated-consumer-beta-preflight`  
 **Predecessor Lineage:** PR #50 (Merge commit `711f8815ae51bf0ea2ba6a155326e676e3da37cb`)  
 **Upstream CI Run:** `40441627114` (Conclusion: SUCCESS across all 3 jobs)  
@@ -43,7 +43,7 @@ Date:   Mon Oct 26 22:59:38 2026 -0400
 ## 2. Worktree & Environment Isolation
 
 In accordance with Phase 0 directives, development and qualification proceed in an isolated git worktree:
-- **Worktree Path:** `C:\Users\allam\Documents\new\bun-router-s3t5`
+- **Worktree Path:** `C:\Users\<user>\Documents\new\bun-router-s3t5`
 - **Git Branch:** `ma4-s3-t5-integrated-consumer-beta-preflight`
 - **Node Runtime:** Node.js v24.18.0 (Windows x64)
 - **Hardware GPU:** NVIDIA GeForce RTX 4050 Laptop GPU (6,141 MiB VRAM, Driver 616.92)
@@ -68,7 +68,7 @@ Remote cloud models and unapproved digests are strictly refused fail-closed by `
 ## 4. Production Installation Directory Protection
 
 The production installation of Bunny A resides at:
-- **Path:** `%LOCALAPPDATA%\Bunny-A` (`C:\Users\allam\AppData\Local\Bunny-A`)
+- **Path:** `%LOCALAPPDATA%\Bunny-A` (`C:\Users\<user>\AppData\Local\Bunny-A`)
 - **Status:** **UNTOUCHED & PRESERVED**
 - **Safety Invariant:** All milestone test runs, temporary databases, and sandboxed worktrees operate strictly within isolated temp directories (`%TEMP%\bunny-ma4-t5-*`). No state, settings, or user databases in `%LOCALAPPDATA%\Bunny-A` are mutated.
 

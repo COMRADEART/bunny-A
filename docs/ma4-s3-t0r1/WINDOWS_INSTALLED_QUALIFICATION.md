@@ -57,7 +57,7 @@ Classification of completion: **PASS**. Classification of independent verificati
 
 Goal `Record the watch status once` was reviewed and approved in the UI. Review text: one success criterion, progress counts only when a linked task completes with verified step receipts, allowed actions `file.read`, `local.generate`, `local.review`, budget 20, ends 2026-12-23. After approval the row was `Goal · Active`, `0 of 1 criteria met`.
 
-Monitor `Status watch` (`mon-8d042f4e-9d16-42ee-ab17-1c35acc2f5f3`) was approved against folder `C:\Users\allam\Documents\Bunny-S3T0R1-Watch`, JSON field `status`, transition PASS to FAIL, every 1 minute. Detail is in `NOTIFICATION_DELIVERY.md`.
+Monitor `Status watch` (`mon-8d042f4e-9d16-42ee-ab17-1c35acc2f5f3`) was approved against folder `C:\Users\<user>\Documents\Bunny-S3T0R1-Watch`, JSON field `status`, transition PASS to FAIL, every 1 minute. Detail is in `NOTIFICATION_DELIVERY.md`.
 
 Approval Center while the second task was waiting: nav badge `Approvals 1`, heading `Use Ollama?`, button `Approve & Run`. After that task completed, the center read `Nothing needs you` / `No approvals waiting.`
 
@@ -91,6 +91,6 @@ Clean uninstall removed only:
 
 - `%LOCALAPPDATA%\Bunny-S3T0R1-Install` (including the scratch shortcut)
 - `%LOCALAPPDATA%\Bunny-S3T0R1-Workspace`
-- `C:\Users\allam\Documents\Bunny-S3T0R1-Watch`
+- `C:\Users\<user>\Documents\Bunny-S3T0R1-Watch`
 
 Ports 43217 and 8084 were down before the delete. `%LOCALAPPDATA%\Bunny-A` still exists. The real Startup shortcut still targets the MA3 T13 release. Uninstall of this candidate: **PASS**.

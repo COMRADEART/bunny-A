@@ -21,11 +21,11 @@ Merge pull request #47 from COMRADEART/ma4-s3-t3r2-release-gate-fix
 ```
 
 An isolated git worktree was established at:
-`C:\Users\allam\Documents\new\bun-router-s3t4`
+`C:\Users\<user>\Documents\new\bun-router-s3t4`
 
 Existing primary installations and shortcuts were preserved untouched:
-- Installed binary folder: `C:\Users\allam\AppData\Local\Bunny-A`
-- Windows startup shortcut: `C:\Users\allam\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\Bunny-A.lnk`
+- Installed binary folder: `C:\Users\<user>\AppData\Local\Bunny-A`
+- Windows startup shortcut: `C:\Users\<user>\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\Bunny-A.lnk`
 
 ---
 

@@ -45,8 +45,8 @@ Historical documentation in T4R2 indicated that 12 repair tasks were validated a
 5. **Pass Rate Discrepancy:** Reconciled T4R1's empirical 54/60 (90%) live model pass rate against T4R2's 60/60 (100%) structural policy ablation (Comparison A).
 
 *Deliverable References:*
-- [`T4R2_BENCHMARK_ENTRY_RECONCILIATION.md`](file:///C:/Users/allam/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/T4R2_BENCHMARK_ENTRY_RECONCILIATION.md)
-- [`BASELINE.md`](file:///C:/Users/allam/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/BASELINE.md)
+- [`T4R2_BENCHMARK_ENTRY_RECONCILIATION.md`](file:///C:/Users/<user>/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/T4R2_BENCHMARK_ENTRY_RECONCILIATION.md)
+- [`BASELINE.md`](file:///C:/Users/<user>/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/BASELINE.md)
 - Audit: `test-results/ma4/t5/benchmark-reconciliation-audit.json`
 
 ---
@@ -69,9 +69,9 @@ The glass notch supports 4-edge positioning across Top, Bottom, Left, and Right 
 - **Weapon Characters:** Planner (`Gada`), Worker (`Spear`), Tester (`Chakra`), and Reviewer (`Sword`) integrated cleanly with existing brand assets without modifying the core Bunny A identity.
 
 *Deliverable References:*
-- [`WINDOWS_DESKTOP_ACCEPTANCE.md`](file:///C:/Users/allam/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/WINDOWS_DESKTOP_ACCEPTANCE.md)
-- [`GLASS_NOTCH_AND_AGENTS.md`](file:///C:/Users/allam/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/GLASS_NOTCH_AND_AGENTS.md)
-- [`PERFORMANCE_RESULTS.md`](file:///C:/Users/allam/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/PERFORMANCE_RESULTS.md)
+- [`WINDOWS_DESKTOP_ACCEPTANCE.md`](file:///C:/Users/<user>/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/WINDOWS_DESKTOP_ACCEPTANCE.md)
+- [`GLASS_NOTCH_AND_AGENTS.md`](file:///C:/Users/<user>/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/GLASS_NOTCH_AND_AGENTS.md)
+- [`PERFORMANCE_RESULTS.md`](file:///C:/Users/<user>/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/PERFORMANCE_RESULTS.md)
 
 ---
 
@@ -84,7 +84,7 @@ The local-first full-duplex voice pipeline was verified across 76 native driver 
 - **Physical Voice Blockers:** While Intel Digital Mics and Realtek speakers are detected, live acoustic room feedback tests and dynamic peripheral disconnects were preserved as **`BLOCKED (ACOUSTIC_SESSION_REQUIRED)`** and **`BLOCKED (HARDWARE_DISCONNECT_BLOCKED)`** in strict accordance with qualification truthfulness.
 
 *Deliverable Reference:*
-- [`VOICE_PHYSICAL_QUALIFICATION.md`](file:///C:/Users/allam/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/VOICE_PHYSICAL_QUALIFICATION.md)
+- [`VOICE_PHYSICAL_QUALIFICATION.md`](file:///C:/Users/<user>/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/VOICE_PHYSICAL_QUALIFICATION.md)
 
 ---
 
@@ -102,9 +102,9 @@ The local-first full-duplex voice pipeline was verified across 76 native driver 
 - **Physical Phone Gate:** Because no physical handset is connected over USB/Wi-Fi (`adb devices` empty), on-device touch validation was preserved as **`BLOCKED (NO_PHYSICAL_DEVICE_ATTACHED)`**.
 
 *Deliverable References:*
-- [`ANDROID_COMPANION_ACCEPTANCE.md`](file:///C:/Users/allam/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/ANDROID_COMPANION_ACCEPTANCE.md)
-- [`PAIRING_SECURITY.md`](file:///C:/Users/allam/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/PAIRING_SECURITY.md)
-- [`ANDROID_SIGNING_AND_PLAY_READINESS.md`](file:///C:/Users/allam/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/ANDROID_SIGNING_AND_PLAY_READINESS.md)
+- [`ANDROID_COMPANION_ACCEPTANCE.md`](file:///C:/Users/<user>/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/ANDROID_COMPANION_ACCEPTANCE.md)
+- [`PAIRING_SECURITY.md`](file:///C:/Users/<user>/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/PAIRING_SECURITY.md)
+- [`ANDROID_SIGNING_AND_PLAY_READINESS.md`](file:///C:/Users/<user>/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/ANDROID_SIGNING_AND_PLAY_READINESS.md)
 
 ---
 
@@ -116,8 +116,8 @@ The local-first full-duplex voice pipeline was verified across 76 native driver 
 - **Process Sandboxing:** Child processes bound to Windows Job Objects with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, guaranteeing zero leaked processes.
 
 *Deliverable References:*
-- [`SECURITY_AND_PRIVACY_REGRESSION.md`](file:///C:/Users/allam/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/SECURITY_AND_PRIVACY_REGRESSION.md)
-- [`APPROVAL_CENTER_ACCEPTANCE.md`](file:///C:/Users/allam/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/APPROVAL_CENTER_ACCEPTANCE.md)
+- [`SECURITY_AND_PRIVACY_REGRESSION.md`](file:///C:/Users/<user>/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/SECURITY_AND_PRIVACY_REGRESSION.md)
+- [`APPROVAL_CENTER_ACCEPTANCE.md`](file:///C:/Users/<user>/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/APPROVAL_CENTER_ACCEPTANCE.md)
 
 ---
 
@@ -128,9 +128,9 @@ The local-first full-duplex voice pipeline was verified across 76 native driver 
 - **Accessibility:** 100% compliant with WCAG 2.1 AA (11.2:1 contrast ratio, 2px focus ring, Narrator/TalkBack ARIA semantics, full keyboard navigation).
 
 *Deliverable References:*
-- [`INSTALLER_AND_UPGRADE_TESTS.md`](file:///C:/Users/allam/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/INSTALLER_AND_UPGRADE_TESTS.md)
-- [`WINDOWS_SIGNING_AND_STORE_READINESS.md`](file:///C:/Users/allam/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/WINDOWS_SIGNING_AND_STORE_READINESS.md)
-- [`ACCESSIBILITY_RESULTS.md`](file:///C:/Users/allam/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/ACCESSIBILITY_RESULTS.md)
+- [`INSTALLER_AND_UPGRADE_TESTS.md`](file:///C:/Users/<user>/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/INSTALLER_AND_UPGRADE_TESTS.md)
+- [`WINDOWS_SIGNING_AND_STORE_READINESS.md`](file:///C:/Users/<user>/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/WINDOWS_SIGNING_AND_STORE_READINESS.md)
+- [`ACCESSIBILITY_RESULTS.md`](file:///C:/Users/<user>/Documents/new/bun-router-s3t5/docs/ma4-s3-t5/ACCESSIBILITY_RESULTS.md)
 
 ---
 

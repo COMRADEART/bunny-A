@@ -83,7 +83,7 @@ Inference is performed exclusively using the pinned local Ollama instance (`qwen
 ## 6. Disk Footprint and Storage Management
 
 - **Host Repository Footprint**: ~42 MB source code.
-- **Ephemeral Test Rigs**: Created under `.tmp-s2t2/rig-*` or `C:\Users\allam\Documents\Bunny-T3R2-Workspace`. Automatically scrubbed upon task completion or test fixture teardown.
+- **Ephemeral Test Rigs**: Created under `.tmp-s2t2/rig-*` or `C:\Users\<user>\Documents\Bunny-T3R2-Workspace`. Automatically scrubbed upon task completion or test fixture teardown.
 - **Audit Logs and Receipts**: Stored in JSON Lines format with daily rolling policies. Receipts are lightweight records (< 1 KB each).
 
 ---

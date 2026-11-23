@@ -1,7 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-const root = "C:/Users/allam/AppData/Local/Bunny-S3T0R1-Install/state";
+const root = "C:/Users/<user>/AppData/Local/Bunny-S3T0R1-Install/state";
 for (const name of readdirSync(root).filter((n) => n.endsWith(".sqlite"))) {
   const db = new DatabaseSync(join(root, name), { readOnly: true });
   const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map((r) => r.name);

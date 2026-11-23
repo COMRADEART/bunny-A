@@ -65,7 +65,7 @@ Before the desktop harness launched and after final teardown, the modification t
 - **Step 1 (Fresh Desktop Start)**: The packaged host initialized on dynamic loopback port `43768` (PID 27988). The internal health check responded `200 OK` within 420ms.
 - **Step 2 (Onboarding State)**: Host read existing onboarding state without resetting user preferences. State index was confirmed at 9 (`status: "done"`).
 - **Step 3 (Model Selection)**: Verified local model selector displayed `qwen2.5-coder:7b` with priority `local_only`. The verified digest `dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364` was confirmed.
-- **Step 4 (Project Registration)**: Created test workspace `alpha-host` at `C:\Users\allam\Documents\Bunny-T3R2-Workspace\alpha-host`, registering root ID `alpha-host` with envelope grant `files: ["*"]`.
+- **Step 4 (Project Registration)**: Created test workspace `alpha-host` at `C:\Users\<user>\Documents\Bunny-T3R2-Workspace\alpha-host`, registering root ID `alpha-host` with envelope grant `files: ["*"]`.
 
 ### Steps 5–8: Planning and Execution
 - **Step 5 (Grounded Read)**: Task `ptask-304a0576-247b-4953-a79d-81d2ac32ea3e` read `TASK.md` and summarized project goals accurately without hallucinated facts.

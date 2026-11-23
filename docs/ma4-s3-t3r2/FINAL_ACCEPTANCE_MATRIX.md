@@ -52,7 +52,7 @@ All 22 gates have been rigorously evaluated and verified.
 
 ### T3R2-G1: Predecessor Merge Verified
 - **Target:** Commit `5e35cb9d84823671a88826cf6d54a1f74a0cea06` (PR #46).
-- **Audit:** `git log -1 5e35cb9d` verified in isolated worktree `C:\Users\allam\Documents\new\bun-router-s3t3r2`.
+- **Audit:** `git log -1 5e35cb9d` verified in isolated worktree `C:\Users\<user>\Documents\new\bun-router-s3t3r2`.
 - **Verdict:** **PASS**.
 
 ### T3R2-G2: Existing User Install & Shortcuts Preserved

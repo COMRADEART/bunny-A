@@ -11,7 +11,7 @@ Audit date: 2026-10-21. Repository: https://github.com/COMRADEART/bunny-A (the `
 | PR #9 | OPEN, `ma4-s1r-live-qualification` → `ma4-s1-model-intelligence`, MERGEABLE |
 | `main` | `bc0fbf0` (merge of PR #8, MA3 T14). `f5d3f90` is **not** an ancestor of `main`; MA4-S1 has never been PR'd to `main`. |
 | Implementation branch | `ma4-s1r2-hybrid-qualification`, created from `673cfa6` in a new worktree `../bun-router-s1r2` |
-| Main checkout | `C:\Users\allam\Documents\new\bun-router` on `ma4-s1-model-intelligence` with 32 modified MA3 evidence files and untracked user material. **Untouched** by this phase (not staged, restored, moved or deleted). Its `node_modules` is reused through a directory junction, exactly as the S1R worktree did. |
+| Main checkout | `C:\Users\<user>\Documents\new\bun-router` on `ma4-s1-model-intelligence` with 32 modified MA3 evidence files and untracked user material. **Untouched** by this phase (not staged, restored, moved or deleted). Its `node_modules` is reused through a directory junction, exactly as the S1R worktree did. |
 | Other worktrees | `bun-router-s1r` (S1R, clean), `bun-router-t14`, a detached temp worktree — untouched |
 | CI | none before this phase (`.github/` absent) |
 
