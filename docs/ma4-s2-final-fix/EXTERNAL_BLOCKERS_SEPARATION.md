@@ -51,14 +51,14 @@ All remaining gates are strictly external to the source code:
 2. **Operator Action:**
    - At `2026-10-25T15:06:15Z` (or later), execute:
      ```powershell
-     node scripts/ma4-s2t3r/soak-report.mjs --dir C:\Users\allam\AppData\Local\Bunny-S2T3R1-Soak
+     node scripts/ma4-s2t3r/soak-report.mjs --dir C:\Users\<user>\AppData\Local\Bunny-S2T3R1-Soak
      ```
    - Verify 0 invariant errors and record final verdict.
 
 ### BLK-S2-05: Live X53 Interactive Desktop Execution
 1. **Target Test:** `src/lib/bunny-missions/cross-app-live.test.ts`
 2. **Operator Action:**
-   - Open a standard PowerShell console on the interactive desktop (logged in as `allam`).
+   - Open a standard PowerShell console on the interactive desktop (logged in as `<user>`).
    - Run:
      ```powershell
      node --experimental-strip-types --test src/lib/bunny-missions/cross-app-live.test.ts

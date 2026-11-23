@@ -13,7 +13,7 @@ Both local soaks were discovered and preserved without disturbance:
 
 ### Soak Run A (`Bunny-S2T3R-Soak`)
 - **Port:** `43190`
-- **Working Directory:** `C:\Users\allam\AppData\Local\Bunny-S2T3R-Soak`
+- **Working Directory:** `C:\Users\<user>\AppData\Local\Bunny-S2T3R-Soak`
 - **Driver PID:** `32948` (started `2026-10-23T21:32:17Z`)
 - **Active Host PID:** `31616` (started `2026-10-24T12:36:04Z`)
 - **Elapsed Duration:** **19.21 hours** (1,064 samples recorded)
@@ -25,7 +25,7 @@ Both local soaks were discovered and preserved without disturbance:
 
 ### Soak Run B (`Bunny-S2T3R1-Soak`) — Candidate Soak
 - **Port:** `43192`
-- **Working Directory:** `C:\Users\allam\AppData\Local\Bunny-S2T3R1-Soak`
+- **Working Directory:** `C:\Users\<user>\AppData\Local\Bunny-S2T3R1-Soak`
 - **Driver PID:** `6840` (started `2026-10-24T11:06:15Z` / `15:06:22Z UTC`)
 - **Active Host PID:** `19296` (started `2026-10-24T11:06:15Z` / `15:06:22Z UTC`)
 - **Elapsed Duration:** **5.64 hours** (270 samples recorded)

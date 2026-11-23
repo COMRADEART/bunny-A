@@ -5,7 +5,7 @@ Audited 2026-10-21 before any S1R3 file change. All facts below were read from g
 ## Repository and remotes
 
 * GitHub repository: `COMRADEART/bunny-A` (`gh repo view`). The local `origin` URL still names `COMRADEART/router_agent`; GitHub redirects it to `bunny-A`.
-* Main checkout `C:\Users\allam\Documents\new\bun-router` on `ma4-s1-model-intelligence` at `f5d3f90`, with 32 modified tracked MA3 evidence files under `test-results/ma3/` plus untracked owner files. **Not modified by S1R3** (no checkout, reset, stash, add or commit there).
+* Main checkout `C:\Users\<user>\Documents\new\bun-router` on `ma4-s1-model-intelligence` at `f5d3f90`, with 32 modified tracked MA3 evidence files under `test-results/ma3/` plus untracked owner files. **Not modified by S1R3** (no checkout, reset, stash, add or commit there).
 
 ## Worktrees
 

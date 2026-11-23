@@ -26,4 +26,4 @@ Prior to completing MA4-S3-T3, all baseline test suites and continuous integrati
 3. **Approval State Conflict Prevention:**
    - In `PersistentTaskRuntime`, tasks requiring no owner approval enter `QUEUED` directly. The Host checks `ptask.state === "AWAITING_APPROVAL"` before invoking `ptasks.approve()`, preventing `TASK_CONFLICT` errors.
 4. **Preservation of Windows Shortcuts:**
-   - Worktree testing operated cleanly in `C:\Users\allam\Documents\new\bun-router-s3t3` without touching `%LOCALAPPDATA%\bunny-a` or altering existing Windows desktop and startup shortcuts (`Bunny-A.lnk`, `Ollama.lnk`).
+   - Worktree testing operated cleanly in `C:\Users\<user>\Documents\new\bun-router-s3t3` without touching `%LOCALAPPDATA%\bunny-a` or altering existing Windows desktop and startup shortcuts (`Bunny-A.lnk`, `Ollama.lnk`).

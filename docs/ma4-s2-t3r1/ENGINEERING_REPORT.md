@@ -7,7 +7,7 @@ MA4-S2-T3R1 — Beta Readiness Closure, Reliability Audit & Accessibility Qualif
 - Repository: `https://github.com/COMRADEART/bunny-A`
 - Base Branch: `ma4-s1r3-agent-reliability` (PR #27 merged at `1f36d951a380783d4cbfcf70ead72891d88c55b4`, tree-identical to `10993bd897936b3e6478f81aed9a3b522bfc5b51`; PR #28 merged to `main` at `0fce711`)
 - T3R Baseline Commit: `10993bd897936b3e6478f81aed9a3b522bfc5b51`
-- Working Branch: `ma4-s2-t3r1-beta-closure` (worktree `C:\Users\allam\Documents\new\bun-router-s2t3r1`)
+- Working Branch: `ma4-s2-t3r1-beta-closure` (worktree `C:\Users\<user>\Documents\new\bun-router-s2t3r1`)
 - Validated Candidate Code Commit: `448ca6b6fb7252e2ea7af00e02ed9e078b5d1610` (`Bunny-A-Windows-S2T3R1-6-TEST`; subsequent commits on `ma4-s2-t3r1-beta-closure` are documentation and evidence only)
 
 ## Executive Summary

@@ -19,7 +19,7 @@ src/lib/bunny-host/ma4-s2t6.test.ts(127,28): error TS2554: Expected 3 arguments,
 ---
 
 ## 2. Production Contract & Root Cause Analysis
-In [`src/lib/bunny-host/ma4/action-broker.server.ts:50-58`](file:///C:/Users/allam/Documents/new/bun-router-s2-remediation/src/lib/bunny-host/ma4/action-broker.server.ts#L50-L58), the `Connector<I>` interface defines:
+In [`src/lib/bunny-host/ma4/action-broker.server.ts:50-58`](file:///C:/Users/<user>/Documents/new/bun-router-s2-remediation/src/lib/bunny-host/ma4/action-broker.server.ts#L50-L58), the `Connector<I>` interface defines:
 ```ts
 export type Connector<I> = {
   contract: ActionContract<I>;
@@ -50,7 +50,7 @@ In `brokered<I>(connector: Connector<I>, ledger: ActionLedger)` (`action-broker.
 ---
 
 ## 3. Remediation Implemented
-In [`src/lib/bunny-host/ma4-s2t6.test.ts`](file:///C:/Users/allam/Documents/new/bun-router-s2-remediation/src/lib/bunny-host/ma4-s2t6.test.ts):
+In [`src/lib/bunny-host/ma4-s2t6.test.ts`](file:///C:/Users/<user>/Documents/new/bun-router-s2-remediation/src/lib/bunny-host/ma4-s2t6.test.ts):
 1. Constructed a complete, strongly-typed `ActionContext` via `makeActionContext(...)` with explicit `taskId`, `stepId`, `idempotencyKey`, `AbortSignal`, `now()`, `outputOf()`, and `Grants`.
 2. Replaced synthetic `{} as never` with real `Prepared` objects obtained from `await mailSend.prepare!(sendInput, cleanCtx)` and `await docsWrite.prepare!(validDocInput, cleanCtx)`.
 3. Verified that `mailSend.prepare!` and `docsWrite.prepare!` also enforce the untrusted-output boundary and version-CAS precondition before execution.
@@ -64,4 +64,4 @@ In [`src/lib/bunny-host/ma4-s2t6.test.ts`](file:///C:/Users/allam/Documents/new/
    - Idempotency keys (`email.send` with identical `idempotencyKey` sends once and `verify()` confirms delivery)
    - Version-CAS conflict (`docs.write` with stale `expectedVersion` rejected in `prepare()` and `run()`)
    - Malicious connector output (connector result violating contract schema rejected with `result_rejected` and `ok: false`)
-5. Added `ma4-s2t5.test.ts`, `ma4-s2t6.test.ts`, and `ma4-s2t7.test.ts` to the `test:ma4` script in [`package.json`](file:///C:/Users/allam/Documents/new/bun-router-s2-remediation/package.json).
+5. Added `ma4-s2t5.test.ts`, `ma4-s2t6.test.ts`, and `ma4-s2t7.test.ts` to the `test:ma4` script in [`package.json`](file:///C:/Users/<user>/Documents/new/bun-router-s2-remediation/package.json).

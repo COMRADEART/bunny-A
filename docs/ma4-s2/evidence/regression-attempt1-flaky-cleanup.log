@@ -118,7 +118,7 @@ build:whisper-shim built
 ✔ MA2 T1 Windows controller: after-config (19427.0457ms)
 You cannot call a method on a null-valued expression.
 At line:1 char:63
-+ ... d=46028';if($p -and $p.ExecutablePath.StartsWith('C:\Users\allam\AppD ...
++ ... d=46028';if($p -and $p.ExecutablePath.StartsWith('C:\Users\<user>\AppD ...
 +                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     + CategoryInfo          : InvalidOperation: (:) [], RuntimeException
     + FullyQualifiedErrorId : InvokeMethodOnNull
@@ -499,10 +499,10 @@ started
 
 test at scripts\bunny-state-migration.test.mjs:247:73
 ✖ MA2 T1 Windows controller: after-host (19673.6415ms)
-  Error: Command failed: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -Command $p=Get-CimInstance Win32_Process -Filter 'ProcessId=46028';if($p -and $p.ExecutablePath.StartsWith('C:\Users\allam\AppData\Local\Temp\bunny-state-test-TNzPxh\install\releases\') -and $p.CommandLine.Contains('Bunny-Host.mjs')){Stop-Process -Id 46028;Wait-Process -Id 46028 -Timeout 10 -ErrorAction SilentlyContinue}
+  Error: Command failed: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -Command $p=Get-CimInstance Win32_Process -Filter 'ProcessId=46028';if($p -and $p.ExecutablePath.StartsWith('C:\Users\<user>\AppData\Local\Temp\bunny-state-test-TNzPxh\install\releases\') -and $p.CommandLine.Contains('Bunny-Host.mjs')){Stop-Process -Id 46028;Wait-Process -Id 46028 -Timeout 10 -ErrorAction SilentlyContinue}
   You cannot call a method on a null-valued expression.
   At line:1 char:63
-  + ... d=46028';if($p -and $p.ExecutablePath.StartsWith('C:\Users\allam\AppD ...
+  + ... d=46028';if($p -and $p.ExecutablePath.StartsWith('C:\Users\<user>\AppD ...
   +                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       + CategoryInfo          : InvalidOperation: (:) [], RuntimeException
       + FullyQualifiedErrorId : InvokeMethodOnNull
@@ -512,7 +512,7 @@ test at scripts\bunny-state-migration.test.mjs:247:73
       at wrappedFn (node:internal/errors:539:14)
       at checkExecSyncError (node:child_process:925:11)
       at execFileSync (node:child_process:961:15)
-      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-s2/scripts/bunny-state-migration.test.mjs:290:7)
+      at TestContext.<anonymous> (file:///C:/Users/<user>/Documents/new/bun-router-s2/scripts/bunny-state-migration.test.mjs:290:7)
       at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
       at async Test.run (node:internal/test_runner/test:1332:7)
       at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {

@@ -27,7 +27,7 @@ Approved from the UI. Completed in 00:13. UI: Result ready. Activity: independen
 
 ## Monitor
 
-Folder Watch registered at C:\Users\allam\Documents\Bunny-S3T0R1-Watch.
+Folder Watch registered at C:\Users\<user>\Documents\Bunny-S3T0R1-Watch.
 Monitor Status watch, id mon-8d042f4e-9d16-42ee-ab17-1c35acc2f5f3, ACTIVE, notify on, JSON field status, PASS to FAIL, every 1 minute.
 First check 09:07 PM was an invalid reading (UTF-8 BOM from the first file write). File rewritten without a BOM as PASS, then later FAIL.
 09:19 PM: one notice, "Status changed: now FAIL". Away line: 1 change found in 12 checks.

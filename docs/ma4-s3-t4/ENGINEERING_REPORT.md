@@ -23,8 +23,8 @@ MA4-S3-T4 resolves these issues through **Host-verified outcome measurement**, *
 ## 2. Baseline Verification (Phase 0)
 
 1. **Predecessor Merge Integrity:** Verified PR #47 merge at commit `4d19781b10dc64a125242cfb4750a452a4791426`.
-2. **Worktree Isolation:** Established dedicated worktree at `C:\Users\allam\Documents\new\bun-router-s3t4`.
-3. **Preservation of Installed Artifacts:** Confirmed zero mutation of `C:\Users\allam\AppData\Local\Bunny-A` and Windows startup shortcuts (`Bunny-A.lnk`).
+2. **Worktree Isolation:** Established dedicated worktree at `C:\Users\<user>\Documents\new\bun-router-s3t4`.
+3. **Preservation of Installed Artifacts:** Confirmed zero mutation of `C:\Users\<user>\AppData\Local\Bunny-A` and Windows startup shortcuts (`Bunny-A.lnk`).
 4. **Hardware Baseline Recorded:**
    - Dedicated GPU VRAM: 6,141 MiB GDDR6.
    - Available Host RAM: ~21.4 GB / 32 GB LPDDR5x.
