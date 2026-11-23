@@ -61,6 +61,9 @@ jobs:
           msystem: UCRT64
           install: mingw-w64-ucrt-x86_64-gcc
           location: C:\msys64-ci
+      - name: Prepend CI MinGW UCRT64 bin to PATH
+        shell: pwsh
+        run: Add-Content -Path $env:GITHUB_PATH -Value 'C:\msys64-ci\msys64\ucrt64\bin'
       - run: npm ci
       - run: npm run pretest
         env:
