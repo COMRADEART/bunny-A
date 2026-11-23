@@ -64,8 +64,6 @@ export function effectiveCostRank(candidate: RouteCandidate): number {
   return candidate.costBasis === "estimated" ? candidate.estimatedCostUsd * 1.25 : candidate.estimatedCostUsd;
 }
 
-const UNPREPARED = new Set<string>();
-
 export function decideRoute(input: { candidates: RouteCandidate[]; qualityFloor: number; nowMs: number | null }): RouteDecision | null {
   const { candidates, qualityFloor, nowMs } = input;
   const entries: RouteAlternativesEntry[] = [];

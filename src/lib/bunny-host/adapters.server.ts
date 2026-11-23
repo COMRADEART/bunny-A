@@ -631,7 +631,6 @@ export class ClaudeAdapter extends CliBase implements ProviderAdapter {
  * text is the only model claim; nothing is invented.
  */
 const CLINE_AUTH_PROBE_MAX_AGE_MS = 10 * 60_000;
-const CLINE_AUTH_PROBE_PROMPT = "Reply with exactly one word: ready";
 
 /** The final run_result of a cline --json transcript, or null when none completed. */
 export function clineRunResult(stdout: string): { finishReason: string; text: string; modelId: string } | null {
@@ -645,7 +644,7 @@ export function clineRunResult(stdout: string): { finishReason: string; text: st
   return last;
 }
 
-export function clineLaunchArgs(task: OrchTask, platform = process.platform): string[] {
+export function clineLaunchArgs(task: OrchTask, _platform = process.platform): string[] {
   // cline has no read-only mode on this build: a read-scoped task is REFUSED at launch (below), never launched restricted.
   // --retries bounds cline's own consecutive-mistake retry loop; the Host's runtime limit governs the session.
   // `--` prevents prompt text beginning with "-" from being parsed as additional CLI options.
@@ -693,10 +692,6 @@ export class ClineAdapter extends CliBase implements ProviderAdapter {
     if (!launch || !this.detected?.authenticated) throw new Error("Cline is not ready for execution; approve its provider connection first.");
     return spawnSession("cline", launch, clineLaunchArgs(task), task, hooks, task.sessionId ?? crypto.randomUUID(), new ClineNormalizer());
   }
-}
-/** The auth probe decides signed-in only on a clean exit with a completed run result. */
-function probeResultSucceeded(probeRun: ProbeResult, run: { finishReason: string } | null): boolean {
-  return probeRun.code === 0 && probeRun.timedOut === false && run?.finishReason === "completed";
 }
 
 /**

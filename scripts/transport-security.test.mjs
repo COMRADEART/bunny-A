@@ -2,15 +2,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync, existsSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import {
-  assertDeviceAction,
-  deviceMayLaunch,
-  deviceApprovalRefusal,
-  APPROVAL_ON_HOST,
-  WorkstationRequiredError
-} from "../src/lib/bunny-host/device-authority.server.ts";
+import { deviceMayLaunch } from "../src/lib/bunny-host/device-authority.server.ts";
 
 const workspace = process.cwd();
 
@@ -41,9 +35,10 @@ test("Transport Security: Android Companion enforces 100% HTTPS and blocks clear
   });
 
   await t.test("2. ServerAddressTest confirms ServerAddress.normalize rejects cleartext HTTP and local LAN HTTP", () => {
-    // Compile and run ServerAddressTest using javac/java
-    const toolsDir = join(workspace, "test-results/android-tools");
+    // Compile and run ServerAddressTest using javac/java.
+    // The output directory is gitignored, so a fresh checkout does not contain it.
     const testDir = join(workspace, "test-results/test-transport-security");
+    mkdirSync(testDir, { recursive: true });
     const serverAddressJava = join(sourceDir, "java/com/routeragent/jev/ServerAddress.java");
     const serverAddressTestJava = join(workspace, "android/tests/ServerAddressTest.java");
 

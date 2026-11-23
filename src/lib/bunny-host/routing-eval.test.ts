@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { runRoutingEval, routingEvalDigest, ROUTING_EVAL_SET, evalProvider, type EvalRow } from "./routing-eval.ts";
+import { runRoutingEval, routingEvalDigest, ROUTING_EVAL_SET, evalProvider } from "./routing-eval.ts";
 
 test("the committed routing evaluation set holds every routing law against the real router", () => {
   const rows = runRoutingEval();

@@ -14,7 +14,6 @@ const LINE_START = `{"ts":"2026-11-03T04:21:54.731Z","type":"hook_event","hookEv
 const LINE_ITERATION = `{"ts":"2026-11-03T04:21:54.732Z","type":"agent_event","event":{"type":"iteration_start","iteration":1}}`;
 const LINE_ERROR = (message: string) => `{"ts":"2026-11-03T04:21:56.284Z","type":"error","message":${JSON.stringify(message)}}`;
 const SUBSCRIPTION = "No access to ClinePass subscription models yet. Subscribe to ClinePass: https://app.cline.example/dashboard/subscription";
-const RUN_ERROR = (message: string) => `{"ts":"2026-11-03T04:21:55.903Z","type":"agent_event","event":{"type":"error","error":{"name":"Error","message":${JSON.stringify(message)}},"errorClass":"unknown","recoverable":false,"iteration":1}}`;
 const RUN_COMPLETED = `{"ts":"2026-11-03T05:00:00.000Z","type":"run_result","finishReason":"completed","iterations":1,"usage":{"inputTokens":12,"outputTokens":34,"cacheReadTokens":7,"cacheWriteTokens":0,"totalCost":0},"durationMs":1500,"text":"ready","model":{"id":"cline-pass/qwen3.8-max","provider":"cline-pass","info":{"name":"Qwen 3.8 Max","id":"cline-pass/qwen3.8-max","contextWindow":262144,"maxInputTokens":262144,"maxTokens":128000,"capabilities":["images","tools","reasoning","temperature","prompt-cache"]}}}`;
 const RUN_ERROR_RESULT = (message: string) => `{"ts":"2026-11-03T04:21:56.284Z","type":"run_result","finishReason":"error","iterations":1,"usage":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"cacheWriteTokens":0,"totalCost":0},"durationMs":1177,"text":${JSON.stringify(message)},"model":{"id":"cline-pass/qwen3.8-max","provider":"cline-pass"}}`;
 
@@ -54,7 +53,6 @@ process.exitCode = ${exit};
     output: (text) => output.push(text),
     session: () => {},
   };
-  const task = { id: "cline-fixture", provider: "cline", model: null, prompt: "Say ready", cwd: dir } as unknown as OrchTask;
   return { dir, adapter, hooks, events, output, get usage() { return usage; }, get model() { return model; }, marker, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }
 

@@ -2,10 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   DEFAULT_UI_PREFERENCE, GLASS_RIM_COLORS, NOTCH_THEME_SCHEMA, UI_THEMES, UI_THEME_SCHEMA, UI_THEME_SCHEMA_V1,
-  contrast, glassIntensityOf, glassMaterialTokens, notchTheme, over, parseColor, parseUiPreference, resolveTheme,
+  contrast, glassIntensityOf, notchTheme, over, parseColor, parseUiPreference, resolveTheme,
   scaledGlassShadow, themeAttributes, themeCssVars, validateUiPreference,
 } from "./ui-theme.ts";
-import type { Palette, UiThemePreference, Variant } from "./ui-theme.ts";
+import type { UiThemePreference } from "./ui-theme.ts";
 
 /** E1 Glass Intensity (bunny-a.ui-theme.v2): strict validation, deterministic decoration mapping, v1↔v2 compatibility,
  *  and the two invariants the owner pinned: intensity never touches blur, and text never drops below 4.5:1. */
