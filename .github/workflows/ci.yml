@@ -99,7 +99,7 @@ jobs:
         run: node scripts/ci/watchdog.mjs --label stage4 --budget-s 600 --out ci-diag -- bash -c "$(node scripts/ci/test-stage.mjs 3)"
         env:
           BUNNY_NATIVE_CC: C:\msys64-ci\msys64\ucrt64\bin\gcc.exe
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: regression-diagnostics
