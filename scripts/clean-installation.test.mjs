@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
-import { mkdtempSync, rmSync, existsSync, readFileSync, copyFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, readFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";

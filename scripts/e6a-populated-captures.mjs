@@ -125,7 +125,7 @@ try {
     return body;
   };
   await pairOne("E6A QA Phone");
-  const revocable = await pairOne("E6A Revoke Phone");
+  await pairOne("E6A Revoke Phone");
   const devicesAfterPairing = (await state()).devices?.devices ?? (await state()).devices ?? [];
   record.statesSeen.pairedDevices = devicesAfterPairing.map((row) => row.id ?? row.deviceId ?? row.name);
   note("paired devices", { count: devicesAfterPairing.length, names: devicesAfterPairing.map((row) => row.name) });

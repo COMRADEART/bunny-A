@@ -28,6 +28,10 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # Warnings do not fail the job: ESLint exits 0 when there are warnings and no errors
+      # (`--max-warnings` is left unset). An error still fails this step.
+      - name: Lint
+        run: npm run lint
       - run: npm run typecheck
       # MA4 suite: routing modes, approvals, reliability, tool calling, workflow gate, offline cloud adapters.
       # Without WSL2 user namespaces the adversarial sandbox fixtures report SKIPPED (never passed).

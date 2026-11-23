@@ -46,7 +46,7 @@ import { CONNECTION_CATALOG } from "./connections.ts";
 import { freemem, totalmem } from "node:os";
 import { FAIRNESS_SETTING, ROUTING_PRIORITIES, admitStep, readFairness, validateFairness, type FairnessSettings, type RoutingPriority } from "./fairness.ts";
 import { sessionLedgerView } from "./session-ledger.ts";
-import { ROUTING_LEDGER_SCHEMA, routingLedgerView } from "./routing-store.server.ts";
+import { routingLedgerView } from "./routing-store.server.ts";
 import {
   BUILTIN_ABILITIES,
   OPEN_STATES,
