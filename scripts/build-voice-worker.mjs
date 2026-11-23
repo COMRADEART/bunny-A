@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync, copyFileSync } from "node:fs";
 import { dirname, resolve, join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
+import { compilerCommandEnv } from "./build-owned-process.mjs";
 
 const frameworkRoot = "C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319";
 const speechRoot = "C:\\Windows\\Microsoft.NET\\assembly\\GAC_MSIL\\System.Speech";
@@ -43,9 +44,6 @@ export function buildWhisperShim(root, prior, { repin = false } = {}) {
   if (!includes.every(existsSync)) return { status: "skipped", reason: "pinned whisper.cpp headers are not vendored; run node scripts/stage-whisper.mjs" };
   const compiler = process.env.BUNNY_NATIVE_CC || "C:\\msys64\\ucrt64\\bin\\gcc.exe";
   if (!existsSync(compiler)) return { status: "skipped", reason: `gcc not found at ${compiler} (set BUNNY_NATIVE_CC)` };
-  const compilerEnv = { ...process.env };
-  const pathKey = Object.keys(compilerEnv).find(k => k.toLowerCase() === "path") || "PATH";
-  compilerEnv[pathKey] = `${dirname(compiler)};${compilerEnv[pathKey] || ""}`;
 
   const source = resolve(root, "native/voice/whisper-shim.c");
   const sourceSha256 = shaSource(source);
@@ -60,13 +58,14 @@ export function buildWhisperShim(root, prior, { repin = false } = {}) {
   try {
     const compiled = join(temporary, "bunny-whisper-shim.dll");
     const includeFlags = includes.flatMap(d => ["-I", d]);
-    execFileSync(compiler, [...SHIM_FLAGS, ...includeFlags, "-o", compiled, source, whisperDll, ggmlDll, ggmlBaseDll], { windowsHide: true, stdio: "pipe", env: compilerEnv });
+    const commandEnv = compilerCommandEnv(compiler);
+    execFileSync(compiler, [...SHIM_FLAGS, ...includeFlags, "-o", compiled, source, whisperDll, ggmlDll, ggmlBaseDll], { windowsHide: true, stdio: "pipe", env: commandEnv });
     const binarySha256 = sha(compiled);
     if (prior?.binarySha256 && prior.binarySha256 !== binarySha256 && !repin) {
       return { status: "refused", built: binarySha256, reason: `built shim ${binarySha256} differs from the recorded pin ${prior.binarySha256}; not installed. After owner approval: node scripts/build-voice-worker.mjs --repin-whisper-shim` };
     }
     if (!existsSync(output) || sha(output) !== binarySha256) copyFileSync(compiled, output);
-    const version = execFileSync(compiler, ["--version"], { encoding: "utf8", windowsHide: true, env: compilerEnv }).split(/\r?\n/)[0].trim();
+    const version = execFileSync(compiler, ["--version"], { encoding: "utf8", windowsHide: true, env: commandEnv }).split(/\r?\n/)[0].trim();
     return {
       status: "built",
       record: {
