@@ -15,7 +15,7 @@ re-checked before this gate was marked. Green CI on an earlier commit was not us
 
 ## Worktree
 
-`C:\Users\allam\Documents\new\bun-router-s2t2`, branch `ma4-s2-t2-connected-actions`, created from `c3bff8a`. No other
+`C:\Users\<user>\Documents\new\bun-router-s2t2`, branch `ma4-s2-t2-connected-actions`, created from `c3bff8a`. No other
 worktree or the main checkout (`ma4-s1-model-intelligence`, with uncommitted user changes) was modified. Fresh-worktree
 setup per the S2-T1 note: `native/voice/vendor/` and `releases/installed/JEV-Windows-v1/runtime/LICENSE` copied from the
 main checkout (both git-ignored), `npm ci`, `npm run pretest`. `pretest` rebuilds `native/voice/bunny-voice-worker.exe`

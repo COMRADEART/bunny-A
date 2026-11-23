@@ -19,7 +19,7 @@ The core objective is to enforce operating-system-level and Host-kernel-level se
 - **Predecessor Merge Commit:** `5e35cb9d84823671a88826cf6d54a1f74a0cea06` (Merge PR #46 from `COMRADEART/ma4-s3-t3r1-real-agent-qualification` into `main`).
 - **Predecessor Verified Tree:** Fetched `bunny-a/main` from `https://github.com/COMRADEART/bunny-A.git`, verified exact merge commit and clean tree.
 - **Milestone Branch:** `ma4-s3-t3r2-security-boundary-closure`
-- **Isolated Worktree:** `C:\Users\allam\Documents\new\bun-router-s3t3r2`
+- **Isolated Worktree:** `C:\Users\<user>\Documents\new\bun-router-s3t3r2`
 - **Predecessor Evidence Inspected:** All qualification records in `docs/ma4-s3-t3r1/` (including `BASELINE.md`, `REAL_EXECUTION_ARCHITECTURE.md`, `TEST_EXECUTOR_SECURITY.md`, `TEST_VERIFICATION_INTEGRITY.md`, `WINDOWS_INSTALLED_ACCEPTANCE.md`, and `evidence/installed-journey.json`) were inspected and preserved intact without modification.
 
 ---
@@ -48,7 +48,7 @@ Prior to creating any test workspaces or initiating local runs, existing product
 
 | Target | Path | Baseline Timestamp (UTC) | Length |
 | :--- | :--- | :--- | :--- |
-| **Production App Data** | `C:\Users\allam\AppData\Local\Bunny-A` | `10/23/2026 5:03:03 PM` | Directory |
-| **Startup Shortcut** | `C:\Users\allam\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\Bunny-A.lnk` | `10/18/2026 2:52:57 AM` | 2,882 bytes |
+| **Production App Data** | `C:\Users\<user>\AppData\Local\Bunny-A` | `10/23/2026 5:03:03 PM` | Directory |
+| **Startup Shortcut** | `C:\Users\<user>\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\Bunny-A.lnk` | `10/18/2026 2:52:57 AM` | 2,882 bytes |
 
 **Preservation Invariant:** All milestone tests, builds, and packaged GUI qualifications MUST redirect application state, workspace paths, and registry keys to isolated disposable locations (e.g. `Bunny-T3R2-Package`, `alpha-host-t3r2`), ensuring production timestamps and shortcut targets remain strictly unaltered.

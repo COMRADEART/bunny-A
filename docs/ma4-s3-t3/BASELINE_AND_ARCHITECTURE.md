@@ -10,7 +10,7 @@
 - **Parent Commits:** `4af7d9f313ee46b98698fe12662b11676b3391cd` (PR #43 merge) and `cd1349da08e1622baa81dd364861bd8a5bde2c58` (PR #44 head)
 - **Hosted CI Status:** Run `40246317305` (push to `main` on commit `8b795b9`) completed with conclusion **SUCCESS** (full MA3/MA4 regression passed in 25m6s, static security passed in 36s, typecheck and test builds passed in 2m52s).
 - **Execution Environment:** Windows workstation, Node.js v24.18.0 (verified license beside executable, SHA-256 `9A4EB5F1C29C6A2E93852EAD46B999E284A6A5CA8BAB4D4E241D587D025A52DE`), npm 11.16.0, local Ollama daemon running.
-- **Isolated Worktree:** `C:\Users\allam\Documents\new\bun-router-s3t3` on branch `ma4-s3-t3-unified-agent-execution`.
+- **Isolated Worktree:** `C:\Users\<user>\Documents\new\bun-router-s3t3` on branch `ma4-s3-t3-unified-agent-execution`.
 - **Preserved Installations & Shortcuts:** Existing desktop installations under `%LOCALAPPDATA%\bunny-a`, startup shortcuts `Bunny-A.lnk` and `Ollama.lnk` preserved and intact.
 
 ---

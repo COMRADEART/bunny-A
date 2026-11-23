@@ -28,7 +28,7 @@ In T3R, the 18/18 installed Windows checks ran on `Bunny-A-Windows-S2T3R4-TEST` 
 
 ## 2. Packaging & Isolated Upgrade Chain
 
-All packaging and installation ran strictly inside the isolated root `C:\Users\allam\AppData\Local\Bunny-S2T3R-Install\r1` (`hostPort = 43193`, gateway `http://127.0.0.1:8084`, synthetic workspace `C:\Users\allam\Documents\new\bunny-t3r1-installed-project`), never touching the owner's `%LOCALAPPDATA%\Bunny-A`:
+All packaging and installation ran strictly inside the isolated root `C:\Users\<user>\AppData\Local\Bunny-S2T3R-Install\r1` (`hostPort = 43193`, gateway `http://127.0.0.1:8084`, synthetic workspace `C:\Users\<user>\Documents\new\bunny-t3r1-installed-project`), never touching the owner's `%LOCALAPPDATA%\Bunny-A`:
 
 1. Packaged and installed `Bunny-A-Windows-S2T3R1-TEST` (`5c02c0e`), upgraded through `Bunny-A-Windows-S2T3R1-3-TEST` (`fade2b6`), `Bunny-A-Windows-S2T3R1-4-TEST` (`fa72845`), `Bunny-A-Windows-S2T3R1-5-TEST` (`f8c0dbc`), and finally **`Bunny-A-Windows-S2T3R1-6-TEST`** (`448ca6b6fb7252e2ea7af00e02ed9e078b5d1610`).
 2. `Install-Bunny-Release.ps1 -Upgrade` verified `release-manifest.json` SHA-256 (`E4B150E57FC3E23C582B542E07D9575B2E94957630201C6460BA1100E937DB82` for `-6-TEST`), backed up `host.sqlite` before switching `install.json`, and preserved all SQLite goals, schedules, monitors, tasks, occurrences, receipts, and notifications across every upgrade.

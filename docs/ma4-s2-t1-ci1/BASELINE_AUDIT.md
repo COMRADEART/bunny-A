@@ -10,8 +10,8 @@ Recorded 2026-10-23, before any change.
 | Merge commit (= start of CI1) | `af6da789feb6dfd09b9a8c2febd734a908c14609` |
 | Merge parents | `d46a9dc` (integration branch before S2-T1) and `f984657` (S2-T1 head) |
 | `origin/ma4-s1r3-agent-reliability` head at audit | `af6da78`, the merge commit itself |
-| CI1 branch / worktree | `ma4-s2-t1-ci1-host-recovery` at `C:\Users\allam\Documents\new\bun-router-ci1`, created from `af6da78` |
-| Diagnostic branch / worktree | `ci-diag/ma4-s2-t1-ci1` at `C:\Users\allam\Documents\new\bun-router-ci1-diag`. Diagnostics only, never merged |
+| CI1 branch / worktree | `ma4-s2-t1-ci1-host-recovery` at `C:\Users\<user>\Documents\new\bun-router-ci1`, created from `af6da78` |
+| Diagnostic branch / worktree | `ci-diag/ma4-s2-t1-ci1` at `C:\Users\<user>\Documents\new\bun-router-ci1-diag`. Diagnostics only, never merged |
 
 The main checkout (`bun-router`, branch `ma4-s1-model-intelligence`, with uncommitted user changes) and the other 12
 worktrees were not touched.

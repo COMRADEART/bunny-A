@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-const creds = JSON.parse(readFileSync("C:/Users/allam/AppData/Local/Bunny-S3T0R1-Install/state/credentials/credentials.json", "utf8"));
+const creds = JSON.parse(readFileSync("C:/Users/<user>/AppData/Local/Bunny-S3T0R1-Install/state/credentials/credentials.json", "utf8"));
 const res = await fetch(`http://127.0.0.1:${creds.port}/state`, { headers: { authorization: `Bearer ${creds.token}` } });
 const body = await res.json();
 const p = body.proactive ?? {};

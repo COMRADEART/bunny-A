@@ -9,7 +9,7 @@ Both hosted workflows on that SHA succeeded:
 
 Each run completed typecheck/builds, full `npm test`, and static security with conclusion SUCCESS. Run 40192245873 qualified PR #40 only and is not this baseline.
 
-This branch `ma4-s3-t1r3-production-closure` was created from that SHA in `C:\Users\allam\Documents\new\bun-router-s3t1r3`. The T1R2 worktree was left at `199cf3a`. No merge, no deploy, no publish.
+This branch `ma4-s3-t1r3-production-closure` was created from that SHA in `C:\Users\<user>\Documents\new\bun-router-s3t1r3`. The T1R2 worktree was left at `199cf3a`. No merge, no deploy, no publish.
 
 T1R2 findings this milestone closes:
 

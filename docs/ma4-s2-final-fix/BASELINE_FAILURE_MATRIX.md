@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-24  
 **Repository:** `https://github.com/COMRADEART/bunny-A`  
-**Remediation Worktree:** `C:\Users\allam\Documents\new\bun-router-s2-remediation`  
+**Remediation Worktree:** `C:\Users\<user>\Documents\new\bun-router-s2-remediation`  
 **Remediation Branch:** `ma4-s2-final-gate-remediation` (created from `ma4-s2-t8-release-candidate` @ `ea84f803dcf6987555a5438dc28d54794c3038be`)
 
 ---
@@ -51,5 +51,5 @@
 
 | Instance | Driver PID | Host PID | Port | Data Directory | Started (UTC) | Status |
 |---|---|---|---|---|---|---|
-| **Soak A** | `32948` | `31616` | `43190` | `C:\Users\allam\AppData\Local\Bunny-S2T3R-Soak` | `2026-10-24T13:51:15Z` | Active (Preserved) |
-| **Soak B** | `6840` | `19296` | `43192` | `C:\Users\allam\AppData\Local\Bunny-S2T3R1-Soak` | `2026-10-24T15:06:15Z` | Active (Preserved — primary 24h S2T3R1 soak) |
+| **Soak A** | `32948` | `31616` | `43190` | `C:\Users\<user>\AppData\Local\Bunny-S2T3R-Soak` | `2026-10-24T13:51:15Z` | Active (Preserved) |
+| **Soak B** | `6840` | `19296` | `43192` | `C:\Users\<user>\AppData\Local\Bunny-S2T3R1-Soak` | `2026-10-24T15:06:15Z` | Active (Preserved — primary 24h S2T3R1 soak) |

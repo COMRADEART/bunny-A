@@ -14,7 +14,7 @@ Milestone MA4-S3-T3R1 ("Real Agent Execution, Deterministic Test Integrity & Ins
 - **Predecessor Merge Commit:** `83a5092ac0bfdaa6e2bd9128450d3d82273ddb92` (PR #45 merge into `main`).
 - **Verified Predecessor Tree:** `main` was fetched and confirmed clean and synchronized with upstream `origin/main`.
 - **Target Branch:** `ma4-s3-t3r1-real-agent-qualification`
-- **Worktree Path:** `C:\Users\allam\Documents\new\bun-router-s3t3r1`
+- **Worktree Path:** `C:\Users\<user>\Documents\new\bun-router-s3t3r1`
 - **Source Commit Hash (T3R1 Foundation):** `9aa4b7987f495624b9460c47fb7927810ac558b8`
 
 ---

@@ -76,7 +76,7 @@ A synthetic adversarial test harness was executed against the process runner att
    - *Observed Outcome*: The Host path containment validator (`validatePathContainment`) intercepted the path before spawn, verifying that it resolved outside the registered project root (`ROOT_ESCAPES_SCOPE`). The process was never created.
 
 2. **Attempt 2: Write Outside Allowed Workspace**
-   - *Attack*: Test command or configuration points `reportFile` to `C:\Users\allam\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\payload.bat`.
+   - *Attack*: Test command or configuration points `reportFile` to `C:\Users\<user>\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\payload.bat`.
    - *Observed Outcome*: `validatePathContainment` detected that the target destination lay outside the canonical project root and threw an `INVALID_PATH_CONTAINMENT` error. Preflight rejected the request.
 
 3. **Attempt 3: Spawn Unauthorized Child Process**

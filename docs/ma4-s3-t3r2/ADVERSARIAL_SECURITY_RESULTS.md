@@ -46,7 +46,7 @@ Every adversarial test simulates an active attacker attempting to bypass host co
 1. **Elimination of Arbitrary `rootPath`**:
    The legacy `local.test` executor permitted callers to provide an absolute `input.rootPath`, bypassing envelope validation. In T3R2, `input.rootPath` is rejected. The task must supply `input.root`, which is resolved strictly against the Host's trusted registered roots.
 2. **Reparse Point (Junction & Symlink) Neutralization**:
-   On Windows, an attacker can create an NTFS junction targeting sensitive directories (e.g., `mklink /J escape C:\Users\allam\AppData`). Bunny A's `validatePathContainment` traverses each segment of the resolved path and inspects `lstatSync.isSymbolicLink()` and reparse tags. Any reparse point resolving outside the boundary throws `REPARSE_POINT_DISALLOWED`.
+   On Windows, an attacker can create an NTFS junction targeting sensitive directories (e.g., `mklink /J escape C:\Users\<user>\AppData`). Bunny A's `validatePathContainment` traverses each segment of the resolved path and inspects `lstatSync.isSymbolicLink()` and reparse tags. Any reparse point resolving outside the boundary throws `REPARSE_POINT_DISALLOWED`.
 3. **Queue-Time Revocation**:
    When an administrator revokes a root grant while a task is queued, the preflight and runtime checks re-evaluate the envelope grant before execution. The task fails closed with `ROOT_NOT_AUTHORIZED_IN_ENVELOPE`.
 

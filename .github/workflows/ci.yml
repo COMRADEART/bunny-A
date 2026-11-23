@@ -33,6 +33,7 @@ jobs:
       - name: Lint
         run: npm run lint
       - run: npm run typecheck
+      - run: npm run lint
       # MA4 suite: routing modes, approvals, reliability, tool calling, workflow gate, offline cloud adapters.
       # Without WSL2 user namespaces the adversarial sandbox fixtures report SKIPPED (never passed).
       - run: npm run test:ma4
@@ -67,6 +68,7 @@ jobs:
       # cc1.exe loads DLLs from PATH. Git for Windows ships an older libwinpthread, and GCC 16.2
       # then exits 1 with no compiler output. The UCRT64 bin directory has to come first.
       - name: Prefer the MSYS2 UCRT64 compiler libraries
+      - name: Prepend CI MinGW UCRT64 bin to PATH
         shell: pwsh
         run: Add-Content -Path $env:GITHUB_PATH -Value 'C:\msys64-ci\msys64\ucrt64\bin'
       - run: npm ci

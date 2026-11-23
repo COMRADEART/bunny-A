@@ -19,13 +19,13 @@ Milestone `MA4-S3-T4R2` branches directly from the verified merge head of Pull R
 
 ```text
 Commit: 4d54b9e40af77bd2cdbeb18222ee0f632f6d19e6
-Author: COMRADEART <artcomrade@gmail.com>
+Author: COMRADEART <<redacted-email>>
 Date:   Mon Oct 26 19:42:01 2026 -0400
 Message: Merge pull request #49 from COMRADEART/ma4-s3-t4r1-real-benchmark-integrity
 ```
 
 The repository worktree was initialized in an isolated directory:
-- **Worktree Location:** `C:\Users\allam\Documents\new\bun-router-s3t4r2`
+- **Worktree Location:** `C:\Users\<user>\Documents\new\bun-router-s3t4r2`
 - **Active Branch:** `ma4-s3-t4r2-measurement-integrity-closure`
 - **Upstream Remote:** `https://github.com/COMRADEART/bunny-A.git`
 

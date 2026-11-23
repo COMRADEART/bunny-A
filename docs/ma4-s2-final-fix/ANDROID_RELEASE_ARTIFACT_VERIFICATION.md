@@ -8,7 +8,7 @@
 
 ## 1. Artifact Identity & Provenance
 
-Built by [`scripts/build-android.ps1`](file:///C:/Users/allam/Documents/new/bun-router-s2-remediation/scripts/build-android.ps1) and audited via `scripts/bunny-sbom-provenance.mjs`:
+Built by [`scripts/build-android.ps1`](file:///C:/Users/<user>/Documents/new/bun-router-s2-remediation/scripts/build-android.ps1) and audited via `scripts/bunny-sbom-provenance.mjs`:
 
 - **Artifact:** `releases/Bunny-A-Android-v3.apk`
 - **Application Package ID:** `com.routeragent.jev`

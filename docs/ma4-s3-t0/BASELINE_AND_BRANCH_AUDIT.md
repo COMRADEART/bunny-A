@@ -1,7 +1,7 @@
 # MA4-S3-T0 — Baseline and Branch Audit
 
 **Recorded:** 2026-10-24T18:15:18-04:00 (merge) / docs refreshed same session  
-**Working tree:** `C:\Users\allam\Documents\new\bun-router-s3t0`  
+**Working tree:** `C:\Users\<user>\Documents\new\bun-router-s3t0`  
 **Branch:** `ma4-s3-t0-unified-foundation`  
 **Remote:** `https://github.com/COMRADEART/bunny-A` (clone URL historically `router_agent`; GitHub canonical name `bunny-A`)
 

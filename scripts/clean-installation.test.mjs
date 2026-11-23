@@ -54,12 +54,12 @@ test("Clean-Environment Installation: Verify WPF, Host, Node, Voice Worker, and 
 
     // 2. Verify Node Runtime dependencies
     await t.test("2. Pinned Node.js runtime executable executes inside clean sandbox", () => {
-      // Find pinned node.exe in test-results or release package
+      // Find pinned node.exe in test-results, release package, or optional BUNNY_RELEASE_ROOT
       const candidatePaths = [
         join(workspace, "test-results/release-test-staging/runtime/node.exe"),
         join(workspace, "releases/Bunny-A-Windows-v28-BETA-1-TEST/runtime/node.exe"),
-        "C:/Users/allam/Documents/new/bunny-A-e6r1/releases/Bunny-A-Windows-v28-BETA-1-TEST/runtime/node.exe"
-      ];
+        process.env.BUNNY_RELEASE_ROOT ? join(process.env.BUNNY_RELEASE_ROOT, "runtime/node.exe") : null
+      ].filter(Boolean);
       let nodePath = candidatePaths.find(p => existsSync(p));
       if (!nodePath) {
         // Fall back to system node path if release zip has not staged runtime locally
@@ -78,8 +78,8 @@ test("Clean-Environment Installation: Verify WPF, Host, Node, Voice Worker, and 
       
       const candidateVendorRoots = [
         join(voiceDir, "vendor/runtime"),
-        "C:/Users/allam/Documents/new/bunny-A-e6r1/releases/Bunny-A-Windows-v28-BETA-1-TEST/native/voice/vendor/runtime"
-      ];
+        process.env.BUNNY_RELEASE_ROOT ? join(process.env.BUNNY_RELEASE_ROOT, "native/voice/vendor/runtime") : null
+      ].filter(Boolean);
       const vendorRoot = candidateVendorRoots.find(p => existsSync(p));
       if (!vendorRoot) {
         console.log("[Voice Worker] Voice vendor runtime not staged on this runner (skipped in hosted CI per policy).");

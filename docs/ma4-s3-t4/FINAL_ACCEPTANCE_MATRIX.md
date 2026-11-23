@@ -4,7 +4,7 @@
 **Milestone:** MA4-S3-T4 (Adaptive Agent Intelligence, Verified Learning & Resource Optimization)  
 **Target Repository:** `https://github.com/COMRADEART/bunny-A`  
 **Predecessor Merge:** PR #47 (`4d19781b10dc64a125242cfb4750a452a4791426`)  
-**Worktree:** `C:\Users\allam\Documents\new\bun-router-s3t4`  
+**Worktree:** `C:\Users\<user>\Documents\new\bun-router-s3t4`  
 **Date:** 2026-10-26  
 
 ---
@@ -41,7 +41,7 @@ Milestone MA4-S3-T4 upgrades Bunny A into an adaptive, progressively improving m
 | **No LLM Self-Evaluation** | `isVerifiedSuccess()` relies exclusively on exit codes, non-empty output hashes, and acceptance test receipts. Model self-confidence is ignored. | **COMPLIANT** |
 | **No Autonomous Weight Updates** | System achieves intelligence via prompt grounding, DAG minimization, and advisory memory. Zero LoRA or runtime training. | **COMPLIANT** |
 | **Strict Project Scoping** | SQLite queries bind `scope = 'project:' || ?`. Cross-project queries return 0 records. | **COMPLIANT** |
-| **Preserve Installed Host** | `C:\Users\allam\AppData\Local\Bunny-A` and Windows startup shortcuts untouched. | **COMPLIANT** |
+| **Preserve Installed Host** | `C:\Users\<user>\AppData\Local\Bunny-A` and Windows startup shortcuts untouched. | **COMPLIANT** |
 | **Hard Model Pinning** | Unapproved models halt immediately with `PIN_VIOLATION`. Zero cloud fallback. | **COMPLIANT** |
 | **VRAM Safety (6.1 GiB limit)** | Dual 7B concurrency forbidden; sequential grouped residency enforced. | **COMPLIANT** |
 | **Immediate Abort Propagation** | Waiters in model gate unregister immediately on signal abort without acquiring slots. | **COMPLIANT** |
