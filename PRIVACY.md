@@ -1,6 +1,6 @@
 # Bunny A — Privacy Policy
 
-*Effective 2026-11-13. Applies to the Bunny A Windows workstation, its Host, and the Bunny A Android companion.*
+*Effective 2026-11-14. Applies to the Bunny A Windows workstation, its Host, and the Bunny A Android companion.*
 
 ## Summary
 
@@ -28,8 +28,17 @@ There are no analytics, advertising, tracking or crash-reporting services in eit
 
 ## The Android companion
 
-- Asks for one permission: Internet access.
-- Connects only to the HTTPS address you type in — your own PC — and refuses plain HTTP.
+- Asks for two permissions: Internet access and the microphone.
+- Connects only to the HTTPS address you type in — your own PC — and refuses plain HTTP. The one exception is the
+  voice model download described below.
+- **Voice on the phone.** The microphone is used only while the Bunny A screen is open and after you tap a mic button
+  ("Talk to phone" or "Dictate message"). The recording is processed on the phone by an on-device model, kept in
+  memory only, never stored and never sent to your PC or anywhere else. Answers from "Talk to phone" stay on the
+  phone. A dictated message is only placed in the message box; it goes to your PC only if you tap Send.
+- **Voice model download.** The 2.6 GB voice model (Gemma 4 E2B) is downloaded once from Hugging Face, and only after
+  you confirm. Like any download, this reveals the phone's IP address to Hugging Face and to the content delivery
+  network it uses. No account, cookie or Bunny A credential is sent. You can instead copy the model in over USB, and
+  you can remove it at any time on the System tab. Voice adds no analytics or telemetry.
 - Stores that address and a pairing credential protected by the Android Keystore. Chat text is kept in memory only
   and is gone when the app closes.
 - Revoking the phone on your PC, choosing "Forget Locally" in the app, or uninstalling the app removes its access.

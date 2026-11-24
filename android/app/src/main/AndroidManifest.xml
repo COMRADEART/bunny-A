@@ -1,8 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.routeragent.jev" android:versionCode="5" android:versionName="2.3">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.routeragent.jev" android:versionCode="6" android:versionName="2.4">
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36" />
     <uses-permission android:name="android.permission.INTERNET" />
-    <application android:label="Bunny-A" android:icon="@drawable/jev_icon" android:theme="@style/JevTheme" android:allowBackup="false" android:usesCleartextTraffic="false" android:supportsRtl="true">
+    <!-- On-device voice: the microphone is used only while the screen is open and after a mic button is tapped. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Voice is optional: phones without a microphone still install the companion. -->
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+    <!-- Lets the app find the installed text-to-speech engine on Android 11+ (package visibility). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+    <application android:label="Bunny-A" android:icon="@drawable/jev_icon" android:theme="@style/JevTheme" android:allowBackup="false" android:usesCleartextTraffic="false" android:supportsRtl="true" android:extractNativeLibs="true">
+        <!-- LiteRT-LM GPU backend (per the LiteRT-LM guide); optional, so phones without them still install and fall back to CPU. -->
+        <uses-native-library android:name="libOpenCL.so" android:required="false" />
+        <uses-native-library android:name="libvndksupport.so" android:required="false" />
         <activity android:name=".NativeCompanionActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <!-- MA5-S1: the launcher opens the native companion. The alias keeps the previous launcher component name
              (com.routeragent.jev/.MainActivity) so icons and shortcuts pinned by earlier versions still resolve

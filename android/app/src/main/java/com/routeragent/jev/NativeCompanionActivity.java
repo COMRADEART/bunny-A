@@ -1,8 +1,11 @@
 package com.routeragent.jev;
 
+import android.Manifest;
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.app.AlertDialog;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -17,6 +20,8 @@ import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.os.Handler;
 import android.os.Looper;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -26,11 +31,19 @@ import android.widget.TextView;
 import android.window.OnBackInvokedDispatcher;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
 import java.text.DateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import javax.net.ssl.HttpsURLConnection;
 
 /** Native Android companion: supervises the workstation over HTTPS. No consequential approval or shell authority. */
 public final class NativeCompanionActivity extends Activity {
@@ -66,6 +79,25 @@ public final class NativeCompanionActivity extends Activity {
     private SharedPreferences chatStore;
     private String chatDraft="";
 
+    // On-device voice: the model runs on this phone. Audio stays in memory; nothing here talks to the Host, and voice never sends.
+    private static final VoiceSession voice=new VoiceSession();
+    private static String lastPhoneAnswer; // TALK: the last answer, memory only
+    private static final int VOICE_PERMISSION_REQUEST=41;
+    private final ExecutorService voiceFiles=Executors.newSingleThreadExecutor(); // download and hash check
+    private VoiceRecorder recorder;
+    private TextToSpeech tts;
+    private boolean ttsReady, ttsFailed;
+    private String pendingSpeech;
+    private VoiceSession.Mode pendingVoiceMode;
+    private SharedPreferences voicePrefs; // native_voice_v1: only the verified marker
+    private File voiceDir;
+    private String voiceBlocked;
+    private volatile boolean downloadRunning, downloadCancel;
+    private volatile long downloadDone;
+    private boolean verifying;
+    private String voiceError;
+    private TextView voiceLine;
+
     private final Runnable poll=new Runnable() { @Override public void run() { pollNow(); } };
 
     @Override public void onCreate(Bundle state) {
@@ -79,6 +111,11 @@ public final class NativeCompanionActivity extends Activity {
         // started by an earlier screen can no longer report here, so it becomes "outcome unknown" (Book.interrupted).
         if(chat==null) chat=ChatTurn.Book.decode(chatStore.getString("turns",null)); else chat.interrupted();
         saveChat();
+        voicePrefs=getSharedPreferences("native_voice_v1",MODE_PRIVATE);
+        voiceDir=getExternalFilesDir(null);
+        ActivityManager.MemoryInfo memory=new ActivityManager.MemoryInfo();
+        ((ActivityManager) getSystemService(ACTIVITY_SERVICE)).getMemoryInfo(memory);
+        voiceBlocked=VoiceGate.blockedReason(Build.VERSION.SDK_INT, VoiceEngine.LIBRARY_MIN_SDK, Build.SUPPORTED_ABIS, memory.totalMem);
         applyAppearance();
         root=new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(BG);
         root.setOnApplyWindowInsetsListener((view,insets) -> {
@@ -101,13 +138,26 @@ public final class NativeCompanionActivity extends Activity {
 
     @Override protected void onSaveInstanceState(Bundle out) { super.onSaveInstanceState(out); out.putInt("tab",activeTab); out.putString("draft",chatDraft); }
     @Override protected void onStart() { super.onStart(); started=true; if(session!=null) { schedulePoll(0); reconcileOpen(); } }
-    @Override protected void onStop() { started=false; main.removeCallbacks(poll); super.onStop(); }
+    @Override protected void onStop() {
+        started=false; main.removeCallbacks(poll);
+        // Leaving the screen (Home, a call, rotation): the recording is discarded, the mic released, generation and speech stopped.
+        voiceCancel();
+        downloadCancel=true; // the .part file stays; the download resumes from it next time
+        super.onStop();
+    }
     @Override protected void onDestroy() {
         destroyed=true;
         main.removeCallbacksAndMessages(null);
         reads.shutdownNow();
         commands.shutdownNow();
+        voiceFiles.shutdownNow();
+        if(tts!=null) { tts.shutdown(); tts=null; }
+        if(isFinishing()) VoiceEngine.get().close();
         super.onDestroy();
+    }
+    @Override public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if(level>=TRIM_MEMORY_RUNNING_CRITICAL && voice.state==VoiceSession.State.IDLE) VoiceEngine.get().close();
     }
 
     private static final class Insets30 {
@@ -504,8 +554,10 @@ public final class NativeCompanionActivity extends Activity {
 
     /** Rebuilds the tab only when what it shows changed, so polling does not reset scrolling or typing. */
     private void renderCurrentTab(boolean force) {
+        // Voice belongs to the Chat tab: switching away ends a recording or an answer (a download keeps running).
+        if(activeTab!=1 && voice.state!=VoiceSession.State.IDLE) voiceCancel();
         if(snapshot==null) { if(session!=null) loading("Connecting securely to workstation…"); return; }
-        String signature=activeTab + "|" + (lastFailure==null ? "" : lastFailure.getMessage()) + "|" + chat.signature().hashCode() + "|" +
+        String signature=activeTab + "|" + (lastFailure==null ? "" : lastFailure.getMessage()) + "|" + chat.signature().hashCode() + "|" + voiceSignature() + "|" +
                 (activeTab==1 ? "" : (String.valueOf(snapshot.optJSONObject("persistentTasks")) + snapshot.optJSONObject("missions") + snapshot.optJSONObject("hostIdentity") + snapshot.optJSONArray("tasks")).hashCode());
         if(!force && signature.equals(renderedSignature)) return;
         renderedSignature=signature;
@@ -770,6 +822,7 @@ public final class NativeCompanionActivity extends Activity {
             add(chatBox, reply, 6);
         }
         add(body, chatBox, 14);
+        voiceCard(body);
 
         EditText input=new EditText(this);
         input.setHint("Ask the workstation…");
@@ -809,6 +862,274 @@ public final class NativeCompanionActivity extends Activity {
     }
 
     // ==========================================
+    // VOICE ON THIS PHONE (the model runs here; audio and answers never reach the Host, and voice never sends a message)
+    // ==========================================
+
+    private ModelFile.Status voiceStatus() {
+        return voiceDir==null ? ModelFile.Status.MISSING : ModelFile.status(voiceDir, ModelSource.SIZE, voicePrefs.getString("verified", null));
+    }
+
+    private String voiceSignature() {
+        return voice.signature() + "|" + voiceStatus() + "|" + downloadRunning + "|" + verifying + "|" + voiceError + "|" + (lastPhoneAnswer==null ? 0 : lastPhoneAnswer.hashCode());
+    }
+
+    private void voiceCard(LinearLayout body) {
+        voiceLine=null;
+        LinearLayout card=new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackground(surface(PANEL, 10));
+        card.setPadding(dp(14), dp(12), dp(14), dp(12));
+        TextView title=text("🎤 Voice on this phone", 15, FG);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        if(Build.VERSION.SDK_INT>=28) title.setAccessibilityHeading(true);
+        card.addView(title);
+        card.addView(text("Runs on this phone. Your voice is not sent to the workstation or anywhere else.", 12, MUTED));
+        ModelFile.Status status=voiceStatus();
+        if(voiceBlocked!=null) {
+            add(card, text(voiceBlocked, 13, WARN), 8);
+        } else if(voiceDir==null) {
+            add(card, text("This phone's storage is not available right now.", 13, WARN), 8);
+        } else if(downloadRunning) {
+            voiceLine=text(downloadLine(), 13, FG);
+            add(card, voiceLine, 8);
+            add(card, button("Pause", false, v -> downloadCancel=true), 8);
+        } else if(status==ModelFile.Status.MISSING || status==ModelFile.Status.PARTIAL) {
+            add(card, text("Voice needs a 2.6 GB model (Gemma 4 E2B, from Hugging Face). It is downloaded once and stays on this phone.", 13, FG), 8);
+            if(voiceError!=null) add(card, text(voiceError, 13, WARN), 6);
+            add(card, button(status==ModelFile.Status.PARTIAL ? "Resume download" : "Download voice model (2.6 GB)", true, v -> confirmDownload()), 8);
+        } else if(status==ModelFile.Status.UNVERIFIED) {
+            add(card, text("Checking the model file…", 13, FG), 8);
+            verifyVoiceModel();
+        } else {
+            switch(voice.state) {
+                case RECORDING:
+                    voiceLine=text(listeningLine(), 13, FG);
+                    add(card, voiceLine, 8);
+                    add(card, button(voice.mode==VoiceSession.Mode.TALK ? "Stop and answer" : "Stop and transcribe", true, v -> voiceStop()), 8);
+                    add(card, button("Cancel", false, v -> { voiceCancel(); renderCurrentTab(false); }), 8);
+                    break;
+                case THINKING:
+                    add(card, text("Thinking on this phone…", 13, FG), 8);
+                    if(voice.text!=null && !voice.text.isEmpty()) add(card, text(voice.text, 14, FG), 6);
+                    add(card, button("Cancel", false, v -> { voiceCancel(); renderCurrentTab(false); }), 8);
+                    break;
+                case SPEAKING:
+                    add(card, text("Speaking…", 13, FG), 8);
+                    add(card, button("Stop", false, v -> { if(tts!=null) tts.stop(); voice.spoken(); renderCurrentTab(false); }), 8);
+                    break;
+                default:
+                    Button talk=button("Talk to phone", true, v -> voiceStart(VoiceSession.Mode.TALK));
+                    talk.setContentDescription("Talk to phone, runs on this device");
+                    add(card, talk, 8);
+                    Button dictate=button("Dictate message", false, v -> voiceStart(VoiceSession.Mode.DICTATE));
+                    dictate.setContentDescription("Dictate a message for the workstation");
+                    add(card, dictate, 8);
+                    if(voice.notice!=null) add(card, text(voice.notice, 13, MUTED), 8);
+                    break;
+            }
+            if(lastPhoneAnswer!=null) add(card, bubble("Phone", lastPhoneAnswer, false, "Answered on this phone · not sent to the workstation", MUTED), 10);
+        }
+        add(body, card, 12);
+    }
+
+    private String downloadLine() {
+        long done=downloadDone;
+        return String.format(Locale.US, "Downloading voice model… %d%% (%.2f of %.2f GB)", done*100/ModelSource.SIZE, done/1e9, ModelSource.SIZE/1e9);
+    }
+
+    private String listeningLine() {
+        int s=recorder==null ? 0 : recorder.seconds();
+        return String.format(Locale.US, "Listening… %d:%02d of 0:%02d", s/60, s%60, Wav.MAX_SECONDS);
+    }
+
+    private final Runnable listeningTick=new Runnable() { @Override public void run() {
+        if(voice.state!=VoiceSession.State.RECORDING) return;
+        if(voiceLine!=null) voiceLine.setText(listeningLine());
+        main.postDelayed(this, 500);
+    } };
+
+    private void voiceStart(VoiceSession.Mode mode) {
+        if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED) {
+            pendingVoiceMode=mode;
+            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, VOICE_PERMISSION_REQUEST);
+            return;
+        }
+        if(!voice.start(mode)) return;
+        if(recorder==null) recorder=new VoiceRecorder(this::voiceStop); // the 30 s limit stops and answers
+        if(recorder.start()) main.postDelayed(listeningTick, 500); else voice.failed("The microphone could not be opened.");
+        renderCurrentTab(false);
+    }
+
+    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(requestCode, permissions, results);
+        if(requestCode!=VOICE_PERMISSION_REQUEST) return;
+        VoiceSession.Mode mode=pendingVoiceMode;
+        pendingVoiceMode=null;
+        if(results.length>0 && results[0]==PackageManager.PERMISSION_GRANTED && mode!=null) { voiceStart(mode); return; }
+        voice.failed("Microphone access is off. Allow it in Settings › Apps › Bunny-A › Permissions to use voice.");
+        renderCurrentTab(false);
+    }
+
+    private void voiceStop() {
+        if(voice.state!=VoiceSession.State.RECORDING || recorder==null) return;
+        main.removeCallbacks(listeningTick);
+        byte[] pcm=recorder.stop();
+        if(voice.stopRecording(pcm.length)) {
+            final VoiceSession.Mode mode=voice.mode;
+            byte[] wav=Wav.wrap(pcm);
+            VoiceEngine.get().ask(this, ModelFile.path(voiceDir), VoicePrompt.system(mode, workLines(), lastFailure==null), wav, new VoiceEngine.Listener() {
+                @Override public void partial(String soFar) { post(() -> { voice.partial(soFar); renderCurrentTab(false); }); }
+                @Override public void done(String full) { post(() -> voiceAnswered(mode, full)); }
+                @Override public void failed(Exception e) {
+                    post(() -> {
+                        if(voice.state!=VoiceSession.State.THINKING) return;
+                        voice.failed("The voice model could not answer: " + (e.getMessage()==null ? e.toString() : e.getMessage()));
+                        renderCurrentTab(false);
+                    });
+                }
+            });
+        }
+        Arrays.fill(pcm, (byte) 0);
+        renderCurrentTab(false);
+    }
+
+    private void voiceAnswered(VoiceSession.Mode mode, String full) {
+        String out=voice.answered(full);
+        if(!out.isEmpty()) {
+            if(mode==VoiceSession.Mode.TALK) { lastPhoneAnswer=out; speak(out); }
+            // A dictated message only fills the box: the owner reviews it and taps Send. Voice never calls sendChat.
+            else chatDraft=chatDraft.isEmpty() ? out : chatDraft + " " + out;
+        }
+        renderCurrentTab(false);
+    }
+
+    /** Ends whatever voice is doing; a late answer from a cancelled request is ignored by VoiceEngine and VoiceSession. */
+    private void voiceCancel() {
+        main.removeCallbacks(listeningTick);
+        if(recorder!=null) recorder.discard();
+        VoiceEngine.get().cancel();
+        if(tts!=null) tts.stop();
+        pendingSpeech=null;
+        voice.cancel();
+    }
+
+    private void speak(String out) {
+        if(ttsFailed) { speechUnavailable(); return; }
+        if(tts==null) {
+            pendingSpeech=out;
+            tts=new TextToSpeech(this, status -> post(() -> {
+                if(status!=TextToSpeech.SUCCESS) { ttsFailed=true; speechUnavailable(); return; }
+                ttsReady=true;
+                tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                    @Override public void onStart(String id) {}
+                    @Override public void onDone(String id) { post(() -> { voice.spoken(); renderCurrentTab(false); }); }
+                    @Override public void onError(String id) { post(() -> { voice.spoken(); renderCurrentTab(false); }); }
+                });
+                if(pendingSpeech!=null) { utter(pendingSpeech); pendingSpeech=null; }
+            }));
+            return;
+        }
+        if(!ttsReady) { pendingSpeech=out; return; }
+        utter(out);
+    }
+
+    private void utter(String out) {
+        if(voice.state!=VoiceSession.State.SPEAKING) return;
+        if(tts.speak(out, TextToSpeech.QUEUE_FLUSH, null, "bunny-voice")!=TextToSpeech.SUCCESS) speechUnavailable();
+    }
+
+    /** The answer stays on screen; the session returns to idle with a plain note. */
+    private void speechUnavailable() {
+        if(voice.state==VoiceSession.State.SPEAKING) voice.failed("Speech output isn't available on this phone.");
+        renderCurrentTab(false);
+    }
+
+    /** "<title> — <state>" for the missions and tasks the Tasks tab lists, as context for "what is running?". */
+    private List<String> workLines() {
+        List<String> lines=new ArrayList<>();
+        if(snapshot==null) return lines;
+        JSONArray missions=snapshot.optJSONObject("missions")==null ? null : snapshot.optJSONObject("missions").optJSONArray("missions");
+        for(int i=0; missions!=null && i<missions.length(); i++) {
+            JSONObject m=missions.optJSONObject(i);
+            if(m!=null) lines.add(m.optString("title","Mission") + " — " + m.optString("state","unknown").replace('_',' '));
+        }
+        JSONArray tasks=snapshot.optJSONObject("persistentTasks")==null ? null : snapshot.optJSONObject("persistentTasks").optJSONArray("tasks");
+        for(int i=0; tasks!=null && i<tasks.length(); i++) {
+            JSONObject t=tasks.optJSONObject(i);
+            if(t!=null && !t.optBoolean("corrupt")) lines.add(t.optString("title","Task") + " — " + t.optString("truthState", t.optString("state","unknown")));
+        }
+        JSONArray chats=snapshot.optJSONArray("tasks");
+        for(int i=0; chats!=null && i<chats.length(); i++) {
+            JSONObject t=chats.optJSONObject(i);
+            if(t!=null) lines.add("Chat: " + t.optString("prompt","Chat") + " — " + t.optString("state","unknown").replace('_',' '));
+        }
+        return lines;
+    }
+
+    private void confirmDownload() {
+        new AlertDialog.Builder(this).setTitle("Download 2.6 GB?")
+                .setMessage("This uses mobile data if you are not on Wi-Fi. The download continues only while this screen is open and resumes where it stopped.")
+                .setNegativeButton("Not now", null).setPositiveButton("Download", (d, w) -> startDownload()).show();
+    }
+
+    private void startDownload() {
+        final File dir=voiceDir;
+        if(dir==null || downloadRunning) return;
+        long have=ModelFile.partial(dir).length();
+        if(dir.getUsableSpace() < ModelSource.SIZE - have + 200_000_000L) {
+            voiceError="Not enough free space for the voice model. Free 2.8 GB and try again.";
+            renderCurrentTab(false);
+            return;
+        }
+        downloadRunning=true; downloadCancel=false; downloadDone=have; voiceError=null;
+        renderCurrentTab(false);
+        voiceFiles.execute(() -> {
+            String error=null;
+            try {
+                // A plain HTTPS connection: no cookie handler, no Host client code, no credentials.
+                ModelDownload.run(url -> (HttpsURLConnection) new URL(url).openConnection(), ModelSource.url(), dir, ModelSource.SIZE, ModelSource.SHA256, new ModelDownload.Progress() {
+                    @Override public void at(long done, long total) { downloadDone=done; post(() -> { if(voiceLine!=null && downloadRunning) voiceLine.setText(downloadLine()); }); }
+                    @Override public boolean cancelled() { return downloadCancel || destroyed; }
+                });
+            } catch(IOException | RuntimeException e) {
+                error=e.getMessage()==null ? "The voice model download failed." : e.getMessage();
+            }
+            final String failure=error;
+            post(() -> { downloadRunning=false; voiceError=failure; renderCurrentTab(false); });
+        });
+    }
+
+    /** Hashes the whole file off the main thread; only a matching file gets the marker that makes it READY. */
+    private void verifyVoiceModel() {
+        if(verifying || voiceDir==null) return;
+        verifying=true;
+        final File model=ModelFile.path(voiceDir);
+        voiceFiles.execute(() -> {
+            String marker=ModelFile.marker(model);
+            boolean ok=ModelFile.verify(model, ModelSource.SIZE, ModelSource.SHA256) && marker.equals(ModelFile.marker(model));
+            if(!ok) model.delete();
+            post(() -> {
+                verifying=false;
+                if(ok) { voicePrefs.edit().putString("verified", marker).apply(); voiceError=null; }
+                else voiceError="The voice model file was damaged and has been removed.";
+                renderCurrentTab(false);
+            });
+        });
+    }
+
+    private void removeVoiceModel() {
+        voiceCancel();
+        downloadCancel=true;
+        VoiceEngine.get().close();
+        voicePrefs.edit().remove("verified").apply();
+        final File dir=voiceDir;
+        voiceFiles.execute(() -> {
+            if(dir!=null) { ModelFile.path(dir).delete(); ModelFile.partial(dir).delete(); }
+            post(() -> { lastPhoneAnswer=null; voiceError=null; renderCurrentTab(true); });
+        });
+    }
+
+    // ==========================================
     // SYSTEM & SESSION
     // ==========================================
 
@@ -834,6 +1155,18 @@ public final class NativeCompanionActivity extends Activity {
         row(card, "Host epoch (changes when the Host restarts)", identity==null ? "unknown" : identity.optString("epoch","unknown"), FG);
         row(card, "Updates", "HTTP polling while this screen is open (every 5–10 s, 1.5 s during a chat). It stops in the background; this is not real-time streaming.", MUTED);
         row(card, "Notifications", "This companion posts no notifications and requests no notification permission.", MUTED);
+        ModelFile.Status model=voiceStatus();
+        row(card, "Voice model", voiceBlocked!=null ? "Not supported on this phone" : model==ModelFile.Status.READY ? "Installed (2.6 GB)" : "Not installed", FG);
+        if(voiceDir!=null && (ModelFile.path(voiceDir).exists() || ModelFile.partial(voiceDir).exists())) {
+            Button remove=button("Remove voice model", false, v -> new AlertDialog.Builder(this)
+                    .setTitle("Remove the voice model?")
+                    .setMessage("Voice stops working until it is downloaded again.")
+                    .setNegativeButton("Keep", null)
+                    .setPositiveButton("Remove", (dialog, which) -> removeVoiceModel()).show());
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1, -2);
+            lp.topMargin=dp(10);
+            card.addView(remove, lp);
+        }
         add(body, card, 14);
 
         add(body, button("Sync Now", true, v -> schedulePoll(0)), 20);

@@ -31,6 +31,15 @@ dependency lock (${sbom.components.length} components).
 - **.NET runtime** — MIT: https://github.com/dotnet/runtime/blob/main/LICENSE.TXT
 - **cloudflared** (downloaded on request for remote access, hash-pinned) — Apache-2.0: https://github.com/cloudflare/cloudflared
 
+## Android companion components
+
+- **LiteRT-LM** (\`litertlm-android\` 0.19.1, including \`liblitertlm_jni.so\`) — Apache-2.0: https://github.com/google-ai-edge/LiteRT-LM
+- **Kotlin standard library** 2.4.0 and **kotlin-reflect** 2.4.0 — Apache-2.0: https://github.com/JetBrains/kotlin
+- **kotlinx.coroutines** (\`kotlinx-coroutines-core-jvm\`, \`kotlinx-coroutines-android\`) 1.11.0 — Apache-2.0: https://github.com/Kotlin/kotlinx.coroutines
+- **Gson** 2.14.0 — Apache-2.0: https://github.com/google/gson
+- **JetBrains annotations** 23.0.0 and **Error Prone annotations** 2.48.0 — Apache-2.0
+- **Gemma 4 E2B** (\`litert-community/gemma-4-E2B-it-litert-lm\`, file \`gemma-4-E2B-it.litertlm\`) — Apache-2.0. Not bundled: the phone downloads it once after you confirm, or you copy it in over USB.
+
 ## Notes on specific licences
 
 - **MPL-2.0** (lightningcss): used unmodified. Source: https://github.com/parcel-bundler/lightningcss

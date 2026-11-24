@@ -20,17 +20,34 @@ public final class PackageModule {
         zos.closeEntry();
     }
 
+    /** classes.dex, classes2.dex, ... in multidex order; a single file keeps the old one-dex form. */
+    public static List<File> dexFiles(File dexInput) {
+        if (!dexInput.isDirectory()) return Collections.singletonList(dexInput);
+        File[] found = dexInput.listFiles((dir, name) -> name.matches("classes\\d*\\.dex"));
+        List<File> files = new ArrayList<>(Arrays.asList(found == null ? new File[0] : found));
+        files.sort(Comparator.comparingInt(f -> { String n = f.getName().replaceAll("\\D", ""); return n.isEmpty() ? 1 : Integer.parseInt(n); }));
+        if (files.isEmpty() || !files.get(0).getName().equals("classes.dex")) throw new IllegalStateException("No classes.dex in " + dexInput);
+        return files;
+    }
+
+    /** The .so files of the optional native-library directory argument, sorted; none when the argument is absent. */
+    public static File[] nativeLibraries(String[] args, int index) {
+        if (args.length <= index) return new File[0];
+        File[] found = new File(args[index]).listFiles((dir, name) -> name.endsWith(".so"));
+        if (found == null || found.length == 0) throw new IllegalStateException("No native libraries in " + args[index]);
+        Arrays.sort(found);
+        return found;
+    }
+
     public static void main(String[] args) throws Exception {
         if (args.length < 3) {
-            System.err.println("Usage: PackageModule <proto-resources.apk> <classes.dex> <output-base.zip>");
+            System.err.println("Usage: PackageModule <proto-resources.apk> <classes.dex | dex-directory> <output-base.zip> [arm64-v8a-native-library-directory]");
             System.exit(1);
         }
 
         File protoApk = new File(args[0]);
-        File classesDex = new File(args[1]);
+        File dexInput = new File(args[1]);
         File outputZip = new File(args[2]);
-
-        byte[] dexBytes = Files.readAllBytes(classesDex.toPath());
 
         try (ZipFile zipIn = new ZipFile(protoApk);
              FileOutputStream fos = new FileOutputStream(outputZip);
@@ -71,8 +88,9 @@ public final class PackageModule {
                 putEntry(zos, moduleName, data);
             }
 
-            // Put classes.dex into dex/classes.dex
-            putEntry(zos, "dex/classes.dex", dexBytes);
+            // Every classes*.dex goes under dex/, every native library under lib/arm64-v8a/.
+            for (File dex : dexFiles(dexInput)) putEntry(zos, "dex/" + dex.getName(), Files.readAllBytes(dex.toPath()));
+            for (File library : nativeLibraries(args, 3)) putEntry(zos, "lib/arm64-v8a/" + library.getName(), Files.readAllBytes(library.toPath()));
         }
 
         System.out.println("Packaged base module: " + outputZip.getAbsolutePath() + " (" + outputZip.length() + " bytes)");

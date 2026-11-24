@@ -62,6 +62,39 @@ $tests = Join-Path $buildDirectory 'tests'
 $dex = Join-Path $buildDirectory 'dex'
 $staging = Join-Path $buildDirectory 'staging'
 $protoApk = Join-Path $buildDirectory 'proto-resources.apk'
+# On-device voice: LiteRT-LM and its runtime jars are verified against the lock before use. The AAR is unpacked here:
+# classes.jar joins the classpath and only the arm64-v8a native libraries are packaged (the AAR also carries x86_64).
+$libraryDirectory = Join-Path $tools 'libs'
+$nativeLibraries = Join-Path $buildDirectory 'native/arm64-v8a'
+New-Item -ItemType Directory -Path $nativeLibraries -Force | Out-Null
+$libraryJars = @()
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+foreach ($library in $toolchain.libraries) {
+  $libraryPath = Join-Path $libraryDirectory $library.name
+  if (-not (Test-Path -LiteralPath $libraryPath)) { throw ('Missing Android library (run scripts/prepare-android-native-tools.ps1): '+$library.name) }
+  if ((Get-FileHash -Algorithm SHA256 -LiteralPath $libraryPath).Hash.ToLowerInvariant() -ne $library.sha256) { throw ('Android library hash mismatch: '+$library.name) }
+  if ($library.kind -eq 'jar') { $libraryJars += $libraryPath; continue }
+  if ($library.kind -ne 'aar') { throw ('Unknown Android library kind: '+$library.name) }
+  $aarClasses = Join-Path $buildDirectory ('aar-' + [IO.Path]::GetFileNameWithoutExtension($library.name) + '.jar')
+  $aar = [IO.Compression.ZipFile]::OpenRead($libraryPath)
+  try {
+    foreach ($entry in $aar.Entries) {
+      if ($entry.FullName -eq 'classes.jar') { [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $aarClasses) }
+      elseif ($entry.FullName -match '^jni/arm64-v8a/[^/]+\.so$') { [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, (Join-Path $nativeLibraries $entry.Name)) }
+    }
+  } finally { $aar.Dispose() }
+  if (-not (Test-Path -LiteralPath $aarClasses)) { throw ('Android library has no classes.jar: '+$library.name) }
+  $libraryJars += $aarClasses
+}
+if ($libraryJars.Count -eq 0 -or @(Get-ChildItem -LiteralPath $nativeLibraries -Filter '*.so').Count -eq 0) { throw 'The voice libraries were not unpacked.' }
+$compileClasspath = (@($platformJar) + $libraryJars) -join ';'
+# On-device voice: the engine and recorder wrappers hold audio and model text; they must never reach network or Host code.
+foreach ($voiceFile in @('VoiceRecorder.java','VoiceEngine.java')) {
+  $voiceSource = Get-Content -LiteralPath (Join-Path $sourceDirectory ('java/com/routeragent/jev/' + $voiceFile)) -Raw
+  foreach ($forbidden in @('java.net.','NativeCompanionClient','HostExchange')) {
+    if ($voiceSource.Contains($forbidden)) { throw ($voiceFile + ' must not reference ' + $forbidden + '.') }
+  }
+}
 
 # 1. Compile resources with aapt2
 Run-Checked $aapt @('compile','--dir',(Join-Path $sourceDirectory 'res'),'-o',$compiled)
@@ -72,11 +105,11 @@ Run-Checked $aapt (@('link','--proto-format','--manifest',(Join-Path $sourceDire
 
 # 3. Compile Java sources
 $sources = @(Get-ChildItem -LiteralPath (Join-Path $sourceDirectory 'java'),$generated -Filter '*.java' -Recurse | ForEach-Object FullName)
-Run-Checked 'javac' (@('--release','8','-encoding','UTF-8','-classpath',$platformJar,'-d',$classes) + $sources)
+Run-Checked 'javac' (@('--release','8','-encoding','UTF-8','-classpath',$compileClasspath,'-d',$classes) + $sources)
 
 # 4. Dex compilation with D8
 $classFiles = @(Get-ChildItem -LiteralPath $classes -Filter '*.class' -Recurse | ForEach-Object FullName)
-Run-Checked 'java' (@('-cp',$r8,'com.android.tools.r8.D8','--release','--min-api','26','--lib',$platformJar,'--output',$dex) + $classFiles)
+Run-Checked 'java' (@('-cp',$r8,'com.android.tools.r8.D8','--release','--min-api','26','--lib',$platformJar,'--output',$dex) + $classFiles + $libraryJars)
 
 # 5. Build helper tools
 $helperSources = @(Get-ChildItem -LiteralPath (Join-Path $workspace 'android/tools') -Filter '*.java' | ForEach-Object FullName)
@@ -91,23 +124,43 @@ Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'j
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.NativeCookiePolicyTest')
 Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/PollPolicy.java'),(Join-Path $workspace 'android/tests/PollPolicyTest.java'))
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.PollPolicyTest')
+# On-device voice: WAV framing and the device gate.
+Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/Wav.java'),(Join-Path $workspace 'android/tests/WavTest.java'))
+Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.WavTest')
+Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/VoiceGate.java'),(Join-Path $workspace 'android/tests/VoiceGateTest.java'))
+Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.VoiceGateTest')
+# On-device voice: the pinned model, its file states, and the resumable download (real loopback HTTP server).
+Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/ModelSource.java'),(Join-Path $sourceDirectory 'java/com/routeragent/jev/ModelFile.java'),(Join-Path $sourceDirectory 'java/com/routeragent/jev/ModelDownload.java'),(Join-Path $workspace 'android/tests/ModelFileTest.java'),(Join-Path $workspace 'android/tests/ModelDownloadTest.java'))
+Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.ModelFileTest')
+Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.ModelDownloadTest')
+# On-device voice: the state machine and the prompts.
+Run-Checked 'javac' @('--release','8','-encoding','UTF-8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/Wav.java'),(Join-Path $sourceDirectory 'java/com/routeragent/jev/VoiceSession.java'),(Join-Path $sourceDirectory 'java/com/routeragent/jev/VoicePrompt.java'),(Join-Path $workspace 'android/tests/VoiceSessionTest.java'),(Join-Path $workspace 'android/tests/VoicePromptTest.java'))
+Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.VoiceSessionTest')
+Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.VoicePromptTest')
 Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/HostExchange.java'),(Join-Path $workspace 'android/tests/HostExchangeTest.java'))
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.HostExchangeTest')
 Run-Checked 'javac' @('--release','8','-encoding','UTF-8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/HostExchange.java'),(Join-Path $sourceDirectory 'java/com/routeragent/jev/ChatTurn.java'),(Join-Path $workspace 'android/tests/HostExchangeTest.java'),(Join-Path $workspace 'android/tests/ChatTurnTest.java'))
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.ChatTurnTest')
+Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $workspace 'android/tools/ElfAlign.java'),(Join-Path $workspace 'android/tests/ElfAlignTest.java'))
+Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.tools.ElfAlignTest')
 Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $workspace 'android/tests/ManifestLauncherTest.java'))
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.ManifestLauncherTest',(Join-Path $sourceDirectory 'AndroidManifest.xml'))
 Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/CompanionAppearance.java'),(Join-Path $workspace 'android/tests/CompanionAppearanceTest.java'))
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.CompanionAppearanceTest')
 
 # 7. Architecture verification
-$dexBytes = [IO.File]::ReadAllBytes((Join-Path $dex 'classes.dex'))
-if ([Text.Encoding]::ASCII.GetString($dexBytes).Contains('Landroid/webkit/')) { throw 'classes.dex references android.webkit; the companion must not depend on a WebView.' }
-Write-Output ('classes.dex SHA-256: ' + (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $dex 'classes.dex')).Hash.ToLowerInvariant())
+# MA5-S1: the core journeys are native. No dex file of the app (its own code or a library) may reference android.webkit.
+$dexFiles = @(Get-ChildItem -LiteralPath $dex -Filter 'classes*.dex' | Sort-Object Name)
+foreach ($dexFile in $dexFiles) {
+  if ([Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($dexFile.FullName)).Contains('Landroid/webkit/')) { throw ($dexFile.Name + ' references android.webkit; the companion must not depend on a WebView.') }
+  Write-Output ($dexFile.Name + ' SHA-256: ' + (Get-FileHash -Algorithm SHA256 -LiteralPath $dexFile.FullName).Hash.ToLowerInvariant())
+}
+# Native libraries must be 16 KB page aligned.
+Run-Checked 'java' (@('-cp',$helpers,'com.routeragent.jev.tools.ElfAlign') + @(Get-ChildItem -LiteralPath $nativeLibraries -Filter '*.so' | ForEach-Object FullName))
 
 # 8. Package base module zip using PackageModule helper
 $baseZip = Join-Path $buildDirectory 'base.zip'
-Run-Checked 'java' @('-cp',$helpers,'com.routeragent.jev.tools.PackageModule',$protoApk,(Join-Path $dex 'classes.dex'),$baseZip)
+Run-Checked 'java' @('-cp',$helpers,'com.routeragent.jev.tools.PackageModule',$protoApk,$dex,$baseZip,$nativeLibraries)
 
 # 9. Build AAB using bundletool
 New-Item -ItemType Directory -Path (Join-Path $workspace 'releases') -Force | Out-Null
