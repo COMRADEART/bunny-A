@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Availability, ProviderId } from "./types.ts";
+import type { Availability } from "./types.ts";
 
 /**
  * Bunny A Unified Orchestration Framework (UOF) shared contracts, versioned uof.v1.
